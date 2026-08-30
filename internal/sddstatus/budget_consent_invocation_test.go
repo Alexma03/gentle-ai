@@ -17,6 +17,23 @@ func budgetConsentFixture() BudgetConsentInput {
 	}
 }
 
+func TestBudgetConsentOmitsChangedLineUtilizationWhenUnbounded(t *testing.T) {
+	in := budgetConsentFixture()
+	in.MaxChangedLines = 0
+	in.CumulativeLines = 900
+	envelope, err := BudgetConsentEnvelope(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(envelope.Evidence, "\n")
+	if strings.Contains(joined, "changed lines") || strings.Contains(joined, "900") {
+		t.Fatalf("unbounded budget consent advertised changed-line utilization:\n%s", joined)
+	}
+	if !strings.Contains(joined, "attempts: 1 of 1") {
+		t.Fatalf("unbounded budget consent lost attempt utilization:\n%s", joined)
+	}
+}
+
 // grantInvocationFlag pulls one flag value out of the granted invocation the
 // same way a relaying orchestrator would: by reading the exact string, not by
 // re-deriving it from the input.

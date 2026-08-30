@@ -215,6 +215,10 @@ func (store RuntimeStore) Acquire(ctx context.Context, request CompactAcquireReq
 	if err != nil {
 		return compactBlockedByUnreadableAuthority(err), nil
 	}
+	begin, err = store.runtimeBeginRequestWithInheritedChangedLineLimit(replay, begin)
+	if err != nil {
+		return compactBlockedByUnreadableAuthority(err), nil
+	}
 	if receipt, exists := replay.Requests[begin.RequestID]; exists {
 		record, loadErr := store.loadRecord(receipt.Revision)
 		if loadErr != nil {

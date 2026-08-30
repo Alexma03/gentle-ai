@@ -424,10 +424,9 @@ type RepairConsecutiveRescopeRequest struct {
 // RescopeObjectiveRequest carries the maintainer-authorized narrower
 // successor scope for AUDITED NARROWING RESCOPE. Reason/Actor mirror
 // ResetObjectiveRequest's audit fields: rescope is authorized exactly like
-// reset. Unlike BeginAttemptRequest, MaxAttempts/MaxChangedLines are never
-// defaulted when zero (normalizeRescopeObjectiveRequest requires >=1
-// explicitly): a narrowing operation must state its narrower ceiling, not
-// silently inherit DefaultRuntimeAttemptLimit/DefaultRuntimeChangedLines.
+// reset. MaxAttempts remains explicit. A zero MaxChangedLines preserves the
+// current limit kind: it inherits a positive historical ceiling and remains zero
+// for an unbounded objective.
 type RescopeObjectiveRequest struct {
 	ExpectedRevision string `json:"expected_revision"`
 	RequestID        string `json:"request_id"`
@@ -779,12 +778,16 @@ func (store RuntimeStore) Begin(ctx context.Context, request BeginAttemptRequest
 	if err != nil {
 		return RuntimeStatus{}, err
 	}
-	if inheritIntendedUntracked {
+	if inheritIntendedUntracked || request.MaxChangedLines == 0 {
 		replay, loadErr := store.load()
 		if loadErr != nil {
 			return RuntimeStatus{}, loadErr
 		}
-		request = runtimeRescopeSuccessorRequest(replay.Status, request, true)
+		request = runtimeRescopeSuccessorRequest(replay.Status, request, inheritIntendedUntracked)
+		request, loadErr = store.runtimeBeginRequestWithInheritedChangedLineLimit(replay, request)
+		if loadErr != nil {
+			return RuntimeStatus{}, loadErr
+		}
 	}
 	digest := runtimeValueHash("gentle-ai.sdd-runtime-begin-request/v1", request)
 	legacyDigest := ""
@@ -1456,6 +1459,40 @@ func runtimeObjectiveRescopeStructurallyPermitted(status RuntimeStatus) bool {
 		(last.Outcome == AttemptFailed || last.Outcome == AttemptInterrupted)
 }
 
+// runtimeRescopeChangedLineLimitWidens preserves the kind of line allowance as
+// well as its value. A positive historical ceiling may only stay positive and
+// narrow; an unbounded zero may only remain unbounded.
+func runtimeRescopeChangedLineLimitWidens(current, requested int) bool {
+	if current == 0 {
+		return requested != 0
+	}
+	return requested == 0 || requested > current
+}
+
+// runtimeRescopeRequestWithInheritedChangedLineLimit interprets a zero request
+// against a positive historical objective as "hold the recorded ceiling". Exact
+// replay consults the committed event first so later objective transitions cannot
+// change the request digest.
+func (store RuntimeStore) runtimeRescopeRequestWithInheritedChangedLineLimit(replay runtimeReplay, request RescopeObjectiveRequest) (RescopeObjectiveRequest, error) {
+	if request.MaxChangedLines != 0 {
+		return request, nil
+	}
+	if receipt, ok := replay.Requests[request.RequestID]; ok {
+		record, err := store.loadRecord(receipt.Revision)
+		if err != nil {
+			return RescopeObjectiveRequest{}, err
+		}
+		if record.Rescope != nil && record.Rescope.MaxChangedLines > 0 {
+			request.MaxChangedLines = record.Rescope.MaxChangedLines
+		}
+		return request, nil
+	}
+	if replay.Status.Objective != nil && replay.Status.Objective.MaxChangedLines > 0 {
+		request.MaxChangedLines = replay.Status.Objective.MaxChangedLines
+	}
+	return request, nil
+}
+
 // Rescope implements AUDITED NARROWING RESCOPE (#2298, #2296 part 2): the
 // maintainer-authorized exit from a terminal, non-complete, zero-drift
 // objective whose recorded scope no caller may legally re-request (begin
@@ -1470,6 +1507,16 @@ func (store RuntimeStore) Rescope(ctx context.Context, request RescopeObjectiveR
 	request, err := normalizeRescopeObjectiveRequest(request)
 	if err != nil {
 		return RuntimeStatus{}, err
+	}
+	if request.MaxChangedLines == 0 {
+		replay, loadErr := store.load()
+		if loadErr != nil {
+			return RuntimeStatus{}, loadErr
+		}
+		request, loadErr = store.runtimeRescopeRequestWithInheritedChangedLineLimit(replay, request)
+		if loadErr != nil {
+			return RuntimeStatus{}, loadErr
+		}
 	}
 	digest := runtimeValueHash("gentle-ai.sdd-runtime-rescope-request/v1", request)
 	return store.mutate(ctx, request.ExpectedRevision, request.RequestID, digest, func(replay runtimeReplay) (runtimeRecord, error) {
@@ -1495,7 +1542,7 @@ func (store RuntimeStore) Rescope(ctx context.Context, request RescopeObjectiveR
 			// bare mutation refusal, so Rescope itself stays fail-closed here.
 			return runtimeRecord{}, ErrRuntimeRescopeNotAllowed
 		}
-		if request.MaxChangedLines > objective.MaxChangedLines {
+		if runtimeRescopeChangedLineLimitWidens(objective.MaxChangedLines, request.MaxChangedLines) {
 			return runtimeRecord{}, store.runtimeRescopeWidenedRefusal(
 				status, "--max-changed-lines", request.MaxChangedLines, objective.MaxChangedLines)
 		}
@@ -1510,7 +1557,7 @@ func (store RuntimeStore) Rescope(ctx context.Context, request RescopeObjectiveR
 			return runtimeRecord{}, store.runtimeRescopeExhaustedRefusal(
 				"--max-attempts", request.MaxAttempts, status.CumulativeAttempts, objective.MaxAttempts)
 		}
-		if request.MaxChangedLines <= status.CumulativeChangedLines {
+		if runtimeChangedLineBudgetExhausted(request.MaxChangedLines, status.CumulativeChangedLines) {
 			return runtimeRecord{}, store.runtimeRescopeExhaustedRefusal(
 				"--max-changed-lines", request.MaxChangedLines, status.CumulativeChangedLines, objective.MaxChangedLines)
 		}
@@ -1802,7 +1849,7 @@ func projectLegacyExhaustedSuccessor(status *RuntimeStatus) {
 		return
 	}
 	if status.CumulativeAttempts >= status.Objective.MaxAttempts ||
-		status.CumulativeChangedLines >= status.Objective.MaxChangedLines {
+		runtimeChangedLineBudgetExhausted(status.Objective.MaxChangedLines, status.CumulativeChangedLines) {
 		status.DecisionRequired = true
 		status.NextAction = RuntimeActionReset
 	}
@@ -2021,7 +2068,8 @@ func applyRuntimeBeginEvent(replay *runtimeReplay, revision string, record runti
 			return rejectRuntimeRecord("begin_continue_rescoped_objective")
 		}
 	}
-	if replay.Status.CumulativeAttempts >= event.MaxAttempts || replay.Status.CumulativeChangedLines >= event.MaxChangedLines {
+	if replay.Status.CumulativeAttempts >= event.MaxAttempts ||
+		runtimeChangedLineBudgetExhausted(event.MaxChangedLines, replay.Status.CumulativeChangedLines) {
 		return rejectRuntimeRecord("begin_exceeds_persisted_objective")
 	}
 	intendedUntracked := []string{}
@@ -2082,7 +2130,8 @@ func applyRuntimeRescopeEvent(replay *runtimeReplay, revision string, record run
 	// PreviousMax* claim: a record cannot launder a widen by simply lying
 	// about what the previous ceiling was, because this comparison never
 	// reads event.PreviousMax* at all.
-	if event.MaxAttempts > objective.MaxAttempts || event.MaxChangedLines > objective.MaxChangedLines {
+	if event.MaxAttempts > objective.MaxAttempts ||
+		runtimeRescopeChangedLineLimitWidens(objective.MaxChangedLines, event.MaxChangedLines) {
 		return rejectRuntimeRecord("objective_rescope_widens_current")
 	}
 	if event.PreviousObjectiveID != objective.ID || event.PreviousGeneration != objective.Generation ||
@@ -2151,7 +2200,8 @@ func validateConsecutiveRescopeRepairCandidate(replay runtimeReplay, poisoned ru
 		return errors.New("record is not missing only current-objective attempt ownership") // refusal:by-design world-action: normal replay remains authoritative for every other rescope shape
 	}
 	event := poisoned.Rescope
-	if event.MaxAttempts > objective.MaxAttempts || event.MaxChangedLines > objective.MaxChangedLines ||
+	if event.MaxAttempts > objective.MaxAttempts ||
+		runtimeRescopeChangedLineLimitWidens(objective.MaxChangedLines, event.MaxChangedLines) ||
 		event.PreviousObjectiveID != objective.ID || event.PreviousGeneration != objective.Generation ||
 		event.PreviousGeneration != replay.Status.ObjectiveGeneration ||
 		event.PreviousMaxAttempts != objective.MaxAttempts || event.PreviousMaxChangedLines != objective.MaxChangedLines ||
@@ -2182,7 +2232,7 @@ func applyRuntimeConsecutiveRescopeRepairEvent(store RuntimeStore, replay *runti
 		Reason: event.Reason, Actor: event.Actor,
 	}
 	if replay.Status.CumulativeAttempts >= replay.Status.Objective.MaxAttempts ||
-		replay.Status.CumulativeChangedLines >= replay.Status.Objective.MaxChangedLines {
+		runtimeChangedLineBudgetExhausted(replay.Status.Objective.MaxChangedLines, replay.Status.CumulativeChangedLines) {
 		replay.Status.DecisionRequired = true
 		replay.Status.NextAction = RuntimeActionReset
 	}
@@ -2236,8 +2286,13 @@ func applyRuntimeAdvanceEvent(replay *runtimeReplay, revision string, record run
 //
 // Callers reach this only with an active attempt, which cannot exist without an
 // objective, so the dereference matches what both inlined copies already did.
+func runtimeChangedLineBudgetExhausted(limit, changedLines int) bool {
+	return limit > 0 && changedLines >= limit
+}
+
 func runtimeChangedLineBudgetExceeded(status RuntimeStatus, changedLines int) bool {
-	return status.CumulativeChangedLines+changedLines > status.Objective.MaxChangedLines
+	return status.Objective.MaxChangedLines > 0 &&
+		status.CumulativeChangedLines+changedLines > status.Objective.MaxChangedLines
 }
 
 func applyRuntimeFinishEvent(replay *runtimeReplay, event *runtimeFinishEvent, unmanagedRemediation bool) error {
@@ -2314,7 +2369,7 @@ func applyRuntimeFinishEvent(replay *runtimeReplay, event *runtimeFinishEvent, u
 		replay.Status.Complete = true
 		replay.Status.NextAction = RuntimeActionComplete
 	} else if event.ChangedLineBudgetExceeded || replay.Status.CumulativeAttempts >= replay.Status.Objective.MaxAttempts ||
-		replay.Status.CumulativeChangedLines >= replay.Status.Objective.MaxChangedLines {
+		runtimeChangedLineBudgetExhausted(replay.Status.Objective.MaxChangedLines, replay.Status.CumulativeChangedLines) {
 		replay.Status.DecisionRequired = true
 		replay.Status.NextAction = RuntimeActionReset
 	} else {
@@ -2404,7 +2459,7 @@ func validateRuntimeBeginEvent(record runtimeRecord) error {
 	}
 	if !runtimeRevisionPattern.MatchString(event.ObjectiveID) || event.ObjectiveGeneration < 0 || validateRuntimeText(event.WorkUnit, 160) != nil ||
 		validateRuntimeText(event.EvidenceGoal, 240) != nil || event.MaxAttempts < 1 || event.MaxAttempts > maximumRuntimeAttemptLimit ||
-		event.MaxChangedLines < 1 || event.MaxChangedLines > maximumRuntimeChangedLines || event.Ordinal < 1 ||
+		event.MaxChangedLines < 0 || event.MaxChangedLines > maximumRuntimeChangedLines || event.Ordinal < 1 ||
 		!runtimeRevisionPattern.MatchString(event.BeginCandidateIdentity) || !runtimeGitTreePattern.MatchString(event.BeginCandidateTree) ||
 		// BeginWorktree is optional (empty means legacy/pre-field), but a
 		// PRESENT value is still an identity string, not free user input: it
@@ -2543,18 +2598,19 @@ func validateRuntimeRecordShape(record runtimeRecord) error {
 		event := record.Rescope
 		if !runtimeRevisionPattern.MatchString(event.PreviousObjectiveID) || event.PreviousGeneration < 1 ||
 			event.PreviousMaxAttempts < 1 || event.PreviousMaxAttempts > maximumRuntimeAttemptLimit ||
-			event.PreviousMaxChangedLines < 1 || event.PreviousMaxChangedLines > maximumRuntimeChangedLines ||
+			event.PreviousMaxChangedLines < 0 || event.PreviousMaxChangedLines > maximumRuntimeChangedLines ||
 			!runtimeRevisionPattern.MatchString(event.RescopeCandidateIdentity) || !runtimeGitTreePattern.MatchString(event.RescopeCandidateTree) ||
 			!runtimeRevisionPattern.MatchString(event.ObjectiveID) || event.ObjectiveGeneration < 1 ||
 			validateRuntimeText(event.WorkUnit, 160) != nil || validateRuntimeText(event.EvidenceGoal, 240) != nil ||
 			event.MaxAttempts < 1 || event.MaxAttempts > maximumRuntimeAttemptLimit ||
-			event.MaxChangedLines < 1 || event.MaxChangedLines > maximumRuntimeChangedLines ||
+			event.MaxChangedLines < 0 || event.MaxChangedLines > maximumRuntimeChangedLines ||
 			// The shape-level narrowing check below defends against a record
 			// whose OWN fields are internally inconsistent; it is not the
 			// real narrowing guard. applyRuntimeRescopeEvent independently
 			// recomputes narrowing against the REPLAYED objective, which a
 			// forged PreviousMax* cannot fool (see its doc comment).
-			event.MaxAttempts > event.PreviousMaxAttempts || event.MaxChangedLines > event.PreviousMaxChangedLines ||
+			event.MaxAttempts > event.PreviousMaxAttempts ||
+			runtimeRescopeChangedLineLimitWidens(event.PreviousMaxChangedLines, event.MaxChangedLines) ||
 			validateRuntimeText(event.Reason, 500) != nil || validateRuntimeText(event.Actor, 128) != nil {
 			return rejectRuntimeRecord("invalid_rescope_event")
 		}
@@ -2638,13 +2694,10 @@ func normalizeBeginAttemptRequest(request BeginAttemptRequest) (BeginAttemptRequ
 	if request.MaxAttempts == 0 {
 		request.MaxAttempts = DefaultRuntimeAttemptLimit
 	}
-	if request.MaxChangedLines == 0 {
-		request.MaxChangedLines = DefaultRuntimeChangedLines
-	}
 	if request.MaxAttempts < 1 || request.MaxAttempts > maximumRuntimeAttemptLimit {
 		return BeginAttemptRequest{}, fmt.Errorf("max_attempts must be within 1..%d", maximumRuntimeAttemptLimit)
 	}
-	if request.MaxChangedLines < 1 || request.MaxChangedLines > maximumRuntimeChangedLines {
+	if request.MaxChangedLines < 0 || request.MaxChangedLines > maximumRuntimeChangedLines {
 		return BeginAttemptRequest{}, fmt.Errorf("max_changed_lines must be within 1..%d", maximumRuntimeChangedLines)
 	}
 	intended, err := canonicalRuntimeIntendedUntracked(request.IntendedUntracked)
@@ -2859,10 +2912,9 @@ func normalizeGrantRootsRequest(request GrantRootsRequest) (GrantRootsRequest, e
 
 // normalizeRescopeObjectiveRequest mirrors normalizeResetObjectiveRequest's
 // CAS/audit-field validation, plus BeginAttemptRequest's work-unit-scope
-// validation for the successor scope -- except MaxAttempts/MaxChangedLines
-// are never defaulted when zero: an audited narrowing rescope must state its
-// narrower ceiling explicitly, not silently inherit
-// DefaultRuntimeAttemptLimit/DefaultRuntimeChangedLines.
+// validation for the successor scope. MaxAttempts remains explicit; zero
+// MaxChangedLines is resolved against replayed objective history before the
+// request digest is computed.
 func normalizeRescopeObjectiveRequest(request RescopeObjectiveRequest) (RescopeObjectiveRequest, error) {
 	if request.ExpectedRevision == "" || !runtimeRevisionPattern.MatchString(request.ExpectedRevision) {
 		return RescopeObjectiveRequest{}, errors.New("rescope requires an exact expected runtime revision") // refusal:by-design operator-knowledge: only the caller knows the intended expected-revision token; retry with the exact `sdd-attempt status` revision
@@ -2879,7 +2931,7 @@ func normalizeRescopeObjectiveRequest(request RescopeObjectiveRequest) (RescopeO
 	if request.MaxAttempts < 1 || request.MaxAttempts > maximumRuntimeAttemptLimit {
 		return RescopeObjectiveRequest{}, fmt.Errorf("max_attempts must be within 1..%d", maximumRuntimeAttemptLimit)
 	}
-	if request.MaxChangedLines < 1 || request.MaxChangedLines > maximumRuntimeChangedLines {
+	if request.MaxChangedLines < 0 || request.MaxChangedLines > maximumRuntimeChangedLines {
 		return RescopeObjectiveRequest{}, fmt.Errorf("max_changed_lines must be within 1..%d", maximumRuntimeChangedLines)
 	}
 	if err := validateRuntimeText(request.Reason, 500); err != nil {

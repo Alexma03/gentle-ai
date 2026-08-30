@@ -251,6 +251,7 @@ type sddAttemptFlagDefinition struct {
 	name     string
 	kind     sddAttemptFlagKind
 	required bool
+	hidden   bool
 	usage    string
 }
 
@@ -279,7 +280,7 @@ var sddAttemptOperationDefinitions = []sddAttemptOperationContract{
 		{name: "work-unit", usage: "optional; single-line label, at most 160 bytes; reports the verdict acquire would return"},
 		{name: "evidence-goal", usage: "optional; single-line objective, at most 240 bytes; reports the verdict acquire would return"},
 		{name: "max-attempts", kind: sddAttemptIntFlag, usage: "optional; default 2, limit 1..100"},
-		{name: "max-changed-lines", kind: sddAttemptIntFlag, usage: "optional; default 200, limit 1..1000000"},
+		{name: "max-changed-lines", kind: sddAttemptIntFlag, hidden: true, usage: "deprecated; historical positive-limit compatibility only; zero is unbounded"},
 	}},
 	{name: "begin", purpose: "Start a bounded runtime attempt", flags: []sddAttemptFlagDefinition{
 		sddAttemptCWDFlag, sddAttemptChangeFlag,
@@ -288,7 +289,7 @@ var sddAttemptOperationDefinitions = []sddAttemptOperationContract{
 		{name: "work-unit", required: true, usage: "required; single-line label, at most 160 bytes"},
 		{name: "evidence-goal", required: true, usage: "required; single-line objective, at most 240 bytes"},
 		{name: "max-attempts", kind: sddAttemptIntFlag, usage: "optional; default 2, limit 1..100"},
-		{name: "max-changed-lines", kind: sddAttemptIntFlag, usage: "optional; default 200, limit 1..1000000"},
+		{name: "max-changed-lines", kind: sddAttemptIntFlag, hidden: true, usage: "deprecated; historical positive-limit compatibility only; zero is unbounded"},
 		{name: "untracked-scope", usage: "required when eligible untracked files exist; select or exclude"},
 		{name: "expected-untracked-inventory", usage: "required with untracked-scope; inventory digest"},
 		{name: "intended-untracked", kind: sddAttemptRepeatableStringFlag, usage: "repeatable selected repo-relative untracked path"},
@@ -328,7 +329,7 @@ var sddAttemptOperationDefinitions = []sddAttemptOperationContract{
 		{name: "work-unit", required: true, usage: "required; narrower single-line label, at most 160 bytes"},
 		{name: "evidence-goal", required: true, usage: "required; narrower single-line objective, at most 240 bytes"},
 		{name: "max-attempts", kind: sddAttemptIntFlag, required: true, usage: "required; explicit limit 1..100, cannot exceed current objective"},
-		{name: "max-changed-lines", kind: sddAttemptIntFlag, required: true, usage: "required; explicit limit 1..1000000, cannot exceed current objective"},
+		{name: "max-changed-lines", kind: sddAttemptIntFlag, hidden: true, usage: "deprecated; historical positive-limit compatibility only; zero preserves the current limit kind"},
 		{name: "reason", required: true, usage: "required; trimmed single-line text, at most 500 bytes"},
 		{name: "actor", required: true, usage: "required; trimmed single-line text, at most 128 bytes"},
 	}},
@@ -346,7 +347,7 @@ var sddAttemptOperationDefinitions = []sddAttemptOperationContract{
 		{name: "work-unit", required: true, usage: "required; single-line label, at most 160 bytes"},
 		{name: "evidence-goal", required: true, usage: "required; single-line objective, at most 240 bytes"},
 		{name: "max-attempts", kind: sddAttemptIntFlag, usage: "optional; default 2, limit 1..100"},
-		{name: "max-changed-lines", kind: sddAttemptIntFlag, usage: "optional; default 200, limit 1..1000000"},
+		{name: "max-changed-lines", kind: sddAttemptIntFlag, hidden: true, usage: "deprecated; historical positive-limit compatibility only; zero is unbounded"},
 		{name: "remediates-evidence-revision", usage: "optional; sha256:<64 lowercase hex> failed evidence correction"},
 		{name: "untracked-scope", usage: "required when eligible untracked files exist; select or exclude"},
 		{name: "expected-untracked-inventory", usage: "required with untracked-scope; inventory digest"},
@@ -474,6 +475,9 @@ func renderSDDAttemptHelp(operation string, stdout io.Writer) error {
 	definition, _ := sddAttemptOperationDefinition(operation)
 	_, _ = fmt.Fprintf(stdout, "Usage: gentle-ai sdd-attempt %s [flags]\n\n%s.\n\nFlags:\n", operation, definition.purpose)
 	for _, flagDefinition := range definition.flags {
+		if flagDefinition.hidden {
+			continue
+		}
 		value := "<value>"
 		if flagDefinition.kind == sddAttemptIntFlag {
 			value = "<n>"

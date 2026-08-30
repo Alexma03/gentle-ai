@@ -1811,7 +1811,7 @@ func renderPhaseInstructions(status Status) PhaseInstructions {
 func nativeRuntimeInstructions(status Status, change string) []string {
 	workspace := status.ActionContext.WorkspaceRoot
 	instructions := []string{
-		fmt.Sprintf("Before any runtime-bearing apply, verify, or remediation launch, run `gentle-ai sdd-attempt acquire --cwd %s --change %q --request-id \"<unique-request-id>\" --work-unit \"<label>\" --evidence-goal \"<stable-goal>\" --max-attempts <count> --max-changed-lines <count>`.", pathquote.Quote(workspace), change),
+		fmt.Sprintf("Before any runtime-bearing apply, verify, or remediation launch, run `gentle-ai sdd-attempt acquire --cwd %s --change %q --request-id \"<unique-request-id>\" --work-unit \"<label>\" --evidence-goal \"<stable-goal>\" --max-attempts <count>`.", pathquote.Quote(workspace), change),
 		"Launch only for state proceed and retain its opaque token. State blocked or complete stops the launch; full runtime status is a diagnostic escape hatch, not normal model context.",
 		fmt.Sprintf("After a failed or passed run, call `gentle-ai sdd-attempt settle --cwd %s --change %q --token \"<acquire-token>\" --request-id \"<unique-request-id>\" --outcome <passed|failed> --evidence-revision <sha256> --diagnosis \"<proven-diagnosis>\" --harness-disposition <reused|invalidated> --cleanup-evidence \"<evidence>\" --process-evidence \"<evidence>\"`.", pathquote.Quote(workspace), change),
 		fmt.Sprintf("After an interrupted run, call `gentle-ai sdd-attempt settle --cwd %s --change %q --token \"<acquire-token>\" --request-id \"<unique-request-id>\" --outcome interrupted --diagnosis \"<proven-diagnosis>\" --harness-disposition <reused|invalidated> --cleanup-evidence \"<evidence>\" --process-evidence \"<evidence>\"` and omit --evidence-revision.", pathquote.Quote(workspace), change),
@@ -1821,8 +1821,12 @@ func nativeRuntimeInstructions(status Status, change string) []string {
 		evidence, found := runtimeChainFailedEvidence(status.RuntimeStatus.Attempts)
 		if found {
 			objective := status.RuntimeStatus.Objective
+			changedLineArgument := ""
+			if objective.MaxChangedLines > 0 {
+				changedLineArgument = fmt.Sprintf(" --max-changed-lines %d", objective.MaxChangedLines)
+			}
 			instructions = append(instructions,
-				fmt.Sprintf("For failed SDD evidence %s, run `gentle-ai sdd-attempt acquire --cwd %s --change %q --request-id \"<unique-request-id>\" --work-unit %q --evidence-goal %q --max-attempts %d --max-changed-lines %d --remediates-evidence-revision %s`.", evidence, pathquote.Quote(workspace), change, objective.WorkUnit, objective.EvidenceGoal, objective.MaxAttempts, objective.MaxChangedLines, evidence),
+				fmt.Sprintf("For failed SDD evidence %s, run `gentle-ai sdd-attempt acquire --cwd %s --change %q --request-id \"<unique-request-id>\" --work-unit %q --evidence-goal %q --max-attempts %d%s --remediates-evidence-revision %s`.", evidence, pathquote.Quote(workspace), change, objective.WorkUnit, objective.EvidenceGoal, objective.MaxAttempts, changedLineArgument, evidence),
 				fmt.Sprintf("After the candidate changes, settle that token with `--remediates-evidence-revision %s`; fresh independent verification is required before archive.", evidence),
 			)
 		}

@@ -133,6 +133,25 @@ func TestStatusStillPrescribesSatisfiableUnmanagedRemediation(t *testing.T) {
 // interrupted-only chain), so prescribing `--remediates-evidence-revision`
 // would demand a settlement Finish can never admit. Status renders the
 // fresh-verification route instead.
+func TestStatusRemediationInstructionOmitsChangedLineFlagWhenObjectiveIsUnbounded(t *testing.T) {
+	failedEvidence := runtimeTestHash('a')
+	status := Status{
+		RemediationState: RemediationState{Required: true},
+		RuntimeStatus: &RuntimeStatus{
+			Objective: &RuntimeObjective{WorkUnit: "remediation", EvidenceGoal: "repair failed evidence", MaxAttempts: 2, MaxChangedLines: 0},
+			Attempts:  []RuntimeAttempt{{Outcome: AttemptFailed, EvidenceRevision: failedEvidence}},
+		},
+	}
+	status.ActionContext.WorkspaceRoot = "/workspace/repo"
+	joined := strings.Join(nativeRuntimeInstructions(status, "unbounded-remediation"), "\n")
+	if !strings.Contains(joined, "--remediates-evidence-revision "+failedEvidence) {
+		t.Fatalf("unbounded remediation instruction lost its evidence binding:\n%s", joined)
+	}
+	if strings.Contains(joined, "--max-changed-lines") {
+		t.Fatalf("unbounded remediation instruction requires a changed-line limit:\n%s", joined)
+	}
+}
+
 func TestStatusRendersFreshVerificationRouteWhenNothingRemediable(t *testing.T) {
 	const change = "nothing-remediable-advice"
 	repo := initRuntimeLedgerRepo(t)

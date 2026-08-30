@@ -46,6 +46,32 @@ func runtimeRescopeSuccessorRequest(status RuntimeStatus, request BeginAttemptRe
 	return request
 }
 
+// runtimeBeginRequestWithInheritedChangedLineLimit preserves a positive limit
+// already owned by a historical objective when a modern caller omits the
+// deprecated max_changed_lines input (zero). A fresh objective keeps zero, which
+// is its unbounded representation. Exact request replay reads the committed begin
+// event first so a later reset or advance cannot change the digest of the original
+// request.
+func (store RuntimeStore) runtimeBeginRequestWithInheritedChangedLineLimit(replay runtimeReplay, request BeginAttemptRequest) (BeginAttemptRequest, error) {
+	if request.MaxChangedLines != 0 {
+		return request, nil
+	}
+	if receipt, ok := replay.Requests[request.RequestID]; ok {
+		record, err := store.loadRecord(receipt.Revision)
+		if err != nil {
+			return BeginAttemptRequest{}, err
+		}
+		if record.Begin != nil && record.Begin.MaxChangedLines > 0 {
+			request.MaxChangedLines = record.Begin.MaxChangedLines
+		}
+		return request, nil
+	}
+	if replay.Status.Objective != nil && !replay.Status.Complete && replay.Status.Objective.MaxChangedLines > 0 {
+		request.MaxChangedLines = replay.Status.Objective.MaxChangedLines
+	}
+	return request, nil
+}
+
 // runtimeBeginAdmission is the ONE evaluator of every precondition Begin must
 // satisfy before it can record an attempt, ledger-side and repository-side
 // alike. It mutates nothing: it reads the replayed status the caller hands it
@@ -135,7 +161,8 @@ func (store RuntimeStore) runtimeBeginAdmission(
 	}
 	// The successor opens a fresh per-objective budget, so the charges the
 	// completed scope accrued cannot exhaust it before its first attempt.
-	if !advancing && (status.CumulativeAttempts >= request.MaxAttempts || status.CumulativeChangedLines >= request.MaxChangedLines) {
+	if !advancing && (status.CumulativeAttempts >= request.MaxAttempts ||
+		runtimeChangedLineBudgetExhausted(request.MaxChangedLines, status.CumulativeChangedLines)) {
 		return runtimeBeginAdmissionResult{}, ErrRuntimeBudgetExhausted
 	}
 	return runtimeBeginAdmissionResult{Advancing: advancing, Generation: generation, Snapshot: snapshot}, nil
@@ -183,6 +210,10 @@ func (store RuntimeStore) AdmissionStatus(ctx context.Context, request BeginAtte
 		return status, nil
 	}
 	normalized = runtimeRescopeSuccessorRequest(status, normalized, inheritIntendedUntracked)
+	normalized, err = store.runtimeBeginRequestWithInheritedChangedLineLimit(replay, normalized)
+	if err != nil {
+		return RuntimeStatus{}, err
+	}
 	if result, terminal := runtimeReadiness(runtimeReadinessInput{
 		Status: status, AttemptTokens: replay.AttemptTokens, Request: normalized,
 	}); terminal && result.State == CompactStateBlocked {
