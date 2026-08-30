@@ -13,10 +13,6 @@ import (
 	"unicode/utf8"
 )
 
-// LargeChangeLines is a review-composition boundary, not a tier input. Volume
-// deliberately no longer selects a review tier: a five-line authorization edit
-// outranks a five-thousand-line mechanical rename, so only evidence escalates.
-const LargeChangeLines = 400
 const MaxCorrectionChangedLines = 200
 
 // processBoundaryScanByteLimit caps every content readback this classifier

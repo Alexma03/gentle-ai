@@ -288,19 +288,22 @@ func TestLowRiskReviewPathPolicyUsesCanonicalPOSIXOperationalBoundaries(t *testi
 	}
 }
 
-// TestClassifyRiskIgnoresTheFormerFourHundredLineBoundary is the regression
-// guard for the removed size rule: the old escalation boundary must no longer
-// change anything on either side of it.
-func TestClassifyRiskIgnoresTheFormerFourHundredLineBoundary(t *testing.T) {
+// TestHighVolumeWithoutRiskEvidenceNeverEscalates is the regression guard for
+// the removed size rule: a passive candidate stays tier 0 at representative
+// non-boundary magnitudes, because only evidence escalates.
+func TestHighVolumeWithoutRiskEvidenceNeverEscalates(t *testing.T) {
 	t.Parallel()
-	for _, lines := range []int{LargeChangeLines, LargeChangeLines + 1} {
-		got, err := ClassifyRisk(RiskInput{
-			Stats:                     []DiffStat{{Path: "docs/ordinary-guide.md", Additions: lines}},
-			OnlyPassiveContentChanges: true,
+	for _, lines := range []int{2_000, 50_000} {
+		t.Run(fmt.Sprintf("%d Markdown lines", lines), func(t *testing.T) {
+			t.Parallel()
+			got, err := ClassifyRisk(RiskInput{
+				Stats:                     []DiffStat{{Path: "docs/ordinary-guide.md", Additions: lines}},
+				OnlyPassiveContentChanges: true,
+			})
+			if err != nil || got != RiskLow {
+				t.Fatalf("ClassifyRisk(%d Markdown lines) = %q, %v; want %q", lines, got, err, RiskLow)
+			}
 		})
-		if err != nil || got != RiskLow {
-			t.Fatalf("ClassifyRisk(%d Markdown lines) = %q, %v; want %q", lines, got, err, RiskLow)
-		}
 	}
 }
 
@@ -421,8 +424,8 @@ func TestClassifySnapshotRiskDerivesAuthAfterCountingCanonicalStats(t *testing.T
 		t.Fatal(err)
 	}
 	risk, lines, err := (SnapshotBuilder{Repo: repo}).ClassifySnapshotRisk(context.Background(), snapshot)
-	if err != nil || risk != RiskHigh || lines >= LargeChangeLines {
-		t.Fatalf("ClassifySnapshotRisk() = %q, %d, %v; want high below %d lines", risk, lines, err, LargeChangeLines)
+	if err != nil || risk != RiskHigh || lines != 1 {
+		t.Fatalf("ClassifySnapshotRisk() = %q, %d, %v; want high from one authored line", risk, lines, err)
 	}
 }
 
