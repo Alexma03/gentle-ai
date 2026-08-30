@@ -37,6 +37,20 @@ func TestAdmitFailsClosedAndReturnsOnlyVerifiedGrants(t *testing.T) {
 			wantAllowed: true,
 			wantGrants:  []Grant{GrantContext7},
 		},
+		{
+			name: "Pi documentation",
+			request: Request{Schema: SchemaV1, AgentID: model.AgentPi,
+				Class: ClassDocumentation, ObservedGrants: []Grant{"fetch_content", "get_search_content"}},
+			wantAllowed: true,
+			wantGrants:  []Grant{"fetch_content", "get_search_content"},
+		},
+		{
+			name: "Pi open web",
+			request: Request{Schema: SchemaV1, AgentID: model.AgentPi,
+				Class: ClassOpenWeb, ObservedGrants: []Grant{"web_search", "source_check", "fetch_content", "get_search_content"}},
+			wantAllowed: true,
+			wantGrants:  []Grant{"web_search", "source_check", "fetch_content", "get_search_content"},
+		},
 		{name: "missing schema", request: Request{AgentID: model.AgentClaudeCode, Class: ClassDocumentation, ObservedGrants: []Grant{GrantWebFetch}}},
 		{name: "unknown schema", request: Request{Schema: "gentle-ai.sdd-research-capability/v2", AgentID: model.AgentClaudeCode, Class: ClassDocumentation, ObservedGrants: []Grant{GrantWebFetch}}},
 		{name: "missing class", request: Request{Schema: SchemaV1, AgentID: model.AgentClaudeCode, ObservedGrants: []Grant{GrantWebFetch}}},
@@ -45,6 +59,9 @@ func TestAdmitFailsClosedAndReturnsOnlyVerifiedGrants(t *testing.T) {
 		{name: "unsupported known agent", request: Request{Schema: SchemaV1, AgentID: model.AgentOpenCode, Class: ClassDocumentation, ObservedGrants: []Grant{GrantWebFetch}}},
 		{name: "Bash is not evidence", request: Request{Schema: SchemaV1, AgentID: model.AgentClaudeCode, Class: ClassDocumentation, ObservedGrants: []Grant{"Bash"}}},
 		{name: "generic MCP is not evidence", request: Request{Schema: SchemaV1, AgentID: model.AgentKiroIDE, Class: ClassDocumentation, ObservedGrants: []Grant{"mcp"}}},
+		{name: "Pi missing tool denies", request: Request{Schema: SchemaV1, AgentID: model.AgentPi, Class: ClassDocumentation, ObservedGrants: []Grant{"fetch_content"}}},
+		{name: "Pi extra tool breaks exact match", request: Request{Schema: SchemaV1, AgentID: model.AgentPi, Class: ClassDocumentation, ObservedGrants: []Grant{"fetch_content", "get_search_content", "Bash"}}},
+		{name: "Pi generic tool is not evidence", request: Request{Schema: SchemaV1, AgentID: model.AgentPi, Class: ClassDocumentation, ObservedGrants: []Grant{"mcp"}}},
 		{name: "unnamed inheritance is not evidence", request: Request{Schema: SchemaV1, AgentID: model.AgentClaudeCode, Class: ClassDocumentation, ObservedGrants: []Grant{"inherited"}}},
 		{name: "extra grant breaks exact match", request: Request{Schema: SchemaV1, AgentID: model.AgentClaudeCode, Class: ClassDocumentation, ObservedGrants: []Grant{GrantWebFetch, "Bash"}}},
 		{name: "Kiro has no open-web grant", request: Request{Schema: SchemaV1, AgentID: model.AgentKiroIDE, Class: ClassOpenWeb, ObservedGrants: []Grant{GrantContext7}}},
@@ -91,7 +108,7 @@ func TestDocumentationLikeInputsNeverBecomeGrants(t *testing.T) {
 	}
 }
 
-func TestForAgentDeclaresOnlyClaudeAndKiro(t *testing.T) {
+func TestForAgentDeclaresOnlyClaudeKiroAndPi(t *testing.T) {
 	t.Parallel()
 
 	want := map[model.AgentID]map[Class][]Grant{
@@ -100,6 +117,10 @@ func TestForAgentDeclaresOnlyClaudeAndKiro(t *testing.T) {
 			ClassOpenWeb:       {GrantWebSearch, GrantWebFetch},
 		},
 		model.AgentKiroIDE: {ClassDocumentation: {GrantContext7}},
+		model.AgentPi: {
+			ClassDocumentation: {"fetch_content", "get_search_content"},
+			ClassOpenWeb:       {"web_search", "source_check", "fetch_content", "get_search_content"},
+		},
 	}
 	for _, agent := range []model.AgentID{
 		model.AgentClaudeCode, model.AgentOpenCode, model.AgentKilocode, model.AgentGeminiCLI,
