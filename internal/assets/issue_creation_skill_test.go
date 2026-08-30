@@ -134,10 +134,10 @@ func TestIssueCreationSkillDelegatedWorkflowMutationContract(t *testing.T) {
 		"`no_write` requires both an authoritative target-host rejection proving no mutation was accepted and successful target-host post-readback whose complete target state equals pre-read exactly: same number, URL, open/closed state, and entire label set",
 		"`unknown` includes ambiguity, partial readback, identity mismatch, unavailable post-read, lost response, or any difference at all in requested or unrelated state/labels, including missing labels, and stops all further mutations and retries",
 		"`status:approved` is a strict special case",
-		"Protected policy labels are `status:approved`, `size:exception`, and any repository-defined gate-override or authorization label.",
+		"Protected policy labels are `status:approved` and any repository-defined gate-override or authorization label.",
 		"Before any generic `$LABEL` add/remove command, explicitly reject every protected label from the generic path.",
 		"Ordinary label actions fail closed when classification is unknown.", "Adding or removing a protected label requires current direct instruction verified on the target host as binding exact target/action to a repository maintainer or repository-authorized approver, plus authenticated actor `viewerPermission` `MAINTAIN` or `ADMIN`.",
-		"`size:exception` additionally requires documented over-budget rationale; rationale never replaces policy authority.", "A repository-defined gate-override or authorization label has no generic fallback; require repository-defined protected handling or stop.",
+		"A repository-defined gate-override or authorization label has no generic fallback; require repository-defined protected handling or stop.",
 		"one bounded mutation attempt with no blind retry",
 		"`TRIAGE` is explicitly insufficient for `status:approved`; an unverifiable instructing principal means no mutation.",
 	} {
@@ -156,8 +156,6 @@ func TestIssueCreationSkillDelegatedWorkflowMutationContract(t *testing.T) {
 		`gh pr edit "$NUMBER" --repo "$TARGET" --add-label "status:approved"`,
 		`gh issue edit "$NUMBER" --repo "$TARGET" --remove-label "status:approved"`,
 		`gh pr edit "$NUMBER" --repo "$TARGET" --remove-label "status:approved"`,
-		`gh pr edit "$NUMBER" --repo "$TARGET" --add-label "size:exception"`,
-		`gh pr edit "$NUMBER" --repo "$TARGET" --remove-label "size:exception"`,
 		`gh issue edit "$NUMBER" --repo "$TARGET" --add-label "$LABEL"`,
 		`gh issue edit "$NUMBER" --repo "$TARGET" --remove-label "$LABEL"`,
 		`gh pr edit "$NUMBER" --repo "$TARGET" --add-label "$LABEL"`,
@@ -175,8 +173,8 @@ func TestIssueCreationSkillDelegatedWorkflowMutationContract(t *testing.T) {
 	protectedAuthorityGate := strings.Index(reference, wantCommands[2])
 	ordinaryGenericBlock := strings.Index(reference, "## Ordinary bounded action and read-back")
 	genericGuard := strings.Index(reference, "Before any generic `$LABEL` add/remove command, explicitly reject every protected label from the generic path.")
-	firstGenericCommand := strings.Index(reference, wantCommands[11])
-	if genericGuard == -1 || firstGenericCommand == -1 || genericGuard > firstGenericCommand || protectedAuthorityGate == -1 || ordinaryGenericBlock == -1 || strings.Index(reference, wantCommands[3]) <= protectedAuthorityGate || strings.Index(reference, wantCommands[10]) >= ordinaryGenericBlock {
+	firstGenericCommand := strings.Index(reference, wantCommands[9])
+	if genericGuard == -1 || firstGenericCommand == -1 || genericGuard > firstGenericCommand || protectedAuthorityGate == -1 || ordinaryGenericBlock == -1 || strings.Index(reference, wantCommands[3]) <= protectedAuthorityGate || strings.Index(reference, wantCommands[8]) >= ordinaryGenericBlock {
 		t.Error("protected commands must follow their authority gate and remain independent of the guarded generic block")
 	}
 	if strings.Contains(reference, "Never add `status:approved`") {
@@ -199,9 +197,9 @@ func TestIssueCreationSkillDelegationAuthorityBoundaries(t *testing.T) {
 		{
 			name: "protected labels require policy authority",
 			terms: []string{
-				"Protected policy labels are `status:approved`, `size:exception`, and any repository-defined gate-override/authorization label.",
+				"Protected policy labels are `status:approved` and any repository-defined gate-override/authorization label.",
 				"Adding or removing a protected label requires current direct target-host-verified maintainer/authorized-approver instruction for exact add/remove plus authenticated actor target-host `viewerPermission` `MAINTAIN` or `ADMIN`; `TRIAGE` never suffices.",
-				"`size:exception` also needs a documented rationale; unknown gate labels stop.",
+				"Unknown gate labels stop.",
 				"Reject inferred/model-authored authority; atomic `status:approved`, exactly one attempt/readback; fail closed.",
 			},
 		},

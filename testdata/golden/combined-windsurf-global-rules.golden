@@ -290,9 +290,9 @@ The gatekeeper runs in addition to the Review Workload Guard and the Mandatory D
 
 ### Native Runtime Attempt Authority (MANDATORY)
 
-Use the provider-owned Git-common-dir runtime ledger for every runtime-bearing `sdd-apply`, `sdd-verify`, or remediation continuation. It is the single attempt/budget authority for both OpenSpec and Engram; never persist caller-authored counters in OpenSpec files, Engram topics, prompts, or Pi state.
+Use the provider-owned Git-common-dir runtime ledger for every runtime-bearing `sdd-apply`, `sdd-verify`, or remediation continuation. It is the single attempt and evidence authority for both OpenSpec and Engram; never persist caller-authored counters in OpenSpec files, Engram topics, prompts, or Pi state.
 
-1. Before an actor or harness launch, call `gentle-ai sdd-attempt acquire --cwd <repo> --change <change> --request-id <id> --work-unit <label> --evidence-goal <goal> --max-attempts <count> --max-changed-lines <count>`.
+1. Before an actor or harness launch, call `gentle-ai sdd-attempt acquire --cwd <repo> --change <change> --request-id <id> --work-unit <label> --evidence-goal <goal> --max-attempts <count>`. New objectives are unbounded by changed-line counts; historical positive limits remain ledger-owned compatibility state.
 2. Launch only when acquire returns `state: proceed`, and retain its opaque `token`. `blocked` or `complete` stops the launch.
 3. After the external run, call `gentle-ai sdd-attempt settle --cwd <repo> --change <change> --token <token> --request-id <settle-id> ...` with a request ID distinct from the acquire operation's request ID, outcome, and bounded evidence. Reuse each operation's own ID only for its idempotent replay. Settle derives native binding/remediation inputs; pass `--successor-lineage` only for a distinct approved successor, otherwise the bound lineage remains its own successor.
 4. On any failed external command (test command or non-test external command) before a later native block, disclose in this order: **Primary failure:** identify the command in a privacy-safe form, its failed/cancelled/non-zero outcome, and only bounded relevant error evidence; never persist or print secrets, private values, raw environment, or unbounded output. **Verification consequence:** state that the current SDD phase/verification did not pass. **Attempt settlement:** when the native contract requires it, settle the current token with the correct failed/interrupted outcome and diagnosis, and disclose the settlement result before any later acquire/refusal. **Secondary governance block:** label a later objective-change/acquire refusal as secondary, never as the cause of the external command failure, and preserve the exact provider-owned runnable continuation unchanged. Never imply Gentle AI or the native ledger caused the independent consumer command failure.
@@ -312,7 +312,7 @@ Cache the artifact store choice for the session. Add it to every inline phase co
 
 ### Delivery Strategy
 
-On the first `/sdd-new`, `/sdd-ff`, or `/sdd-continue` (or an equivalent natural-language request) in a session, ask once for and cache delivery strategy: `ask-on-risk` (default), `auto-chain`, `single-pr`, or `exception-ok`. Pass it as `delivery_strategy` to `sdd-tasks` and `sdd-apply` prompts.
+On the first `/sdd-new`, `/sdd-ff`, or `/sdd-continue` (or an equivalent natural-language request) in a session, ask once for and cache delivery strategy: `ask-on-risk` (default), `auto-chain`, or `single-pr`. Pass it as `delivery_strategy` to `sdd-tasks` and `sdd-apply` prompts. Review workload is qualitative; changed-line counts never influence the decision.
 
 ### Chain Strategy
 
@@ -342,12 +342,11 @@ Each phase returns: `status`, `executive_summary`, `artifacts`, `next_recommende
 
 After `sdd-tasks` completes and before launching `sdd-apply`, inspect `Review Workload Forecast`.
 
-If it says `Chained PRs recommended: Yes`, `400-line budget risk: High`, estimated changed lines exceed 400, or `Decision needed before apply: Yes`, apply cached `delivery_strategy`:
+If it says `Chained PRs recommended: Yes` or `Decision needed before apply: Yes`, apply cached `delivery_strategy`:
 
-- **`ask-on-risk`**: STOP and ask chained/stacked PRs vs maintainer-approved `size:exception`. If the user chooses chained PRs and `chain_strategy` is not yet cached, also ask which chain strategy to use (`stacked-to-main` or `feature-branch-chain`).
-- **`auto-chain`**: Do not ask about splitting. If `chain_strategy` is not yet cached, ask which chain strategy to use. Then run `sdd-apply` inline for only the next autonomous chained/stacked PR slice using work-unit commits, clear start/finish boundaries, verification, and rollback.
-- **`single-pr`**: STOP and require/record `size:exception` before apply.
-- **`exception-ok`**: Continue, but tell `sdd-apply` this run uses `size:exception`.
+- **`ask-on-risk`**: STOP and ask whether to use the proposed natural split or proceed as one cohesive PR. If the user chooses chaining and `chain_strategy` is not yet cached, also ask which chain strategy to use (`stacked-to-main` or `feature-branch-chain`).
+- **`auto-chain`**: Do not ask about splitting. If `chain_strategy` is not yet cached, ask which chain strategy to use. Then run `sdd-apply` inline for only the next autonomous natural work-unit slice using work-unit commits, clear start/finish boundaries, verification, and rollback.
+- **`single-pr`**: Proceed only when the plan explains why one PR remains cohesive and reviewable; otherwise stop and ask whether to change strategy.
 
 Any other `delivery_strategy` value is invalid. Do NOT pick the nearest branch and do NOT proceed: STOP, report the unrecognised value, and re-collect the delivery strategy before `sdd-apply` runs.
 

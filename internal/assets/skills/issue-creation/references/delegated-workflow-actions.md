@@ -13,8 +13,8 @@ gh pr view "$NUMBER" --repo "$TARGET" --json number,url,state,labels >"$PRE_READ
 
 ## Protected policy labels
 
-Protected policy labels are `status:approved`, `size:exception`, and any repository-defined gate-override or authorization label. Before any generic `$LABEL` add/remove command, explicitly reject every protected label from the generic path. Ordinary label actions fail closed when classification is unknown.
-Adding or removing a protected label requires current direct instruction verified on the target host as binding exact target/action to a repository maintainer or repository-authorized approver, plus authenticated actor `viewerPermission` `MAINTAIN` or `ADMIN`. `size:exception` additionally requires documented over-budget rationale; rationale never replaces policy authority.
+Protected policy labels are `status:approved` and any repository-defined gate-override or authorization label. Before any generic `$LABEL` add/remove command, explicitly reject every protected label from the generic path. Ordinary label actions fail closed when classification is unknown.
+Adding or removing a protected label requires current direct instruction verified on the target host as binding exact target/action to a repository maintainer or repository-authorized approver, plus authenticated actor `viewerPermission` `MAINTAIN` or `ADMIN`.
 A repository-defined gate-override or authorization label has no generic fallback; require repository-defined protected handling or stop.
 
 ## Atomic approval
@@ -34,8 +34,6 @@ gh issue edit "$NUMBER" --repo "$TARGET" --add-label "status:approved"
 gh pr edit "$NUMBER" --repo "$TARGET" --add-label "status:approved"
 gh issue edit "$NUMBER" --repo "$TARGET" --remove-label "status:approved"
 gh pr edit "$NUMBER" --repo "$TARGET" --remove-label "status:approved"
-gh pr edit "$NUMBER" --repo "$TARGET" --add-label "size:exception"
-gh pr edit "$NUMBER" --repo "$TARGET" --remove-label "size:exception"
 ```
 
 ## Ordinary bounded action and read-back

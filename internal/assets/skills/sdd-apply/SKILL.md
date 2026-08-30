@@ -37,7 +37,7 @@ From the orchestrator:
 - The specific task(s) to implement (e.g., "Phase 1, tasks 1.1-1.3")
 - Artifact store mode as REPORTED by native status (`engram | openspec | hybrid | none`) — consume it, never re-derive it
 - Structured status from `skills/_shared/sdd-status-contract.md`: `schemaName`, `planningHome`, `changeRoot`, `artifactPaths`, `contextFiles`, `applyState`, task progress, dependency states, and `actionContext`
-- Delivery strategy and resolved workload decision (`ask-on-risk | auto-chain | single-pr | exception-ok`, plus PR slice or `size:exception` when applicable)
+- Delivery strategy and resolved qualitative workload decision (`ask-on-risk | auto-chain | single-pr`, plus natural PR slice when applicable)
 
 ## Execution and Persistence Contract
 
@@ -82,23 +82,22 @@ Before writing ANY code:
 
 Before implementing, inspect the tasks artifact for `Review Workload Forecast`.
 
-If the forecast says any of the following:
+If the forecast says either of the following:
 
-- `400-line budget risk: High`
 - `Chained PRs recommended: Yes`
 - `Decision needed before apply: Yes`
 
 Then you MUST confirm the orchestrator/user provided a resolved delivery path:
 
-1. **`auto-chain` or chosen chained/stacked PR mode**: implement only the assigned work-unit slice, keep scope autonomous, and report the intended PR boundary. Follow the `Chain strategy` from the tasks artifact (`stacked-to-main` or `feature-branch-chain`) for branch targeting.
-2. **`exception-ok` or single PR with exception**: continue only if the prompt explicitly says the maintainer accepts `size:exception`.
-3. **`single-pr` above budget**: continue only after the prompt explicitly records `size:exception`.
+1. **`auto-chain` or chosen chained/stacked PR mode**: implement only the assigned natural work-unit slice, keep scope autonomous, and report the intended PR boundary. Follow the `Chain strategy` from the tasks artifact (`stacked-to-main` or `feature-branch-chain`) for branch targeting.
+2. **`single-pr`**: continue only when the plan explains why one PR remains cohesive and reviewable.
+3. **`ask-on-risk`**: continue only after the user resolves the proposed natural split versus one cohesive PR.
 
 Also check for `Chain strategy` in the tasks artifact. If present and not `pending`, follow it consistently:
 - `stacked-to-main`: each PR targets the previous PR's branch (or `main` after the previous merges).
 - `feature-branch-chain`: PR #1 targets the feature/tracker branch; later PRs target the immediate previous PR branch. The tracker PR aggregates the feature branch to `main`; child PR diffs must stay focused on only the current work unit and must never target `main` directly.
 
-If neither delivery decision nor chain strategy is present, STOP before writing code and return `blocked` with: `Workload decision required before apply: estimated work may exceed 400 changed lines. Ask the user which chain strategy to use (stacked-to-main, feature-branch-chain, or size-exception).`
+If a qualitative workload decision is required but neither delivery decision nor chain strategy is present, STOP before writing code and return `blocked` with: `Workload decision required before apply: choose the proposed natural split or confirm that one PR remains cohesive and reviewable.`
 
 #### Step 2b: Read Previous Apply-Progress (if exists)
 
@@ -242,10 +241,10 @@ If none, say "None."}
 - [ ] {next task}
 
 ### Workload / PR Boundary
-- Mode: {single PR | chained PR slice | stacked PR slice | size:exception}
+- Mode: {single PR | chained PR slice | stacked PR slice}
 - Current work unit: {unit name or "N/A"}
 - Boundary: {what this apply batch starts from and ends with}
-- Estimated review budget impact: {brief note}
+- Qualitative workload rationale: {cohesion, boundaries, risk, and verification note}
 
 ### Status
 {N}/{total} tasks complete. {Ready for next batch / Ready for verify / Blocked by X}
@@ -264,7 +263,6 @@ If none, say "None."}
 - If a task is blocked by something unexpected, STOP and report back
 - If workload forecast requires a decision and none was provided, STOP before writing code
 - When applying a chained/stacked PR slice, keep the batch autonomous: one deliverable scope, verification included, and clear rollback boundary
-- When applying `size:exception`, state it explicitly in apply-progress and the return summary
 - NEVER implement tasks that weren't assigned to you
 - Skill loading is handled in Step 1 — follow any loaded skills strictly when writing code
 - Apply any `rules.apply` from `openspec/config.yaml`
@@ -306,7 +304,7 @@ You are an IMPLEMENTER sub-agent. You receive specific tasks and implement them 
 - Read max 3 files at a time — if you need more to understand a task, stop and report `needs-explore`
 - Keep edits minimal and localized to task files
 - Consume structured status when provided; stop on `blocked`, `all_done`, or unsafe `actionContext`
-- If workload forecast says >400 lines or `Chained PRs recommended`, STOP and return `blocked: workload-decision-required`
+- If the qualitative workload forecast says `Decision needed before apply: Yes` or has unresolved chaining, STOP and return `blocked: workload-decision-required`
 - If previous apply-progress exists, read it via mem_search + mem_get_observation and MERGE before saving
 - Focused remediation is the sole `all_done` exception and must bind evidence to the exact failed_evidence_revision from native status
 

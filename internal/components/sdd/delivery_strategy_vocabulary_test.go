@@ -25,16 +25,16 @@ import (
 //
 // Nothing asserted the halves agreed, so the preflight emitted `ask-always`,
 // `single-pr-default`, `force-chained`, and `auto-forecast` into a consumer
-// whose whole declared domain was `ask-on-risk | auto-chain | single-pr |
-// exception-ok` (community report by @MarcosArispe). Every consumer branch list
-// is a bare four-way match, so an out-of-domain value matched nothing and the
+// whose declared domain did not match the producer (community report by
+// @MarcosArispe). Every consumer branch list was a bare match, so an
+// out-of-domain value matched nothing and the
 // orchestrator model picked a delivery strategy freely.
 //
 // Both halves below are derived from shipped artifacts, never from a list
 // restated here: the domain from the phase skills that declare it as their
 // input contract, the producer from the preflight UI label list plus the
 // mapping block in the same document, and the producer sites from walking the
-// embedded assets tree. A renamed label, a fifth canonical value, or a typo on
+// embedded assets tree. A renamed label, an added canonical value, or a typo on
 // either side fails here instead of drifting silently.
 
 // deliveryDomainDeclaration matches a phase skill's declared input domain for
@@ -55,8 +55,8 @@ var backtickSpan = regexp.MustCompile("`([^`]+)`")
 
 // canonicalValueShape matches the shape every delivery strategy value has:
 // lowercase, hyphen-separated, nothing else. It exists to skip the prompt
-// variables (`delivery_strategy`) and qualified labels (`size:exception`) that
-// legitimately share those sentences, while still catching a retired or
+// variables (`delivery_strategy`) that legitimately share those sentences,
+// while still catching a retired or
 // mistyped strategy such as `single-pr-default`.
 var canonicalValueShape = regexp.MustCompile(`^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$`)
 
@@ -388,11 +388,9 @@ func TestInjectOpenCodeMigratesRetiredDeliveryStrategyMapping(t *testing.T) {
 	}
 }
 
-// `Chained` was retired from the preflight PR question. Chaining is not a mode
-// an operator can force: `delivery_strategy` is read only after the tasks
-// Review Workload Forecast crosses the review-budget line, so below that line
-// there is nothing to chain, and above it `Auto` already resolves to
-// `auto-chain` without asking again. The label therefore promised control the
+// `Chained` was retired from the preflight PR question. Chaining is selected
+// only when the qualitative task forecast identifies natural review boundaries;
+// `Auto` already resolves to `auto-chain` without asking again. The label therefore promised control the
 // design does not offer, and it collided with the pace question's `Automatic`.
 // Only the label is retired; `auto-chain` stays canonical, which the companion
 // guard below pins.
@@ -410,7 +408,7 @@ func TestSDDPreflightNoLongerOffersRetiredChainedPRLabel(t *testing.T) {
 				continue
 			}
 			t.Errorf(
-				"%s still offers the retired PR option %q; chaining is decided by the tasks review-budget forecast, "+
+				"%s still offers the retired PR option %q; chaining is decided by the qualitative tasks forecast, "+
 					"not by this preference, so the option promises control the preflight cannot deliver",
 				path,
 				retired,
@@ -444,7 +442,7 @@ func TestSDDPreflightAutoStillProducesAutoChain(t *testing.T) {
 	}
 }
 
-// The four-option preflight shipped alongside the already-corrected
+// The legacy four-option preflight shipped alongside the already-corrected
 // `ask-on-risk` mapping, so a prompt that still offers `Chained` satisfies every
 // freshness clause that existed before this change — including the one added
 // when the retired mapping was fixed. Without a clause that fails on the retired
@@ -467,8 +465,8 @@ func TestInjectOpenCodeMigratesRetiredChainedPRPreflightOption(t *testing.T) {
 		"3. PRs: Ask me, Single PR, Chained, Auto.",
 		"Ask me -> `ask-on-risk`; Single PR -> `single-pr`; Auto -> `auto-chain`",
 		"Ask me -> `ask-on-risk`; Single PR -> `single-pr`; Chained -> `auto-chain`; Auto -> `auto-chain`",
-		"The preflight offers no separate chained option because `delivery_strategy` is only consulted once the tasks forecast flags review-budget risk: below that line there is nothing to chain, and above it `Auto` already resolves to `auto-chain`.",
-		"Chained and Auto both resolve to `auto-chain` because `delivery_strategy` is only consulted once the tasks forecast flags review-budget risk.",
+		"The preflight offers no separate chained option because chaining is selected only when the qualitative task forecast identifies natural review boundaries.",
+		"Chained and Auto both resolve to `auto-chain` when the qualitative task forecast identifies natural review boundaries.",
 	).Replace(ensurePreservedOpenCodeOrchestratorPreflight(""))
 
 	for _, seeded := range []string{

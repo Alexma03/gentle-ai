@@ -609,7 +609,7 @@ func TestInjectOpenCodeUsesOpenCodeSpecificOrchestratorPrompt(t *testing.T) {
 			for _, wanted := range []string{
 				"Gentle AI",
 				"Read the configured models from `opencode.json`",
-				"Use the `question` tool for SDD Session Preflight only when it is available in the current interactive runtime and all four groups are exactly representable",
+				"Use the `question` tool for SDD Session Preflight only when it is available in the current interactive runtime and all three groups are exactly representable",
 				"present the proceed/adjust/stop options through the lossless blocking-prompt route",
 				"### Research and Pre-Proposal Gate (MANDATORY)",
 				"Present the two strategy options through one `question` tool call when the lossless native route is usable",
@@ -689,7 +689,7 @@ func TestInjectOpenCodePreservesExistingOrchestratorPromptWhenRequested(t *testi
 		"run a fresh audit before continuing",
 		"use fresh context for adversarial review of diffs",
 		"select concrete lenses by risk profile",
-		"Large PR, hot path, or >400 changed lines",
+		"Large PR, hot path, or retired numeric threshold",
 		"small mechanical changes",
 		"trivial docs/text",
 		"#### Review Lens Selection",
@@ -758,10 +758,10 @@ func TestInjectOpenCodeMigratesPreservedLegacyOrchestratorPromptReferences(t *te
 		"agent.gentle-orchestrator.model",
 		"### SDD Session Preflight (HARD GATE)",
 		"Use the `question` tool for SDD Session Preflight",
-		"Ask all four preflight groups in one single `question` tool call",
+		"Ask all three preflight groups in one single `question` tool call",
 		"OpenCode can render the groups as tabs",
 		"Do NOT run this as a sequential wizard",
-		"Do NOT issue four separate `question` tool calls",
+		"Do NOT issue three separate `question` tool calls",
 		"Match the user's current language and active persona",
 		"Treat the preflight UI as direct orchestrator conversation",
 		"not as a generated technical artifact",
@@ -833,7 +833,7 @@ func TestInjectOpenCodeUpgradesPromptOwnedLensRouter(t *testing.T) {
 		"| Behavior, state, tests, determinism, or regressions | `review-reliability` |\n" +
 		"| Shell/process integration, partial failures, recovery, or degraded dependencies | `review-resilience` |\n" +
 		"| Security, permissions, data exposure/loss, architecture, or dependencies | `review-risk` |\n" +
-		"| Large PR, hot path, or >400 changed lines | full 4R: `review-risk`, `review-resilience`, `review-readability`, `review-reliability` |\n\n" +
+		"| Large PR, hot path, or retired numeric threshold | full 4R: `review-risk`, `review-resilience`, `review-readability`, `review-reliability` |\n\n" +
 		"If multiple rows match, run the narrow set that covers the risk.\n" +
 		"<!-- /gentle-ai:delegation-hard-gates-migration -->\n"
 	seed := `{
@@ -893,7 +893,7 @@ func TestInjectOpenCodeUpgradesPromptOwnedLensRouter(t *testing.T) {
 	}
 	for _, stale := range []string{
 		"select concrete lenses by risk profile",
-		"Large PR, hot path, or >400 changed lines",
+		"Large PR, hot path, or retired numeric threshold",
 		"run the narrow set that covers the risk",
 		"small mechanical changes",
 		"trivial docs/text",
@@ -1212,7 +1212,7 @@ func TestInjectOpenCodeMigratesPartialPreflightPrompt(t *testing.T) {
 	const partialPrompt = `# Custom prompt
 
 Ask the user directly with a compact, numbered preflight prompt. Match the user's current language for all user-facing prose. Keep option codes (A1, B1, C1, D1) and canonical values unchanged.
-Do NOT ask the user to type raw keys like execution mode, artifact store, chained PR strategy, or review budget.
+Do NOT ask the user to type raw keys like execution mode, artifact store, chained PR strategy, or a retired review threshold.
 Use this shape for English users, or translate user-facing prose to the user's current language while preserving option codes.
 Before continuing with SDD, choose one option per group.
 Reply with "use recommended" or with codes like: A1, B1, C1, D1.
@@ -1227,15 +1227,15 @@ B. Artifacts
    B3 Both: OpenSpec files plus Engram copy.
 
 C. PRs
-   C1 Ask me (recommended): stop and ask if the forecast exceeds the budget.
-   C2 Single PR: try to keep the change in one PR.
-   C3 Chained: split into chained PRs from the start.
-   C4 Auto: decide from the size forecast.
+   C1 Ask me (recommended): stop and ask when the qualitative forecast identifies a decision.
+   C2 Single PR: keep one cohesive review unit.
+   C3 Chained: split at natural review boundaries.
+   C4 Auto: decide from the qualitative forecast.
 
 D. Review
-   D1 400 lines (recommended): stop if forecast exceeds 400 changed lines.
-   D2 800 lines: more permissive; useful for medium changes.
-   D3 Other: ask for the number afterwards.
+   D1 Retired threshold: legacy choice that must be removed.
+   D2 Legacy alternative: another retired choice.
+   D3 Other: retired custom threshold.
 
 Map answers to canonical values: A1/Interactive -> interactive.
 `
@@ -1268,7 +1268,7 @@ Map answers to canonical values: A1/Interactive -> interactive.
 		"### SDD Session Preflight (HARD GATE)",
 		"openspec/config.yaml",
 		"Use the `question` tool for SDD Session Preflight",
-		"Ask all four preflight groups in one single `question` tool call",
+		"Ask all three preflight groups in one single `question` tool call",
 		"OpenCode can render the groups as tabs",
 		"Do NOT run this as a sequential wizard",
 		"Match the user's current language and active persona",
@@ -1303,7 +1303,7 @@ Map answers to canonical values: A1/Interactive -> interactive.
 		"A1 Interactive",
 		"B1 OpenSpec",
 		"C1 Ask me",
-		"D1 400 lines",
+		"D1 Retired threshold",
 		"Map answers to canonical values: A1/Interactive",
 	} {
 		if strings.Contains(text, stale) {
@@ -1377,10 +1377,10 @@ Hard gate rules:
 	for _, wanted := range []string{
 		"# Custom prompt",
 		"Use the `question` tool for SDD Session Preflight",
-		"Ask all four preflight groups in one single `question` tool call",
+		"Ask all three preflight groups in one single `question` tool call",
 		"OpenCode can render the groups as tabs",
 		"Do NOT run this as a sequential wizard",
-		"Do NOT issue four separate `question` tool calls",
+		"Do NOT issue three separate `question` tool calls",
 		"Do NOT mix languages inside one grouped question",
 		"Do NOT show option codes",
 		"Do NOT show canonical values or other internal values",
@@ -7595,6 +7595,157 @@ func TestMigrateLegacyOpenCodeCommandPromptNoOp(t *testing.T) {
 		if string(out) != in {
 			t.Fatalf("input %q mutated to %q, want unchanged", in, string(out))
 		}
+	}
+}
+
+// TestRemoveLegacyOpenCodePlainChatPreflightLinesPreservesUserContentAfterGroup
+// is the regression for the group-scoped legacy scrub: the retired `D. Review`
+// preflight group must be removed together with its D1/D2/D3 legacy options, but
+// the scrub must NOT spill past the group boundary into later user-authored
+// content. A blank line ends the group, and a later line whose text merely
+// mentions "D. Review" (for example "See D. Review notes below") must survive.
+func TestRemoveLegacyOpenCodePlainChatPreflightLinesPreservesUserContentAfterGroup(t *testing.T) {
+	input := strings.Join([]string{
+		"Before continuing with SDD, choose one option per group.",
+		"Reply with \"use recommended\" or with codes like:",
+		"A. Pace",
+		"A1 Interactive",
+		"B. Artifacts",
+		"B1 OpenSpec",
+		"C. PRs",
+		"C1 Ask me",
+		"D. Review",
+		"D1 legacy threshold",
+		"D2 legacy alternative",
+		"D3 legacy custom",
+		"",
+		"D1 user-authored deployment note",
+		"Keep D2 and D3 for the release checklist.",
+		"See D. Review notes below for rationale.",
+		"",
+		"Final section after the group.",
+	}, "\n")
+
+	got := removeLegacyOpenCodePlainChatPreflightLines(input)
+
+	// The retired header must be gone as a line; user content that merely
+	// mentions "D. Review" in prose must survive, so assert exact-line removal.
+	for _, line := range strings.Split(got, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "D. Review" || trimmed == "D. Revisión" {
+			t.Errorf("legacy group header line %q survived the scrub\noutput:\n%s", trimmed, got)
+		}
+	}
+
+	for _, stale := range []string{
+		"D1 legacy threshold",
+		"D2 legacy alternative",
+		"D3 legacy custom",
+	} {
+		if strings.Contains(got, stale) {
+			t.Errorf("legacy group content %q survived the scrub\noutput:\n%s", stale, got)
+		}
+	}
+
+	for _, preserved := range []string{
+		"D1 user-authored deployment note",
+		"Keep D2 and D3 for the release checklist.",
+		"See D. Review notes below for rationale.",
+		"Final section after the group.",
+	} {
+		if !strings.Contains(got, preserved) {
+			t.Errorf("user-authored content after the legacy group was deleted; missing %q\noutput:\n%s", preserved, got)
+		}
+	}
+}
+
+// TestRemoveLegacyOpenCodePlainChatPreflightLinesGroupBoundarySemantics
+// triangulates the scrub boundary: only the retired D1/D2/D3 option lines that
+// directly follow the exact legacy group header are removed, everything else
+// survives, and the group ends at the first blank or non-option line.
+func TestRemoveLegacyOpenCodePlainChatPreflightLinesGroupBoundarySemantics(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		// wantKept asserts on the joined output; wantGone asserts these lines
+		// were removed.
+		wantKept []string
+		wantGone []string
+	}{
+		{
+			name: "blank line ends the group before later user content",
+			input: strings.Join([]string{
+				"D. Review",
+				"D1 legacy",
+				"D2 legacy",
+				"D3 legacy",
+				"",
+				"D1 user-authored deployment note",
+			}, "\n"),
+			wantKept: []string{"D1 user-authored deployment note"},
+			wantGone: []string{"D1 legacy", "D2 legacy", "D3 legacy"},
+		},
+		{
+			name: "non-header line containing D. Review text is preserved",
+			input: strings.Join([]string{
+				"D. Review",
+				"D1 legacy",
+				"D2 legacy",
+				"D3 legacy",
+				"See D. Review notes below for rationale.",
+			}, "\n"),
+			wantKept: []string{"See D. Review notes below for rationale."},
+			wantGone: []string{"D1 legacy", "D2 legacy", "D3 legacy"},
+		},
+		{
+			name: "trailing whitespace inside group options is still stripped",
+			input: strings.Join([]string{
+				"D. Review",
+				"D1 legacy   ",
+				"   D2 legacy",
+				"",
+				"Keep D2 for later.",
+			}, "\n"),
+			wantKept: []string{"Keep D2 for later."},
+			wantGone: []string{"D1 legacy", "D2 legacy"},
+		},
+		{
+			name: "group without blank line ends at first non-option line",
+			input: strings.Join([]string{
+				"D. Revisión",
+				"D1 legado",
+				"D2 legado",
+				"user continuation note",
+			}, "\n"),
+			wantKept: []string{"user continuation note"},
+			wantGone: []string{"D1 legado", "D2 legado"},
+		},
+		{
+			name: "header only removes just the header",
+			input: strings.Join([]string{
+				"D. Review",
+				"",
+				"D1 standalone user note",
+			}, "\n"),
+			wantKept: []string{"D1 standalone user note"},
+			wantGone: []string{"D. Review"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := removeLegacyOpenCodePlainChatPreflightLines(tt.input)
+			for _, want := range tt.wantGone {
+				if strings.Contains(got, want) {
+					t.Errorf("expected %q to be removed, survived in output:\n%s", want, got)
+				}
+			}
+			for _, want := range tt.wantKept {
+				if !strings.Contains(got, want) {
+					t.Errorf("expected %q to be preserved, missing from output:\n%s", want, got)
+				}
+			}
+		})
 	}
 }
 

@@ -344,7 +344,7 @@ Default: `engram` when available. Cache the choice for the session.
 
 ### Delivery Strategy
 
-On the first `/sdd-new`, `/sdd-ff`, or `/sdd-continue` in a session, ask once for and cache delivery strategy: `ask-on-risk` (default), `auto-chain`, `single-pr`, or `exception-ok`. Pass it as `delivery_strategy` to `sdd-tasks` and `sdd-apply` prompts.
+On the first `/sdd-new`, `/sdd-ff`, or `/sdd-continue` in a session, ask once for and cache delivery strategy: `ask-on-risk` (default), `auto-chain`, or `single-pr`. Pass it as `delivery_strategy` to `sdd-tasks` and `sdd-apply` prompts. Review workload is qualitative; changed-line counts never influence the decision.
 
 ### Chain Strategy
 
@@ -361,7 +361,7 @@ When delivery planning yields chained PRs, treat `chained-pr` (registry skill `g
 
 After `sdd-tasks` completes and before launching `sdd-apply`, inspect the task result summary for `Review Workload Forecast`.
 
-If it says `Chained PRs recommended: Yes`, `400-line budget risk: High`, estimated changed lines exceed 400, or `Decision needed before apply: Yes`, apply the cached `delivery_strategy`: `ask-on-risk` asks, `auto-chain` asks for a missing `chain_strategy` and applies only the next PR slice, `single-pr` requires `size:exception`, and `exception-ok` records the exception.
+If it says `Chained PRs recommended: Yes` or `Decision needed before apply: Yes`, apply the cached `delivery_strategy`: `ask-on-risk` asks whether to use the proposed natural split or one cohesive PR, `auto-chain` asks for a missing `chain_strategy` and applies only the next natural work-unit slice, and `single-pr` proceeds only when the plan explains its cohesion and reviewability.
 
 Any other `delivery_strategy` value is invalid. Do NOT pick the nearest branch and do NOT proceed: STOP, report the unrecognised value, and re-collect the delivery strategy before `sdd-apply` runs.
 

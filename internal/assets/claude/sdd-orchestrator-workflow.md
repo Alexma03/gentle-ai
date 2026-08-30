@@ -46,21 +46,19 @@ Required preflight choices:
 
 1. **Execution mode**: `interactive` or `auto`.
 2. **Artifact store**: `openspec`, `engram`, or `hybrid` when Engram is callable. If Engram is unavailable, offer only file/inline-safe choices.
-3. **Chained PR strategy**: the canonical `delivery_strategy` — `ask-on-risk`, `auto-chain`, `single-pr`, or `exception-ok`. The preflight menu offers the first three; `exception-ok` is reachable only when the user explicitly accepts `size:exception`.
-4. **Review budget**: maximum changed lines before stopping for reviewer-burden approval.
+3. **Chained PR strategy**: the canonical `delivery_strategy` — `ask-on-risk`, `auto-chain`, or `single-pr`. Review workload uses qualitative complexity, cohesion, domain/interface boundaries, risk, verification burden, and reviewer cognitive load; never line counts.
 
 User-facing preflight question format:
 
-Use the built-in `AskUserQuestion` tool for SDD Session Preflight only when it is available in the current interactive runtime and all four groups are exactly representable. While that native route is usable, do NOT render a duplicate plain-chat menu. If the tool is unavailable, denied, the runtime is noninteractive, or the prompt is unrepresentable, follow the Lossless Blocking Prompts fallback in the orchestrator rule and STOP.
+Use the built-in `AskUserQuestion` tool for SDD Session Preflight only when it is available in the current interactive runtime and all three groups are exactly representable. While that native route is usable, do NOT render a duplicate plain-chat menu. If the tool is unavailable, denied, the runtime is noninteractive, or the prompt is unrepresentable, follow the Lossless Blocking Prompts fallback in the orchestrator rule and STOP.
 
-When the native route is representable, ask all four preflight groups in one single `AskUserQuestion` tool call so Claude Code can render the groups as one interactive prompt. Do NOT run this as a sequential wizard. Do NOT issue four separate `AskUserQuestion` tool calls.
+When the native route is representable, ask all three preflight groups in one single `AskUserQuestion` tool call so Claude Code can render the groups as one interactive prompt. Do NOT run this as a sequential wizard. Do NOT issue three separate `AskUserQuestion` tool calls.
 
-The single `AskUserQuestion` tool call must contain these four localized groups in this order:
+The single `AskUserQuestion` tool call must contain these three localized groups in this order:
 
 1. Pace: Interactive, Automatic.
 2. Artifacts: OpenSpec, Engram, Both.
 3. PRs: Ask me, Single PR, Auto.
-4. Review: 400 lines, 800 lines, Other.
 
 Match the user's current language and active persona for question labels and descriptions. Treat the preflight UI as direct orchestrator conversation, not as a generated technical artifact. Technical artifacts still default to English, but this UI follows the user's conversation language/persona. Do NOT mix languages inside one grouped question.
 
@@ -68,16 +66,13 @@ Do NOT show option codes in the interactive UI. Do NOT show canonical values or 
 
 After the single grouped `AskUserQuestion` tool call returns, map the selected human labels to canonical values internally. Do not reveal the canonical values in the UI.
 
-If Other is selected for review budget, ask one follow-up question for the numeric budget.
-
-Only after all four preflight choices are collected, summarize them as the `SDD Session Preflight` decision block and continue with the SDD init guard/requested phase.
+Only after all three preflight choices are collected, summarize them as the `SDD Session Preflight` decision block and continue with the SDD init guard/requested phase.
 
 Map answers to canonical values:
 
 - Pace: Interactive -> `interactive`; Automatic -> `auto`.
 - Artifacts: OpenSpec -> `openspec`; Engram -> `engram`; Both -> `hybrid`.
 - PRs: Ask me -> `ask-on-risk`; Single PR -> `single-pr`; Auto -> `auto-chain`.
-- Review: 400 lines -> `review_budget_lines: 400`; 800 lines -> `review_budget_lines: 800`; Other -> ask one follow-up for the number.
 
 The PR canonical values are exactly the `delivery_strategy` domain `sdd-tasks` and `sdd-apply` accept; never emit a value outside it. The preflight offers no separate chained option because `delivery_strategy` is only consulted once the tasks forecast flags review-budget risk: below that line there is nothing to chain, and above it `Auto` already resolves to `auto-chain` without asking again.
 
@@ -143,9 +138,9 @@ On gate failure, re-run the same phase exactly once with specific corrective fee
 
 ### Native Runtime Attempt Authority (MANDATORY)
 
-Use the provider-owned Git-common-dir runtime ledger for every runtime-bearing `sdd-apply`, `sdd-verify`, or remediation continuation. It is the single attempt/budget authority for both OpenSpec and Engram; never persist caller-authored counters in OpenSpec files, Engram topics, prompts, or Pi state.
+Use the provider-owned Git-common-dir runtime ledger for every runtime-bearing `sdd-apply`, `sdd-verify`, or remediation continuation. It is the single attempt and evidence authority for both OpenSpec and Engram; never persist caller-authored counters in OpenSpec files, Engram topics, prompts, or Pi state.
 
-1. Before an actor or harness launch, call `gentle-ai sdd-attempt acquire --cwd <repo> --change <change> --request-id <id> --work-unit <label> --evidence-goal <goal> --max-attempts <count> --max-changed-lines <count>`.
+1. Before an actor or harness launch, call `gentle-ai sdd-attempt acquire --cwd <repo> --change <change> --request-id <id> --work-unit <label> --evidence-goal <goal> --max-attempts <count>`. New objectives are unbounded by changed-line counts; historical positive limits remain ledger-owned compatibility state.
    - Exception: when this launch is a phase actor started BY a parent that already ran this exact acquire and got `state: proceed`, do not acquire blind — pass the parent's returned token as `--token <token>` on the actor's own acquire call. A matching token proves the actor is continuing that SAME attempt and returns `proceed` with zero ledger mutation; acquiring without it collides with the parent's own active attempt and deadlocks on `blocked: active_attempt` (#2291).
 2. Launch only when acquire returns `state: proceed`, and retain its opaque `token`. `blocked` or `complete` stops the launch.
 3. After the external run, call `gentle-ai sdd-attempt settle --cwd <repo> --change <change> --token <token> --request-id <settle-id> ...` with a request ID distinct from the acquire operation's request ID, outcome, and bounded evidence. Reuse each operation's own ID only for its idempotent replay. Settle derives native binding/remediation inputs; pass `--successor-lineage` only for a distinct approved successor, otherwise the bound lineage remains its own successor.
@@ -162,12 +157,11 @@ Pass the artifact store mode to every SDD phase agent.
 
 On the first SDD chain request in a session, ask once for delivery strategy and cache it:
 
-- `ask-on-risk` — default; ask only when the tasks forecast detects review-budget risk.
-- `auto-chain` — automatically split into chained/stacked PR slices when needed.
-- `single-pr` — proceed as one PR only if the size is within budget.
-- `exception-ok` — user accepts `size:exception` when over budget. The preflight menu cannot select this; it is reached only when the user explicitly accepts `size:exception`, either up front or when `ask-on-risk` stops to ask.
+- `ask-on-risk` — default; ask only when the qualitative forecast identifies a genuine review-workload decision.
+- `auto-chain` — automatically split at natural architectural or review boundaries when needed.
+- `single-pr` — preserve one cohesive PR when the work forms one understandable unit.
 
-These four are the whole domain. Pass `delivery_strategy` to `sdd-tasks` and `sdd-apply`.
+These three are the whole domain. Pass `delivery_strategy` to `sdd-tasks` and `sdd-apply`. Never introduce a numeric workload threshold or delivery-waiver token.
 
 ### Chain Strategy
 
@@ -195,18 +189,17 @@ Every SDD phase returns: `status`, `executive_summary`, `artifacts`, `next_recom
 
 ### Review Workload Guard (MANDATORY)
 
-After `sdd-tasks` completes and before launching `sdd-apply`, inspect `Review Workload Forecast`.
+After `sdd-tasks` completes and before launching `sdd-apply`, inspect the qualitative `Review Workload Forecast`.
 
-If it says `Chained PRs recommended: Yes`, `400-line budget risk: High`, estimated changed lines exceed 400, or `Decision needed before apply: Yes`, apply cached `delivery_strategy`:
+If it says `Chained PRs recommended: Yes` or `Decision needed before apply: Yes`, apply cached `delivery_strategy`:
 
-- `ask-on-risk`: stop and ask whether to split or proceed with `size:exception`.
-- `auto-chain`: split automatically; ask for `chain_strategy` only if missing.
-- `single-pr`: stop and require/record `size:exception` before apply.
-- `exception-ok`: continue and tell `sdd-apply` this run uses `size:exception`.
+- `ask-on-risk`: stop and ask whether to split at the proposed natural boundaries or proceed as one cohesive unit.
+- `auto-chain`: split automatically at the proposed natural boundaries; ask for `chain_strategy` only if missing.
+- `single-pr`: proceed only when the plan explains why one PR remains cohesive and reviewable; otherwise stop and ask whether to change strategy.
 
 Any other `delivery_strategy` value is invalid. Do NOT pick the nearest branch and do NOT proceed: STOP, report the unrecognised value, and re-collect the delivery strategy before launching `sdd-apply`.
 
-Always pass the resolved `delivery_strategy`, `chain_strategy`, and PR boundary/exception to `sdd-apply`.
+Always pass the resolved `delivery_strategy`, `chain_strategy`, and natural PR boundary to `sdd-apply`.
 
 When launching `sdd-apply`, always include the resolved `delivery_strategy`, `chain_strategy`, and any chosen PR boundary/exception in the prompt.
 

@@ -44,7 +44,8 @@ func TestRDDDefectWorkflowSkillContract(t *testing.T) {
 		"causal authority invariant", "rollback boundary", "every operator flow",
 		"one truthful black-box bench journey", "actual runtime E2E proof",
 		"Synthetic proxy coverage", "CodeGraph-first", "dedicated worktree",
-		"behavior-first tests", "source-mutating normalization", "400 additions plus deletions",
+		"behavior-first tests", "source-mutating normalization", "causal cohesion",
+		"reviewer cognitive load", "natural boundaries", "never use line counts or size waivers",
 		"independent read-only", "maintainer-owned", "unresolved_authority_decisions",
 	} {
 		if !strings.Contains(content, required) {
@@ -52,7 +53,7 @@ func TestRDDDefectWorkflowSkillContract(t *testing.T) {
 		}
 	}
 
-	for _, forbidden := range []string{"/home/", `C:\Users\`, "local memory"} {
+	for _, forbidden := range []string{"/home/", `C:\Users\`, "local memory", "hard limit is", "explicit maintainer-approved size waiver"} {
 		if strings.Contains(content, forbidden) {
 			t.Errorf("skill contains environment-specific dependency %q", forbidden)
 		}

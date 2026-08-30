@@ -1298,10 +1298,6 @@ func removeLegacyOpenCodePlainChatPreflightLines(prompt string) string {
 		"C2 Single PR",
 		"C3 Chained",
 		"C4 Auto",
-		"D. Review",
-		"D1 400 lines",
-		"D2 800 lines",
-		"D3 Other",
 		"After asking this, STOP and wait for the user's answer.",
 		"Antes de continuar con SDD, elija una opción por grupo.",
 		"Responda con \"usar recomendado\" o con códigos como:",
@@ -1315,10 +1311,6 @@ func removeLegacyOpenCodePlainChatPreflightLines(prompt string) string {
 		"C1 Preguntarme",
 		"C2 Un solo PR",
 		"C3 Encadenados",
-		"D. Revisión",
-		"D1 400 líneas",
-		"D2 800 líneas",
-		"D3 Otro",
 		"Map answers to canonical values: A1/Interactive",
 		// Retired delivery-strategy vocabulary. These canonical values were
 		// produced by the preflight but matched no consumer branch, so a
@@ -1330,8 +1322,29 @@ func removeLegacyOpenCodePlainChatPreflightLines(prompt string) string {
 
 	lines := strings.Split(prompt, "\n")
 	kept := make([]string, 0, len(lines))
+	inLegacyReviewGroup := false
 	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		// Normalize so header recognition is exact: the retired review-budget
+		// group header is the bare line "D. Review"/"D. Revisión", never a
+		// substring of unrelated user content.
+		normalized := strings.Join(strings.Fields(trimmed), " ")
 		stale := false
+		switch {
+		case normalized == "D. Review" || normalized == "D. Revisión":
+			// Exact header line: open the legacy group and drop the header.
+			inLegacyReviewGroup = true
+			stale = true
+		case inLegacyReviewGroup && trimmed == "":
+			// A blank line is the legacy group boundary.
+			inLegacyReviewGroup = false
+		case inLegacyReviewGroup && (strings.HasPrefix(trimmed, "D1 ") || strings.HasPrefix(trimmed, "D2 ") || strings.HasPrefix(trimmed, "D3 ")):
+			// Retired option lines directly inside the legacy group.
+			stale = true
+		case inLegacyReviewGroup:
+			// First non-blank, non-option line ends the group; keep it.
+			inLegacyReviewGroup = false
+		}
 		for _, fragment := range legacyFragments {
 			if strings.Contains(line, fragment) {
 				stale = true
@@ -1543,18 +1556,17 @@ func ensurePreservedOpenCodeOrchestratorPreflight(prompt string) string {
 
 Before executing ANY SDD command or natural-language SDD request, ensure this session has an explicit ` + "`SDD Session Preflight`" + ` decision block.
 
-Required preflight choices: execution mode, artifact store, chained PR strategy, and review budget.
+Required preflight choices: execution mode, artifact store, and chained PR strategy. Review workload is assessed qualitatively from cohesion, natural boundaries, risk, verification burden, and reviewer cognitive load; changed-line counts never influence the decision.
 
 Use the ` + "`question`" + ` tool for SDD Session Preflight. Do NOT render the full preflight menu as plain chat text.
 
-Ask all four preflight groups in one single ` + "`question`" + ` tool call so OpenCode can render the groups as tabs. Do NOT run this as a sequential wizard. Do NOT issue four separate ` + "`question`" + ` tool calls.
+Ask all three preflight groups in one single ` + "`question`" + ` tool call so OpenCode can render the groups as tabs. Do NOT run this as a sequential wizard. Do NOT issue three separate ` + "`question`" + ` tool calls.
 
-The single ` + "`question`" + ` tool call must contain these four localized groups in this order:
+The single ` + "`question`" + ` tool call must contain these three localized groups in this order:
 
 1. Pace: Interactive, Automatic.
 2. Artifacts: OpenSpec, Engram, Both.
 3. PRs: Ask me, Single PR, Auto.
-4. Review: 400 lines, 800 lines, Other.
 
 Match the user's current language and active persona for question labels and descriptions. Treat the preflight UI as direct orchestrator conversation, not as a generated technical artifact. Technical artifacts still default to English, but this UI follows the user's conversation language/persona. Do NOT mix languages inside one grouped question.
 
@@ -1562,18 +1574,16 @@ Do NOT show option codes in the interactive UI. Do NOT show canonical values or 
 
 After the single grouped ` + "`question`" + ` tool call returns, map the selected human labels to canonical values internally. Do not reveal the canonical values in the UI.
 
-If Other is selected for review budget, ask one follow-up question for the numeric budget.
+Only after all three preflight choices are collected, summarize them as the ` + "`SDD Session Preflight`" + ` decision block and continue with the SDD init guard/requested phase.
 
-Only after all four preflight choices are collected, summarize them as the ` + "`SDD Session Preflight`" + ` decision block and continue with the SDD init guard/requested phase.
+Map answers to canonical values: Interactive -> ` + "`interactive`" + `; Automatic -> ` + "`auto`" + `; OpenSpec -> ` + "`openspec`" + `; Engram -> ` + "`engram`" + `; Both -> ` + "`both`" + `; Ask me -> ` + "`ask-on-risk`" + `; Single PR -> ` + "`single-pr`" + `; Auto -> ` + "`auto-chain`" + `.
 
-Map answers to canonical values: Interactive -> ` + "`interactive`" + `; Automatic -> ` + "`auto`" + `; OpenSpec -> ` + "`openspec`" + `; Engram -> ` + "`engram`" + `; Both -> ` + "`both`" + `; Ask me -> ` + "`ask-on-risk`" + `; Single PR -> ` + "`single-pr`" + `; Auto -> ` + "`auto-chain`" + `; 400 lines -> ` + "`review_budget_lines: 400`" + `; 800 lines -> ` + "`review_budget_lines: 800`" + `; Other -> ask one follow-up for the number.
-
-The PR canonical values are exactly the ` + "`delivery_strategy`" + ` domain ` + "`sdd-tasks`" + ` and ` + "`sdd-apply`" + ` accept (` + "`ask-on-risk | auto-chain | single-pr | exception-ok`" + `); never emit a value outside it. The preflight offers no separate chained option because ` + "`delivery_strategy`" + ` is only consulted once the tasks forecast flags review-budget risk: below that line there is nothing to chain, and above it ` + "`Auto`" + ` already resolves to ` + "`auto-chain`" + `.
+The PR canonical values are exactly the ` + "`delivery_strategy`" + ` domain ` + "`sdd-tasks`" + ` and ` + "`sdd-apply`" + ` accept (` + "`ask-on-risk | auto-chain | single-pr`" + `); never emit a value outside it. The preflight offers no separate chained option because chaining is selected only when the qualitative task forecast identifies natural review boundaries.
 
 Hard gate rules:
 
 - ` + "`openspec/config.yaml`" + `, existing SDD artifacts, previous ` + "`sdd-init`" + ` results, or installed SDD assets do NOT satisfy session preflight.
-- If the session has no preflight block, ask the single grouped ` + "`question`" + ` tool preflight above. Do not run init, delegate phases, edit files, or apply tasks until all four choices are collected.
+- If the session has no preflight block, ask the single grouped ` + "`question`" + ` tool preflight above. Do not run init, delegate phases, edit files, or apply tasks until all three choices are collected.
 - For a new feature request that says to use SDD, start at preflight -> init guard -> explore/proposal. Never launch ` + "`sdd-apply`" + ` just because the user asked to implement a feature.
 - In ` + "`interactive`" + ` mode, pause after each delegated phase returns, summarize the phase, then ask before launching the next phase via the ` + "`question`" + ` tool, and STOP. Use the ` + "`question`" + ` tool for this between-phase decision: present the proceed/adjust/stop options through a single ` + "`question`" + ` tool call; do NOT render the options as a plain markdown bullet list or plain chat text. Match the user's language and active persona for the question labels; for Spanish neutral fallback frame it as: "¿Quiere ajustar algo o continuamos?". Do not run /sdd-ff phases back-to-back unless execution mode is ` + "`auto`" + `.
 - Interactive approval is phase-scoped. Words like "continue", "dale", or "go on" approve only the immediate next phase, not the rest of the SDD pipeline. Do not treat a generated artifact as approved until the user has had a chance to review or explicitly delegate that review.
@@ -1584,7 +1594,7 @@ Hard gate rules:
 		strings.Contains(prompt, "openspec/config.yaml") &&
 		strings.Contains(prompt, "Never launch `sdd-apply`") &&
 		strings.Contains(prompt, "Match the user's current language") &&
-		strings.Contains(prompt, "Ask all four preflight groups in one single `question` tool call") &&
+		strings.Contains(prompt, "Ask all three preflight groups in one single `question` tool call") &&
 		strings.Contains(prompt, "groups as tabs") &&
 		strings.Contains(prompt, "Do NOT run this as a sequential wizard") &&
 		strings.Contains(prompt, "Do NOT mix languages inside one grouped question") &&

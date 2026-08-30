@@ -108,15 +108,15 @@ Example:
 
 SDD must protect reviewer cognitive load, not only generate tasks.
 
-- The default PR review budget is **400 changed lines** (`additions + deletions`).
-- Count authored text additions plus deletions only for this threshold. Generated goldens are excluded from authored risk count but remain included in complete snapshot identity and receipt validation.
-- The orchestrator MUST cache a delivery strategy at session start: `ask-on-risk` (default), `auto-chain`, `single-pr`, or `exception-ok`. Those four are the whole domain.
+- Assess review workload qualitatively from conceptual complexity, cohesion, domain and interface boundaries, risk, verification burden, and reviewer cognitive load.
+- Never estimate, count, display, or gate on changed lines, and never deform a correct cohesive solution to satisfy a numeric threshold.
+- The orchestrator MUST cache a delivery strategy at session start: `ask-on-risk` (default), `auto-chain`, or `single-pr`. Those three are the whole domain.
 - Any other `delivery_strategy` value is invalid. A phase MUST NOT map it to the nearest branch, MUST NOT record it in an artifact, and MUST NOT forward it: report the unrecognised value and stop.
 - The orchestrator MUST pass `delivery_strategy` to `sdd-tasks` and the resolved decision to `sdd-apply`.
-- `sdd-tasks` MUST forecast whether the planned work may exceed that budget.
-- The forecast MUST include exact plain-text guard lines: `Decision needed before apply: Yes|No`, `Chained PRs recommended: Yes|No`, and `400-line budget risk: Low|Medium|High`.
-- If the forecast is high, `sdd-tasks` MUST recommend chained or stacked PRs using deliverable work units.
-- `sdd-apply` MUST NOT start oversized work unless the delivery strategy resolves to chained/stacked PR slices or explicitly accepted `size:exception`.
+- `sdd-tasks` MUST forecast whether the work crosses natural architectural or review boundaries.
+- The forecast MUST include exact plain-text guard lines: `Decision needed before apply: Yes|No` and `Chained PRs recommended: Yes|No`.
+- When natural boundaries would reduce cognitive load, `sdd-tasks` MUST recommend chained or stacked PRs using deliverable work units.
+- `sdd-apply` MUST NOT start work with an unresolved qualitative workload decision.
 - Each chained PR slice must have a clear start, clear finish, autonomous scope, verification, and reasonable rollback.
 - In a Feature Branch Chain, PR #1 targets the feature/tracker branch and later child PRs target the immediate previous PR branch; if GitHub shows previous slices in a child diff, retarget/rebase until the diff is clean.
 

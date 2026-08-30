@@ -35,7 +35,7 @@ You are a sub-agent responsible for creating the TASK BREAKDOWN. You take the pr
 From the orchestrator:
 - Change name
 - Artifact store mode (`engram | openspec | hybrid | none`)
-- Delivery strategy (`ask-on-risk | auto-chain | single-pr | exception-ok`)
+- Delivery strategy (`ask-on-risk | auto-chain | single-pr`)
 
 ## Execution and Persistence Contract
 
@@ -82,17 +82,17 @@ openspec/changes/{change-name}/
 
 | Field | Value |
 |-------|-------|
-| Estimated changed lines | <rough estimate or range> |
-| 400-line budget risk | Low / Medium / High |
+| Complexity and cohesion | <qualitative assessment> |
+| Domain/interface boundaries | <natural boundaries or none> |
+| Verification and risk burden | <qualitative assessment> |
 | Chained PRs recommended | Yes / No |
 | Suggested split | <single PR or PR 1 → PR 2 → PR 3> |
-| Delivery strategy | <ask-on-risk / auto-chain / single-pr / exception-ok> |
-| Chain strategy | <stacked-to-main / feature-branch-chain / size-exception / pending> |
+| Delivery strategy | <ask-on-risk / auto-chain / single-pr> |
+| Chain strategy | <stacked-to-main / feature-branch-chain / pending> |
 
 Decision needed before apply: <Yes|No>
 Chained PRs recommended: <Yes|No>
-Chain strategy: <stacked-to-main|feature-branch-chain|size-exception|pending>
-400-line budget risk: <Low|Medium|High>
+Chain strategy: <stacked-to-main|feature-branch-chain|pending>
 
 ### Suggested Work Units
 
@@ -141,24 +141,20 @@ Every applicable threat-matrix case MUST become an explicit RED-test task before
 
 ### Review Workload Forecast Rules
 
-Before finalizing tasks, estimate whether implementation is likely to exceed the **400 changed-line review budget** (`additions + deletions`). This is a planning guard, not an exact diff count.
+Before finalizing tasks, assess review workload qualitatively from conceptual complexity, cohesion, domain and interface boundaries, risk, verification burden, generated artifacts, migrations, and reviewer cognitive load. Never estimate or count changed lines.
 
-Use available signals: number of files, phases, integration points, tests, docs, generated artifacts, migrations, and how many concerns the change crosses.
-
-If the estimate is **High** or likely above 400 lines:
+When natural boundaries would reduce cognitive load without deforming a cohesive solution:
 
 1. Mark `Chained PRs recommended` as `Yes`.
 2. Split tasks into **work units** that can become chained or stacked PRs.
 3. Each suggested PR must have a clear start, clear finish, verification, autonomous scope, focused test command, runtime harness, and rollback boundary.
-4. **Ask the user which chain strategy to use** (this is a team decision):
+4. **Ask the user which chain strategy to use** when chaining is selected:
    - **Stacked PRs to main** — each PR merges to main in order. Fast iteration, fix on the go. Best for speed-first teams and independent slices.
    - **Feature Branch Chain** — the feature/tracker branch accumulates the final integration; PR #1 targets the tracker branch, later PRs target the immediate previous PR branch so each child diff stays focused. Only the tracker merges to main. Best for rollback control and coordinated releases.
-   - **size:exception** — keep it as a single PR with maintainer approval. Best for generated code, migrations, or vendor diffs.
 5. Cache the user's choice and set `Decision needed before apply` from delivery strategy:
-   - `ask-on-risk`: `Yes` — orchestrator asks before apply.
+   - `ask-on-risk`: `Yes` when a genuine split-versus-cohesion decision remains.
    - `auto-chain`: `No` — orchestrator proceeds with the first slice using the chosen chain strategy.
-   - `single-pr`: `Yes` — orchestrator must require `size:exception` before apply.
-   - `exception-ok`: `No` — maintainer has accepted `size:exception`.
+   - `single-pr`: `No` only when the forecast explains why one PR remains cohesive and reviewable; otherwise `Yes` so the user can reconsider strategy.
 
 Do not bury this in prose. Put the forecast near the top of the tasks artifact so the user sees it before implementation starts.
 
@@ -167,8 +163,7 @@ The forecast MUST include these exact plain-text lines so downstream guards can 
 ```text
 Decision needed before apply: Yes|No
 Chained PRs recommended: Yes|No
-Chain strategy: stacked-to-main|feature-branch-chain|size-exception|pending
-400-line budget risk: Low|Medium|High
+Chain strategy: stacked-to-main|feature-branch-chain|pending
 ```
 
 You may keep the table for readability, but the plain-text lines are the guard contract.
@@ -229,10 +224,11 @@ Return to the orchestrator:
 {Brief description of the recommended order and why}
 
 ### Review Workload Forecast
-- Estimated changed lines: {estimate or range}
-- 400-line budget risk: {Low | Medium | High}
+- Complexity and cohesion: {qualitative assessment}
+- Domain/interface boundaries: {natural boundaries or none}
+- Verification and risk burden: {qualitative assessment}
 - Chained PRs recommended: {Yes | No}
-- Delivery strategy: {ask-on-risk | auto-chain | single-pr | exception-ok}
+- Delivery strategy: {ask-on-risk | auto-chain | single-pr}
 - Decision needed before apply: {Yes | No}
 - Suggested work-unit PR split: {brief list or "Not needed"}
 
@@ -251,6 +247,6 @@ Return to the orchestrator:
 - Apply any `rules.tasks` from `openspec/config.yaml`
 - If the project uses TDD, integrate test-first tasks: RED task (write failing test) → GREEN task (make it pass) → REFACTOR task (clean up)
 - **Size budget**: Tasks artifact MUST be under 530 words. Each task: 1-2 lines max. Use checklist format, not paragraphs.
-- **Review workload guard**: ALWAYS include the Review Workload Forecast. If likely above 400 changed lines, recommend chained PRs and honor the received delivery strategy for whether a decision/exception is needed before apply.
+- **Review workload guard**: ALWAYS include the qualitative Review Workload Forecast. Recommend chained PRs only at natural boundaries and honor the received delivery strategy without numeric workload thresholds or delivery-waiver tokens.
 - **Work-unit evidence**: every suggested work unit MUST name its Focused test command, Runtime harness command/scenario (or explicit `N/A` reason), and Rollback boundary.
 - Return envelope per **Section D** from `skills/_shared/sdd-phase-common.md`.

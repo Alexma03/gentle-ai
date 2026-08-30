@@ -80,12 +80,12 @@ func TestPRLabelMutationsUseCanonicalIssueCreationAuthority(t *testing.T) {
 			t.Fatalf("read %s: %v", path, err)
 		}
 		text := string(content)
-		for _, required := range []string{"canonical issue-creation workflow contract", "current direct human instruction binds the exact target/action", "target-host capability", "one bounded mutation and target-host readback", "Ordinary `type:*` categorization", "Protected policy labels", "verified policy authority", "target-host `viewerPermission` `MAINTAIN` or `ADMIN`", "`size:exception` additionally requires documented over-budget rationale"} {
+		for _, required := range []string{"canonical issue-creation workflow contract", "current direct human instruction binds the exact target/action", "target-host capability", "one bounded mutation and target-host readback", "Ordinary `type:*` categorization", "Protected policy labels", "verified policy authority", "target-host `viewerPermission` `MAINTAIN` or `ADMIN`"} {
 			if !strings.Contains(text, required) {
 				t.Errorf("%s must require canonical PR-label authority marker %q", path, required)
 			}
 		}
-		for _, stale := range []string{"| Apply `type:*` label to a PR | ❌ | ✅ |", "| Apply `size:exception` label | ❌ | ✅ |", "maintainer-applied `size:exception`", "Ask a maintainer to add the correct label; remove extras", "gh pr edit"} {
+		for _, stale := range []string{"| Apply `type:*` label to a PR | ❌ | ✅ |", "size:", "Ask a maintainer to add the correct label; remove extras", "gh pr edit"} {
 			if strings.Contains(text, stale) {
 				t.Errorf("%s retains stale or unguarded PR-label guidance %q", path, stale)
 			}
@@ -118,7 +118,7 @@ func TestDelegatedWorkflowMutationContract(t *testing.T) {
 			t.Errorf("%s must route approval authority to the canonical issue-creation workflow contract", path)
 		}
 	}
-	for _, condition := range []string{"const hasException = labels.includes('size:exception');", "if (!labels.includes('status:approved')) {"} {
+	for _, condition := range []string{"if (!labels.includes('status:approved')) {"} {
 		if !strings.Contains(string(workflow), condition) {
 			t.Errorf("pr-check workflow must retain enforcement condition %q", condition)
 		}

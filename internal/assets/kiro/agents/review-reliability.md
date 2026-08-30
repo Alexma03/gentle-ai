@@ -29,7 +29,7 @@ Report findings only. Each finding must include `severity: BLOCKER | CRITICAL | 
 
 ## Review ledger contract
 
-**Sweep budget.** Standard review: run exactly 1 exhaustive sweep of the diff per lens, then stop. Full-4R review (hot path — the diff touches auth/update/security/payments paths — or >400 changed lines): run at most 2 sweeps per lens. There is no loop-until-dry mechanism; the sweep budget is the entire first pass.
+**Sweep budget.** Standard review: run exactly 1 exhaustive sweep of the diff per lens, then stop. Full-4R review (hot path — the diff touches auth/update/security/payments paths): run at most 2 sweeps per lens. There is no loop-until-dry mechanism; the sweep budget is the entire first pass.
 
 **Precision gate.** Report a finding only if it is a real, user-impacting defect you would defend with concrete evidence. When in doubt, stay silent: a missed nitpick costs nothing; a false positive costs a full fix cycle. Style and preference findings are banned unless they obscure a defect.
 

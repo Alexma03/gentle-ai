@@ -63,8 +63,8 @@ var currentOpenCodeOrchestratorSections = []orchestratorContractSection{
 		name:   "session preflight",
 		marker: "### SDD Session Preflight (HARD GATE)",
 		sentinels: []string{
-			"all four preflight groups in one single `question` tool call",
-			"Do NOT issue four separate `question` tool calls",
+			"all three preflight groups in one single `question` tool call",
+			"Do NOT issue three separate `question` tool calls",
 			"Cache the choices for this session",
 		},
 	},
@@ -111,7 +111,7 @@ var currentOpenCodeOrchestratorSections = []orchestratorContractSection{
 			"`ask-on-risk`",
 			"`auto-chain`",
 			"`single-pr`",
-			"`exception-ok`",
+			"changed-line counts never influence the decision",
 			"Pass it as `delivery_strategy`",
 		},
 	},
@@ -120,7 +120,7 @@ var currentOpenCodeOrchestratorSections = []orchestratorContractSection{
 		marker: "### Review Workload Guard (MANDATORY)",
 		sentinels: []string{
 			"Chained PRs recommended: Yes",
-			"size:exception",
+			"natural",
 			"Do this even in Automatic mode",
 		},
 	},

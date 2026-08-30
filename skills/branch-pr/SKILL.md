@@ -20,8 +20,8 @@ Load this skill whenever you need to:
 
 1. **Every PR MUST link an approved issue** — `Closes/Fixes/Resolves #<N>` in the PR body, and that issue MUST have `status:approved`. PRs without this are **automatically rejected** by CI.
 2. **Ordinary `type:*` categorization** — CI rejects zero or multiple type labels. Route it through the canonical issue-creation workflow contract: a current direct human instruction binds the exact target/action, target-host capability is verified, and it uses one bounded mutation and target-host readback; otherwise wait without mutation.
-3. **Protected policy labels** — Adding or removing `status:approved` or `size:exception` requires verified policy authority from a target-host repository maintainer or repository-authorized approver for the exact target/action, plus authenticated actor target-host `viewerPermission` `MAINTAIN` or `ADMIN`. `size:exception` additionally requires documented over-budget rationale.
-4. **400-line review budget** — keep PRs within 400 changed lines (`additions + deletions`) or document the rationale required for a `size:exception` label.
+3. **Protected policy labels** — Adding or removing `status:approved` requires verified policy authority from a target-host repository maintainer or repository-authorized approver for the exact target/action, plus authenticated actor target-host `viewerPermission` `MAINTAIN` or `ADMIN`.
+4. **Qualitative review workload** — split only at natural architectural, domain, interface, risk, or verification boundaries; never gate on changed-line counts or deform a cohesive solution.
 5. **Automated checks must pass** — see the Automated Checks table below.
 6. **No `Co-Authored-By` trailers** — never add AI attribution to commits.
 7. **No force-push to main/master** — protected branch.
@@ -132,7 +132,7 @@ cd e2e && ./docker-test.sh
 ## ✅ Contributor Checklist
 
 - [ ] PR is linked to an issue with `status:approved`
-- [ ] PR stays within 400 changed lines, or the `size:exception` rationale and verified policy authority are documented
+- [ ] PR is one cohesive review unit, or is split at natural architectural/review boundaries
 - [ ] API read-back confirms exactly one appropriate `type:*` label on this PR
 - [ ] Unit tests pass (`go test ./...`)
 - [ ] E2E tests pass (`cd e2e && ./docker-test.sh`)
@@ -149,7 +149,6 @@ These checks run on every PR and **all must pass** before merge:
 
 | Check | What It Verifies | How to Fix |
 |-------|-----------------|------------|
-| **Check PR Cognitive Load** | PR stays within 400 changed lines (`additions + deletions`) or has `size:exception` | Split the PR, or document the `size:exception` rationale and verify policy authority before its canonical workflow action |
 | **Check Issue Reference** | PR body contains `Closes/Fixes/Resolves #N` | Add `Closes #<N>` to the PR body |
 | **Check Issue Has `status:approved`** | Linked issue has the required label | Use the canonical issue-creation workflow contract only when a current direct instruction and target-host capability grant authorize the exact action; otherwise wait |
 | **Check PR Has `type:*` Label** | Exactly one `type:*` label is applied to the PR | Use the canonical issue-creation workflow contract only when a current direct instruction and target-host capability authorize the exact action; otherwise wait |
@@ -290,7 +289,7 @@ Fixes Claude Code binary detection failing on Linux when HOME is not set.
 ## ✅ Contributor Checklist
 
 - [x] PR is linked to an issue with \`status:approved\`
-- [x] PR stays within 400 changed lines, or the \`size:exception\` rationale and verified policy authority are documented
+- [x] PR is one cohesive review unit, or is split at natural architectural/review boundaries
 - [x] API read-back confirms exactly one appropriate \`type:*\` label on this PR
 - [x] Unit tests pass (\`go test ./...\`)
 - [x] E2E tests pass (\`cd e2e && ./docker-test.sh\`)

@@ -244,7 +244,7 @@ Cache the artifact store choice for the session. Pass it as `artifact_store.mode
 
 ### Delivery Strategy
 
-On the first `/sdd-new`, `/sdd-ff`, or `/sdd-continue` (or an equivalent natural-language request) in a session, ask once for and cache delivery strategy: `ask-on-risk` (default), `auto-chain`, `single-pr`, or `exception-ok`. Pass it as `delivery_strategy` to `sdd-tasks` and `sdd-apply` prompts.
+On the first `/sdd-new`, `/sdd-ff`, or `/sdd-continue` (or an equivalent natural-language request) in a session, ask once for and cache delivery strategy: `ask-on-risk` (default), `auto-chain`, or `single-pr`. Pass it as `delivery_strategy` to `sdd-tasks` and `sdd-apply` prompts. Review workload is qualitative; changed-line counts never influence the decision.
 
 ### Chain Strategy
 
@@ -269,12 +269,11 @@ Each phase returns: `status`, `executive_summary`, `artifacts`, `next_recommende
 
 After `sdd-tasks` completes and before launching `sdd-apply`, inspect `Review Workload Forecast`.
 
-If it says `Chained PRs recommended: Yes`, `400-line budget risk: High`, estimated changed lines exceed 400, or `Decision needed before apply: Yes`, apply cached `delivery_strategy`:
+If it says `Chained PRs recommended: Yes` or `Decision needed before apply: Yes`, apply cached `delivery_strategy`:
 
-- **`ask-on-risk`**: STOP and ask chained/stacked PRs vs maintainer-approved `size:exception`.
-- **`auto-chain`**: Do not ask. Tell `sdd-apply` to implement only the next autonomous chained/stacked PR slice using work-unit commits.
-- **`single-pr`**: STOP and require/record `size:exception` before apply.
-- **`exception-ok`**: Continue, but tell `sdd-apply` this run uses `size:exception`.
+- **`ask-on-risk`**: STOP and ask whether to use the proposed natural split or proceed as one cohesive PR.
+- **`auto-chain`**: Do not ask. Tell `sdd-apply` to implement only the next autonomous natural work-unit slice using work-unit commits.
+- **`single-pr`**: Proceed only when the plan explains why one PR remains cohesive and reviewable; otherwise stop and ask whether to change strategy.
 
 Any other `delivery_strategy` value is invalid. Do NOT pick the nearest branch and do NOT proceed: STOP, report the unrecognised value, and re-collect the delivery strategy before `sdd-apply` runs.
 

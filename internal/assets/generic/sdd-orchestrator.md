@@ -226,7 +226,7 @@ Cache the artifact store choice for the session. Pass it as `artifact_store.mode
 
 ### Delivery Strategy
 
-On the first `/sdd-new`, `/sdd-ff`, or `/sdd-continue` (or an equivalent natural-language request) in a session, ask once for and cache delivery strategy: `ask-on-risk` (default), `auto-chain`, `single-pr`, or `exception-ok`. Pass it as `delivery_strategy` to `sdd-tasks` and `sdd-apply` prompts.
+On the first `/sdd-new`, `/sdd-ff`, or `/sdd-continue` (or an equivalent natural-language request) in a session, ask once for and cache delivery strategy: `ask-on-risk` (default), `auto-chain`, or `single-pr`. Pass it as `delivery_strategy` to `sdd-tasks` and `sdd-apply` prompts. Review workload is qualitative; changed-line counts never influence the decision.
 
 ### Chain Strategy
 
@@ -251,13 +251,13 @@ Each phase returns: `status`, `executive_summary`, `artifacts`, `next_recommende
 
 After `sdd-tasks` completes and before launching `sdd-apply`, inspect the task result summary for `Review Workload Forecast`.
 
-If it says `Chained PRs recommended: Yes`, `400-line budget risk: High`, estimated changed lines exceed 400, or `Decision needed before apply: Yes`, apply the cached `delivery_strategy`: `ask-on-risk` asks, `auto-chain` asks for a missing `chain_strategy` and applies only the next PR slice, `single-pr` requires `size:exception`, and `exception-ok` records the exception.
+If it says `Chained PRs recommended: Yes` or `Decision needed before apply: Yes`, apply the cached `delivery_strategy`: `ask-on-risk` asks whether to use the proposed natural split or one cohesive PR, `auto-chain` asks for a missing `chain_strategy` and applies only the next natural PR slice, and `single-pr` proceeds only when the plan explains why one PR remains cohesive and reviewable.
 
 Any other `delivery_strategy` value is invalid. Do NOT pick the nearest branch and do NOT proceed: STOP, report the unrecognised value, and re-collect the delivery strategy before `sdd-apply` runs.
 
 Do this even in Automatic mode. Automatic mode does not override reviewer burnout protection.
 
-When launching `sdd-apply`, include the resolved `delivery_strategy`, `chain_strategy`, and any chosen PR boundary/exception in the prompt.
+When launching `sdd-apply`, include the resolved `delivery_strategy`, `chain_strategy`, and chosen natural PR boundary in the prompt.
 
 <!-- /section:model-capable -->
 
