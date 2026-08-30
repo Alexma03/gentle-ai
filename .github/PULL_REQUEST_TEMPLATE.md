@@ -92,7 +92,7 @@ The following checks run automatically on this PR:
 
 | Check | Status | Description |
 |-------|--------|-------------|
-| Check PR Cognitive Load | ⏳ | PR should stay within 400 changed lines (`additions + deletions`) or use `size:exception` |
+| Review Workload | ⏳ | PR should form one cohesive, independently verifiable work unit or split at natural boundaries |
 | Check Issue Reference | ⏳ | PR body must contain `Closes/Fixes/Resolves #N` |
 | Check Issue Has `status:approved` | ⏳ | Linked issue must have been approved before work began |
 | Check PR Has `type:*` Label | ⏳ | Exactly one `type:*` label must be applied |
@@ -105,7 +105,7 @@ The following checks run automatically on this PR:
 ## ✅ Contributor Checklist
 
 - [ ] PR is linked to an issue with `status:approved`
-- [ ] PR stays within 400 changed lines, or I have requested/obtained maintainer-applied `size:exception` with rationale documented
+- [ ] PR is one cohesive review unit, or is split at natural architectural, domain, interface, risk, or verification boundaries
 - [ ] I have added the appropriate `type:*` label to this PR
 - [ ] Unit tests pass (`go test ./...`)
 - [ ] Go format passes (`go run ./internal/gofmtcheck`)

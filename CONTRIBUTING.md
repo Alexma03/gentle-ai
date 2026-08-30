@@ -72,12 +72,6 @@ For disclosure boundaries, required details, attribution rules, and reviewer exp
 | `type:chore` | Build, CI, tooling changes |
 | `type:breaking-change` | Breaking change |
 
-### Size Labels (applied to PRs)
-
-| Label | Description |
-|-------|-------------|
-| `size:exception` | Maintainer-approved exception for PRs above the 400 changed-line review budget |
-
 ### Status Labels (applied to Issues)
 
 | Label | Description |
@@ -311,25 +305,24 @@ Before `sdd-apply` starts, the SDD conductor checks the **Review Workload Foreca
 
 | Strategy | Use when | What happens before apply |
 |---|---|---|
-| `ask-on-risk` | Default. You want the conductor to pause only when the forecast is risky. | If the forecast is high or above 400 changed lines, it asks whether to split or proceed with `size:exception`. |
-| `auto-chain` | You already know the change should be reviewed in slices. | The apply phase implements the next chained/stacked PR slice using work-unit commits. |
-| `single-pr` | The change is small or must land atomically. | If the forecast exceeds 400 changed lines, apply stops until a maintainer approves `size:exception`. |
-| `exception-ok` | A maintainer already accepted a large PR. | Apply continues and records that the PR has maintainer-approved `size:exception`. |
+| `ask-on-risk` | Default. You want the conductor to pause only when the qualitative forecast identifies a genuine review-workload decision. | It asks whether to split at the proposed natural boundaries or proceed as one cohesive PR. |
+| `auto-chain` | The work has natural architectural or review boundaries. | The apply phase implements the next chained/stacked work-unit slice. |
+| `single-pr` | The change forms one cohesive, independently verifiable unit. | Apply proceeds as one PR when the plan explains that cohesion. |
 
 **Decision checklist:**
 
-- [ ] Can one reviewer understand this in about 60 minutes?
-- [ ] Is the PR at or below 400 changed lines?
+- [ ] Does the PR represent one coherent behavior or workflow?
+- [ ] Are domain, interface, risk, and verification boundaries explicit?
 - [ ] Does each work-unit commit include its code, tests, and docs together?
-- [ ] If the answer is “no” to any item, choose `auto-chain` or get explicit `size:exception` approval.
+- [ ] If natural independent boundaries exist, would chaining reduce reviewer cognitive load without deforming the solution?
 
 **Mental model:** work-unit commits are the bricks; chained PRs are the wall sections. Don’t make reviewers inspect the whole building in one sitting.
 
-### PR Size Budget
+### Qualitative Review Workload
 
-Keep PRs at or below **400 changed lines** (`additions + deletions`). This is a deliberate cognitive-load limit: a PR should be reviewable in roughly **60 minutes** without pushing reviewers into fatigue.
+Assess conceptual complexity, cohesion, domain and interface boundaries, risk, verification burden, and reviewer cognitive load. Never estimate, count, display, or gate on changed lines.
 
-If your change cannot fit that budget, split it into **chained or stacked PRs** so each review remains focused. Large generated/vendor/migration diffs may use the `size:exception` label, but only when a maintainer agrees the large diff is unavoidable.
+Split into **chained or stacked PRs** only at natural boundaries that produce coherent, independently verifiable work units. Keep one PR when the solution is conceptually cohesive; never deform correct work merely to make the diff numerically smaller.
 
 ### Work-Unit Commits
 
@@ -337,7 +330,7 @@ Structure commits by deliverable unit, not by file type. A good commit includes 
 
 - Prefer `feat(auth): validate tokens at login` over separate `models`, `services`, and `tests` commits.
 - Keep rollback reasonable: reverting one commit should not remove unrelated work.
-- When a PR grows near 400 changed lines, promote work-unit commits into chained or stacked PRs.
+- When work crosses natural domain, interface, risk, or verification boundaries, promote coherent work-unit groups into chained or stacked PRs.
 
 ### Review Comments
 
@@ -346,7 +339,7 @@ Review feedback should be warm, direct, and useful quickly. Start with the actio
 ### Before Opening a PR
 
 - [ ] There is a linked approved issue (`Closes #<N>`)
-- [ ] The PR is at or below 400 changed lines, or a maintainer approved `size:exception`
+- [ ] The PR is one cohesive review unit, or is split at natural architectural/review boundaries
 - [ ] Commits are organized by deliverable work unit
 - [ ] All unit tests pass (`go test ./...`)
 - [ ] E2E tests pass (`cd e2e && ./docker-test.sh`)
@@ -370,7 +363,6 @@ All PRs go through automated checks:
 
 | Check | What It Verifies |
 |-------|-----------------|
-| **Check PR Cognitive Load** | PR stays within 400 changed lines (`additions + deletions`) unless labelled `size:exception` |
 | **Check Issue Reference** | PR body contains `Closes/Fixes/Resolves #N` |
 | **Check Issue Has status:approved** | The linked issue has `status:approved` under the canonical issue-creation workflow contract |
 | **Check PR Has type:* Label** | Exactly one `type:*` label is applied |
