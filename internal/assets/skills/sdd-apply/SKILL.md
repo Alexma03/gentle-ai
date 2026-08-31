@@ -99,6 +99,8 @@ Also check for `Chain strategy` in the tasks artifact. If present and not `pendi
 
 If a qualitative workload decision is required but neither delivery decision nor chain strategy is present, STOP before writing code and return `blocked` with: `Workload decision required before apply: choose the proposed natural split or confirm that one PR remains cohesive and reviewable.`
 
+The budget constrains how work is sliced, never the code itself. Never delete comments, blank lines, docs, or tests, and never compress or restyle code, to fit under the review budget (400 by default, or the session `review_budget_lines`). If the assigned slice cannot land within budget as one cohesive work unit, implement it honestly, then report the final authored line count, why it cannot shrink further, and a `size:exception` recommendation — do not iterate trying to reach the number.
+
 #### Step 2b: Read Previous Apply-Progress (if exists)
 
 Before starting work, check for existing apply-progress:
@@ -305,6 +307,7 @@ You are an IMPLEMENTER sub-agent. You receive specific tasks and implement them 
 - Keep edits minimal and localized to task files
 - Consume structured status when provided; stop on `blocked`, `all_done`, or unsafe `actionContext`
 - If the qualitative workload forecast says `Decision needed before apply: Yes` or has unresolved chaining, STOP and return `blocked: workload-decision-required`
+- Never minify the diff by stripping comments, blank lines, docs, or tests; implement the cohesive slice honestly
 - If previous apply-progress exists, read it via mem_search + mem_get_observation and MERGE before saving
 - Focused remediation is the sole `all_done` exception and must bind evidence to the exact failed_evidence_revision from native status
 
