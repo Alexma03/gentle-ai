@@ -19,9 +19,8 @@ const readyMessage = "You're ready. Start building."
 const ReadyMessage = readyMessage
 
 // ReadyMessageForCommands renders the "you're ready" completion line naming
-// exactly the given runnable agent commands, in the order given (e.g.
-// []string{"claude", "opencode"} -> "Run `claude` or `opencode` and start
-// building."). It falls back to the generic readyMessage when there are no
+// exactly the given runnable agent commands, in the order given. It falls back
+// to the generic readyMessage when there are no
 // commands to name, so an install with no known-runnable CLI agent never
 // claims one it did not install.
 func ReadyMessageForCommands(commands []string) string {

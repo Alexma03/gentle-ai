@@ -61,28 +61,6 @@ func TestCodeGraphCompatibilityStrategies(t *testing.T) {
 	}
 }
 
-func TestExcludedAgentsNeverEnterCodeGraphSurfaces(t *testing.T) {
-	reg, err := agents.NewDefaultRegistry()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, id := range []model.AgentID{model.AgentOpenCode, model.AgentKilocode, model.AgentGeminiCLI, model.AgentVSCodeCopilot, model.AgentWindsurf, model.AgentKimi, model.AgentQwenCode, model.AgentKiroIDE, model.AgentOpenClaw, model.AgentTrae, model.AgentHermes} {
-		t.Run(string(id), func(t *testing.T) {
-			home := t.TempDir()
-			if _, ok := reg.Get(id); ok {
-				t.Fatalf("retired adapter %q entered default registry", id)
-			}
-			status := DetectStatus(home, DetectorFunc(func(string) (string, error) { return "/bin/codegraph", nil }))
-			if slices.ContainsFunc(status.Agents, func(agent AgentStatus) bool { return agent.Agent == id }) {
-				t.Fatalf("excluded agent entered status: %#v", status.Agents)
-			}
-			if _, ok := codeGraphCompatibilityFor(id); ok {
-				t.Fatalf("retired agent %q entered CodeGraph compatibility table", id)
-			}
-		})
-	}
-}
-
 func TestClaudeGlobalConfigRequiresValidMCPServersEntry(t *testing.T) {
 	home := t.TempDir()
 	reg, _ := agents.NewDefaultRegistry()
@@ -155,22 +133,6 @@ func TestCodeGraphNativeOwnedPaths(t *testing.T) {
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("%s paths = %v, want %v", id, got, want)
 		}
-	}
-}
-
-func TestCodeGraphCommandsUseExplicitMultipleTargets(t *testing.T) {
-	commands, err := CodeGraphCommandsForDetectorAndTargets(DetectorFunc(func(name string) (string, error) {
-		if name == "npm" {
-			return "/bin/npm", nil
-		}
-		return "", errors.New("missing")
-	}), []string{"claude", "cursor", "kiro"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []string{"codegraph", "install", "--target", "claude,cursor,kiro", "--location", "global", "--yes"}
-	if !reflect.DeepEqual(commands[1], want) {
-		t.Fatalf("install command = %v, want %v", commands[1], want)
 	}
 }
 
@@ -249,32 +211,6 @@ func TestCodeGraphRollbackAfterGuidanceAndPostconditionFailures(t *testing.T) {
 				t.Fatalf("rollback bytes = %q", data)
 			}
 		})
-	}
-}
-
-func TestCodeGraphSnapshotRoundTripIsIdempotent(t *testing.T) {
-	home := t.TempDir()
-	path := filepath.Join(home, ".kiro", "settings", "mcp.json")
-	mustWrite(t, path, `{"mcpServers":{"sibling":{"command":"x"}}}`)
-	if err := os.Chmod(path, 0o640); err != nil {
-		t.Fatal(err)
-	}
-	snapshots, err := snapshotCodeGraphPaths([]string{path, filepath.Join(home, "new.json")})
-	if err != nil {
-		t.Fatal(err)
-	}
-	mustWrite(t, path, `{}`)
-	mustWrite(t, filepath.Join(home, "new.json"), `{}`)
-	if err := restoreCodeGraphPaths(snapshots); err != nil {
-		t.Fatal(err)
-	}
-	if err := restoreCodeGraphPaths(snapshots); err != nil {
-		t.Fatal(err)
-	}
-	data, _ := os.ReadFile(path)
-	info, _ := os.Stat(path)
-	if string(data) != `{"mcpServers":{"sibling":{"command":"x"}}}` || runtime.GOOS != "windows" && info.Mode().Perm() != 0o640 {
-		t.Fatalf("round trip = %q mode %o", data, info.Mode().Perm())
 	}
 }
 

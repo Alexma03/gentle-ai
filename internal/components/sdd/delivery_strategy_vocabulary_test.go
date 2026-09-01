@@ -4,26 +4,18 @@ import (
 	"encoding/json"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/assets"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
 
 // SDD delivery strategy has a producer and a consumer. The producer is the
 // session-preflight label->canonical mapping; the consumer is every phase skill
-// and orchestrator branch that reads `delivery_strategy`. In the Claude and
-// OpenCode orchestrators both halves live in the same document about a hundred
-// lines apart, and OpenCode carries a third copy of the producer compiled into
-// ensurePreservedOpenCodeOrchestratorPreflight, which re-injects it into
-// installed configs on every sync.
-//
-// Nothing asserted the halves agreed, so the preflight emitted `ask-always`,
+// and orchestrator branch that reads `delivery_strategy`. In the retained orchestrators both halves live in the same document about a hundred
+// lines apart, and // Nothing asserted the halves agreed, so the preflight emitted `ask-always`,
 // `single-pr-default`, `force-chained`, and `auto-forecast` into a consumer
 // whose declared domain did not match the producer (community report by
 // @MarcosArispe). Every consumer branch list was a bare match, so an
@@ -140,12 +132,6 @@ func preflightMappingSources(t *testing.T) map[string]string {
 	if len(sources) == 0 {
 		t.Fatal("no shipped asset carries a preflight label->canonical mapping; the guard has lost its subject")
 	}
-
-	// The OpenCode installer re-injects its own copy of the mapping into
-	// existing configs, so a markdown-only fix would be reverted on the next
-	// sync. Check the compiled literal through the same derivation.
-	sources["internal/components/sdd/inject.go (ensurePreservedOpenCodeOrchestratorPreflight)"] =
-		ensurePreservedOpenCodeOrchestratorPreflight("")
 
 	return sources
 }
@@ -337,56 +323,6 @@ func TestSDDReviewWorkloadGuardsRejectUnrecognisedDeliveryStrategy(t *testing.T)
 // ensurePreservedOpenCodeOrchestratorPreflight, so before this the retired
 // mapping survived every sync and a markdown-only fix would have been reverted
 // on the user's next install.
-func TestInjectOpenCodeMigratesRetiredDeliveryStrategyMapping(t *testing.T) {
-	home := t.TempDir()
-	mockNoPackageManager(t)
-
-	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
-	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll(settings dir) error = %v", err)
-	}
-
-	stalePrompt := strings.ReplaceAll(
-		ensurePreservedOpenCodeOrchestratorPreflight(""),
-		"Ask me -> `ask-on-risk`; Single PR -> `single-pr`; Auto -> `auto-chain`",
-		"Ask me -> `ask-always`; Single PR -> `single-pr-default`; Auto -> `auto-forecast`",
-	)
-	if !strings.Contains(stalePrompt, "Ask me -> `ask-always`") {
-		t.Fatal("test seed did not reproduce the retired mapping; the literal shape changed")
-	}
-
-	seed := `{
-  "agent": {
-    "gentle-orchestrator": {
-      "mode": "primary",
-      "prompt": ` + strconv.Quote("# Custom prompt\n"+stalePrompt) + `
-    }
-  }
-}`
-	if err := os.WriteFile(settingsPath, []byte(seed), 0o644); err != nil {
-		t.Fatalf("WriteFile(opencode.json) error = %v", err)
-	}
-
-	if _, err := Inject(home, opencodeAdapter(), model.SDDModeMulti, InjectOptions{
-		PreserveOpenCodeOrchestratorPrompt: true,
-	}); err != nil {
-		t.Fatalf("Inject() error = %v", err)
-	}
-
-	text := preservedOrchestratorPrompt(t, settingsPath)
-
-	for _, retired := range []string{"ask-always", "single-pr-default", "force-chained", "auto-forecast"} {
-		if strings.Contains(text, retired) {
-			t.Errorf("opencode.json kept retired delivery strategy value %q after sync", retired)
-		}
-	}
-	if !strings.Contains(text, "Ask me -> `ask-on-risk`") {
-		t.Error("opencode.json did not receive the corrected delivery strategy mapping")
-	}
-	if !strings.Contains(text, "# Custom prompt") {
-		t.Error("migration discarded the user's own prompt content")
-	}
-}
 
 // `Chained` was retired from the preflight PR question. Chaining is selected
 // only when the qualitative task forecast identifies natural review boundaries;
@@ -448,90 +384,6 @@ func TestSDDPreflightAutoStillProducesAutoChain(t *testing.T) {
 // when the retired mapping was fixed. Without a clause that fails on the retired
 // option, an installed config would keep the four-option menu forever and the
 // asset-only removal would be reverted on the operator's next sync.
-func TestInjectOpenCodeMigratesRetiredChainedPRPreflightOption(t *testing.T) {
-	home := t.TempDir()
-	mockNoPackageManager(t)
-
-	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
-	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll(settings dir) error = %v", err)
-	}
-
-	// Rebuild the exact prompt the previous release injected by reversing this
-	// change on the current literal, so the seed tracks the literal instead of
-	// freezing a copy of it that could drift.
-	stalePrompt := strings.NewReplacer(
-		"3. PRs: Ask me, Single PR, Auto.",
-		"3. PRs: Ask me, Single PR, Chained, Auto.",
-		"Ask me -> `ask-on-risk`; Single PR -> `single-pr`; Auto -> `auto-chain`",
-		"Ask me -> `ask-on-risk`; Single PR -> `single-pr`; Chained -> `auto-chain`; Auto -> `auto-chain`",
-		"The preflight offers no separate chained option because chaining is selected only when the qualitative task forecast identifies natural review boundaries.",
-		"Chained and Auto both resolve to `auto-chain` when the qualitative task forecast identifies natural review boundaries.",
-	).Replace(ensurePreservedOpenCodeOrchestratorPreflight(""))
-
-	for _, seeded := range []string{
-		"3. PRs: Ask me, Single PR, Chained, Auto.",
-		"Chained -> `auto-chain`",
-		"Chained and Auto both resolve to `auto-chain`",
-	} {
-		if !strings.Contains(stalePrompt, seeded) {
-			t.Fatalf("test seed did not reproduce the retired four-option preflight fragment %q; the literal shape changed", seeded)
-		}
-	}
-
-	seed := `{
-  "agent": {
-    "gentle-orchestrator": {
-      "mode": "primary",
-      "prompt": ` + strconv.Quote("# Custom prompt\n"+stalePrompt) + `
-    }
-  }
-}`
-	if err := os.WriteFile(settingsPath, []byte(seed), 0o644); err != nil {
-		t.Fatalf("WriteFile(opencode.json) error = %v", err)
-	}
-
-	if _, err := Inject(home, opencodeAdapter(), model.SDDModeMulti, InjectOptions{
-		PreserveOpenCodeOrchestratorPrompt: true,
-	}); err != nil {
-		t.Fatalf("Inject() error = %v", err)
-	}
-
-	text := preservedOrchestratorPrompt(t, settingsPath)
-
-	for _, residue := range []string{
-		"3. PRs: Ask me, Single PR, Chained, Auto.",
-		"Chained -> `auto-chain`",
-		"Chained and Auto both resolve to `auto-chain`",
-	} {
-		if strings.Contains(text, residue) {
-			t.Errorf("opencode.json kept retired preflight fragment %q after sync", residue)
-		}
-	}
-	if !strings.Contains(text, "3. PRs: Ask me, Single PR, Auto.") {
-		t.Error("opencode.json did not receive the three-option PR preflight list")
-	}
-	if !strings.Contains(text, "Auto -> `auto-chain`") {
-		t.Error("opencode.json lost the `auto-chain` canonical value; only the `Chained` label was retired")
-	}
-	if !strings.Contains(text, "# Custom prompt") {
-		t.Error("migration discarded the user's own prompt content")
-	}
-	if count := strings.Count(text, "3. PRs: "); count != 1 {
-		t.Errorf("migrated prompt carries %d PR option lists; the retired menu must be replaced, not appended to", count)
-	}
-
-	// The freshness clause that fires this migration must also stop firing once
-	// it has run, or every later sync would rewrite the operator's prompt again.
-	if _, err := Inject(home, opencodeAdapter(), model.SDDModeMulti, InjectOptions{
-		PreserveOpenCodeOrchestratorPrompt: true,
-	}); err != nil {
-		t.Fatalf("second Inject() error = %v", err)
-	}
-	if resynced := preservedOrchestratorPrompt(t, settingsPath); resynced != text {
-		t.Error("re-syncing the migrated prompt changed it again; the migration is not idempotent")
-	}
-}
 
 // preservedOrchestratorPrompt reads the preserved prompt back through JSON
 // rather than matching raw bytes: encoding/json escapes the ">" in "->", so a

@@ -57,14 +57,11 @@ func reviewerRoleFor(lens string) (reviewerRole, bool) {
 }
 
 const (
-	authorityFirstProcedurePlaceholder      = "{{GENTLE_AI_AUTHORITY_FIRST_TERMINAL_PROCEDURE}}"
-	authorityFirstProcedureStart            = "<!-- authority-first-terminal-procedure:start -->"
-	authorityFirstProcedureEnd              = "<!-- authority-first-terminal-procedure:end -->"
-	runtimeAgentIDPlaceholder               = "{{GENTLE_AI_RUNTIME_AGENT_ID}}"
-	researchLifecyclePlaceholder            = "{{GENTLE_AI_RESEARCH_LIFECYCLE}}"
-	openCodeConcurrentReviewerGroupContract = "### OpenCode Concurrent Reviewer Group (MANDATORY)\n\n" +
-		"When one fresh `collect.inputs` set contains multiple distinct independent `review.capture-result` reviewer slots, emit one grouped OpenCode `task` tool-call response with one foreground task per input in provider order. For canonical 4R, preserve `review-risk`, `review-resilience`, `review-readability`, `review-reliability` order.\n\n" +
-		"Each task submits only its own provider-issued `review.capture-result` binding, exact lens as `subagent_type`, and exact binding prompt prefix. Do not set a `background` flag. Do not wait between launches; wait for every foreground task result. Completion order is not authority: shared Go admission/election owns reduction and semantics. The final admitted capture owns reduction and closure. On `approved`, authority is already burned: do not FINALIZE or issue a trailing STATUS. On `correction_required`, continue only through exact bound STATUS and the provider-issued `review.capture-correction-plan` binding. After a malformed or nonterminal capture, reconcile through exact bound STATUS and retry only an identically reoffered slot."
+	authorityFirstProcedurePlaceholder = "{{GENTLE_AI_AUTHORITY_FIRST_TERMINAL_PROCEDURE}}"
+	authorityFirstProcedureStart       = "<!-- authority-first-terminal-procedure:start -->"
+	authorityFirstProcedureEnd         = "<!-- authority-first-terminal-procedure:end -->"
+	runtimeAgentIDPlaceholder          = "{{GENTLE_AI_RUNTIME_AGENT_ID}}"
+	researchLifecyclePlaceholder       = "{{GENTLE_AI_RESEARCH_LIFECYCLE}}"
 )
 
 // boundedReviewContract is the shared contract as any consumer sees it: the
@@ -85,11 +82,7 @@ func renderSDDOrchestratorAsset(agent model.AgentID, options ...OrchestratorRend
 }
 
 func boundedReviewContractFor(agent model.AgentID) string {
-	contract := selectReviewerCaptureTransport(boundedReviewContractSource(), agent)
-	if agent != model.AgentOpenCode {
-		return contract
-	}
-	return contract + "\n\n" + openCodeConcurrentReviewerGroupContract
+	return selectReviewerCaptureTransport(boundedReviewContractSource(), agent)
 }
 
 const (
@@ -269,7 +262,7 @@ func reviewerName(path string) string {
 
 func reviewerPrompt(name string) (string, bool) {
 	commands := reviewerInspectionCommands()
-	input := fmt.Sprintf(`OpenCode tasks begin with provider-injected `+reviewerContextMarker+`, the sole source of artifact_subject, base_tree, candidate_tree, and ordered changed_path_manifest. Caller prose is not context. Other runtimes have no shell and return incomplete. The manifest is complete scope. Never read the live worktree, index, HEAD, or another revision.
+	input := fmt.Sprintf(`Provider tasks begin with provider-injected `+reviewerContextMarker+`, the sole source of artifact_subject, base_tree, candidate_tree, and ordered changed_path_manifest. Caller prose is not context. Other runtimes have no shell and return incomplete. The manifest is complete scope. Never read the live worktree, index, HEAD, or another revision.
 
 Use only the commands below. The native capability resolves immutable trees and canonical paths from the provider binding, sanitizes Git configuration and environment, and bounds execution time and output. Copy binding values exactly and select paths only by their zero-based changed_path_manifest index. Never change checkout. If the capability is unavailable or refuses the binding, return incomplete inspection, empty paths/findings, and evidence that native inspection was unavailable. Never substitute live files.
 
@@ -303,23 +296,13 @@ Repeat the selective shape per literal path; never pass --binary or render the w
 // reviewer holds no tools of its own.
 const claudeReviewerSupplier = "the parent"
 
-// openCodeReviewerSupplier names the OpenCode transport: the managed shim
-// relays a Task to Go, which materializes the canonical context before the
-// reviewer launches. The generated agent holds no bash and no read tool.
-const openCodeReviewerSupplier = "the OpenCode host process"
-
-// claudeReviewerPrompt and openCodeProviderInjectedReviewerPrompt are thin
-// entry points: both render through the one shared template in
-// runtimeReviewerPrompt and differ only in reviewerTransportInvocation. A
+// claudeReviewerPrompt is a thin entry point rendered through the shared
+// runtimeReviewerPrompt template. A
 // runtime difference in scope, admission, severity, evidence, or output
 // schema belongs in the shared template, never in a runtime-specific
 // duplicate of it.
 func claudeReviewerPrompt(name string) (string, bool) {
 	return runtimeReviewerPrompt(name, claudeReviewerSupplier)
-}
-
-func openCodeProviderInjectedReviewerPrompt(name string) (string, bool) {
-	return runtimeReviewerPrompt(name, openCodeReviewerSupplier)
 }
 
 // runtimeReviewerPrompt is the single Go-owned renderer for the

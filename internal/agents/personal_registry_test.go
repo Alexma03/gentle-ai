@@ -1,7 +1,6 @@
 package agents
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 
@@ -30,16 +29,6 @@ func TestDefaultRegistryIsExactlyThePersonalFive(t *testing.T) {
 		if _, ok := registry.Adapter(definition.ID); !ok {
 			t.Fatalf("Adapter(%q) missing", definition.ID)
 		}
-	}
-}
-
-func TestDefaultRegistryValidateRejectsRetiredSelection(t *testing.T) {
-	registry, err := NewDefaultRegistry()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := registry.Validate([]model.AgentID{model.AgentClaudeCode, model.AgentOpenCode}); !errors.Is(err, ErrAgentNotSupported) {
-		t.Fatalf("Validate() error = %v, want retired selection rejection", err)
 	}
 }
 

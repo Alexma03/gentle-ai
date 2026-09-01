@@ -6,8 +6,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
 
 func TestParseSetupModeDefaultsToSupported(t *testing.T) {
@@ -16,18 +14,6 @@ func TestParseSetupModeDefaultsToSupported(t *testing.T) {
 		if got := ParseSetupMode(value); got != SetupModeSupported {
 			t.Fatalf("ParseSetupMode(%q) = %q, want %q", value, got, SetupModeSupported)
 		}
-	}
-}
-
-func TestParseSetupModeValues(t *testing.T) {
-	if got := ParseSetupMode("off"); got != SetupModeOff {
-		t.Fatalf("ParseSetupMode(off) = %q, want %q", got, SetupModeOff)
-	}
-	if got := ParseSetupMode("supported"); got != SetupModeSupported {
-		t.Fatalf("ParseSetupMode(supported) = %q, want %q", got, SetupModeSupported)
-	}
-	if got := ParseSetupMode("opencode"); got != SetupModeOpenCode {
-		t.Fatalf("ParseSetupMode(opencode) = %q, want %q", got, SetupModeOpenCode)
 	}
 }
 
@@ -44,45 +30,6 @@ func TestParseSetupStrict(t *testing.T) {
 		if ParseSetupStrict(value) {
 			t.Fatalf("ParseSetupStrict(%q) = true, want false", value)
 		}
-	}
-}
-
-func TestSetupAgentSlug(t *testing.T) {
-	tests := []struct {
-		agent model.AgentID
-		slug  string
-		ok    bool
-	}{
-		{model.AgentOpenCode, "opencode", true},
-		{model.AgentClaudeCode, "claude-code", true},
-		{model.AgentCodex, "codex", true},
-		{model.AgentAntigravity, "", false},
-		{model.AgentCursor, "", false},
-	}
-
-	for _, tt := range tests {
-		slug, ok := SetupAgentSlug(tt.agent)
-		if slug != tt.slug || ok != tt.ok {
-			t.Fatalf("SetupAgentSlug(%q) = (%q, %v), want (%q, %v)", tt.agent, slug, ok, tt.slug, tt.ok)
-		}
-	}
-}
-
-func TestShouldAttemptSetup(t *testing.T) {
-	if ShouldAttemptSetup(SetupModeOff, model.AgentOpenCode) {
-		t.Fatal("ShouldAttemptSetup(off, opencode) = true, want false")
-	}
-	if !ShouldAttemptSetup(SetupModeOpenCode, model.AgentOpenCode) {
-		t.Fatal("ShouldAttemptSetup(opencode, opencode) = false, want true")
-	}
-	if ShouldAttemptSetup(SetupModeOpenCode, model.AgentAntigravity) {
-		t.Fatal("ShouldAttemptSetup(opencode, antigravity) = true, want false")
-	}
-	if !ShouldAttemptSetup(SetupModeSupported, model.AgentClaudeCode) {
-		t.Fatal("ShouldAttemptSetup(supported, claude-code) = false, want true")
-	}
-	if ShouldAttemptSetup(SetupModeSupported, model.AgentCursor) {
-		t.Fatal("ShouldAttemptSetup(supported, cursor) = true, want false")
 	}
 }
 

@@ -64,20 +64,6 @@ func TestRenderABComplete_SuccessfulInstallResult(t *testing.T) {
 	}
 }
 
-func TestRenderABComplete_FailedInstallResult(t *testing.T) {
-	agent := &agentbuilder.GeneratedAgent{
-		Name:  "my-agent",
-		Title: "My Agent",
-	}
-	results := []agentbuilder.InstallResult{
-		{AgentID: model.AgentOpenCode, Path: "/path/SKILL.md", Success: false},
-	}
-	out := RenderABComplete(agent, results)
-	if !strings.Contains(out, string(model.AgentOpenCode)) {
-		t.Errorf("failed agent ID not found; output:\n%s", out)
-	}
-}
-
 func TestRenderABComplete_TriggerHintShown(t *testing.T) {
 	agent := &agentbuilder.GeneratedAgent{
 		Name:    "my-agent",

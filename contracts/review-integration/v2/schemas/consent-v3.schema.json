@@ -6,66 +6,179 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema", "contract", "operation", "action", "agent", "blocking", "target_identity", "projection",
-    "risk_level", "changed_files", "changed_lines", "headline", "reason", "value", "risk_evidence",
-    "choices", "off_path"
+    "schema",
+    "contract",
+    "operation",
+    "action",
+    "agent",
+    "blocking",
+    "target_identity",
+    "projection",
+    "risk_level",
+    "changed_files",
+    "changed_lines",
+    "headline",
+    "reason",
+    "value",
+    "risk_evidence",
+    "choices",
+    "off_path"
   ],
   "properties": {
-    "schema": {"const": "gentle-ai.review-integration.consent/v3"},
-    "contract": {"const": "gentle-ai.review-integration/v2"},
-    "operation": {"const": "review.start"},
-    "action": {"const": "consent_required"},
-    "agent": {"enum": ["claude-code", "opencode", "codex", "pi"]},
-    "blocking": {"const": true},
-    "target_identity": {"$ref": "#/$defs/sha256"},
-    "projection": {"enum": ["workspace", "staged"]},
-    "risk_level": {"enum": ["medium", "high"]},
-    "changed_files": {"type": "integer", "minimum": 0},
-    "changed_lines": {"type": "integer", "minimum": 0},
-    "headline": {"type": "string", "minLength": 1},
-    "reason": {"type": "string", "minLength": 1},
-    "value": {"type": "string", "minLength": 1},
-    "risk_evidence": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "schema": {
+      "const": "gentle-ai.review-integration.consent/v3"
+    },
+    "contract": {
+      "const": "gentle-ai.review-integration/v2"
+    },
+    "operation": {
+      "const": "review.start"
+    },
+    "action": {
+      "const": "consent_required"
+    },
+    "agent": {
+      "enum": [
+        "claude-code",
+        "codex",
+        "pi"
+      ]
+    },
+    "blocking": {
+      "const": true
+    },
+    "target_identity": {
+      "$ref": "#/$defs/sha256"
+    },
+    "projection": {
+      "enum": [
+        "workspace",
+        "staged"
+      ]
+    },
+    "risk_level": {
+      "enum": [
+        "medium",
+        "high"
+      ]
+    },
+    "changed_files": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "changed_lines": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "headline": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "value": {
+      "type": "string",
+      "minLength": 1
+    },
+    "risk_evidence": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "choices": {
       "type": "array",
       "minItems": 2,
       "maxItems": 2,
       "prefixItems": [
-        {"$ref": "#/$defs/choice_granted"},
-        {"$ref": "#/$defs/choice_declined"}
+        {
+          "$ref": "#/$defs/choice_granted"
+        },
+        {
+          "$ref": "#/$defs/choice_declined"
+        }
       ],
       "items": false
     },
     "off_path": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["note", "command"],
+      "required": [
+        "note",
+        "command"
+      ],
       "properties": {
-        "note": {"type": "string", "minLength": 1},
-        "command": {"const": "gentle-ai review mode disable"}
+        "note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "const": "gentle-ai review mode disable"
+        }
       }
     }
   },
   "$defs": {
-    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
     "choice": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["answer", "label", "effect", "invocation"],
+      "required": [
+        "answer",
+        "label",
+        "effect",
+        "invocation"
+      ],
       "properties": {
-        "answer": {"enum": ["granted", "declined"]},
-        "label": {"type": "string", "minLength": 1},
-        "effect": {"type": "string", "minLength": 1},
-        "invocation": {"type": "string", "pattern": "^gentle-ai review start --contract gentle-ai\\.review-integration/v2 .+ --consent (granted|declined)$"}
+        "answer": {
+          "enum": [
+            "granted",
+            "declined"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "effect": {
+          "type": "string",
+          "minLength": 1
+        },
+        "invocation": {
+          "type": "string",
+          "pattern": "^gentle-ai review start --contract gentle-ai\\.review-integration/v2 .+ --consent (granted|declined)$"
+        }
       }
     },
     "choice_granted": {
-      "allOf": [{"$ref": "#/$defs/choice"}],
-      "properties": {"answer": {"const": "granted"}}
+      "allOf": [
+        {
+          "$ref": "#/$defs/choice"
+        }
+      ],
+      "properties": {
+        "answer": {
+          "const": "granted"
+        }
+      }
     },
     "choice_declined": {
-      "allOf": [{"$ref": "#/$defs/choice"}],
-      "properties": {"answer": {"const": "declined"}}
+      "allOf": [
+        {
+          "$ref": "#/$defs/choice"
+        }
+      ],
+      "properties": {
+        "answer": {
+          "const": "declined"
+        }
+      }
     }
   }
 }

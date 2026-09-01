@@ -516,7 +516,7 @@ func (err *reviewStartContextError) Unwrap() error { return err.Cause }
 
 func RunReview(args []string, stdout io.Writer) error {
 	if len(args) == 0 || args[0] == "help" || args[0] == "-h" || args[0] == "--help" {
-		_, _ = fmt.Fprintln(stdout, "Usage: gentle-ai review <acknowledge-approved|capture-result|capture-correction-plan|capture-refuter|capture-validation|lens-context|capabilities|start|validate|status|repair|invalidate|abandon|recover|reclaim|store-reset|inspect-authority|inspect-candidate|reopen-results|schema|opencode-transport> [flags]\n\nOrdinary review facade; repository scope, authority, canonical artifacts, and lifecycle transitions are derived by Go. Provider transports relay opaque bytes only; Go materializes, admits, captures, and closes review on its final causal event. Generic review recover remains unchanged. Use review repair --preflight for provider-owned classified authority repair.")
+		_, _ = fmt.Fprintln(stdout, "Usage: gentle-ai review <acknowledge-approved|capture-result|capture-correction-plan|capture-refuter|capture-validation|lens-context|capabilities|start|validate|status|repair|invalidate|abandon|recover|reclaim|store-reset|inspect-authority|inspect-candidate|reopen-results|schema> [flags]\n\nOrdinary review facade; repository scope, authority, canonical artifacts, and lifecycle transitions are derived by Go. Provider transports relay opaque bytes only; Go materializes, admits, captures, and closes review on its final causal event. Generic review recover remains unchanged. Use review repair --preflight for provider-owned classified authority repair.")
 		return nil
 	}
 	operation, negotiated, preflightFailure := reviewIntegrationFailureRoute(args)
@@ -680,8 +680,6 @@ func runReviewCommand(args []string, stdout io.Writer) error {
 		return RunReviewReopenResults(args[1:], stdout)
 	case "schema":
 		return RunReviewSchema(args[1:], stdout)
-	case "opencode-transport":
-		return RunReviewOpenCodeTransport(args[1:], stdout)
 	default:
 		return fmt.Errorf("unknown review command %q", args[0])
 	}
@@ -1018,11 +1016,8 @@ func runReviewStatus(ctx context.Context, args []string, stdout io.Writer) error
 							artifacts, artifactErr = discoverCapturedReviewerArtifacts(ctx, root, store.Dir, record.State, record.State.CapturePhaseRevision)
 						}
 						if artifactErr == nil {
-							// OpenCode relays Go-issued role tasks through its live
-							// transport; the pi host relay collects the same roles
-							// through the printed materialize + submission route.
-							// Both discover pending roles identically here.
-							providerRoleHost := runtime == model.AgentOpenCode || reviewProviderHostRelayMaterializeRuntime(runtime) || reviewProviderCaptureRuntime(runtime)
+							// Provider roles use compiled capture or the Pi host relay.
+							providerRoleHost := reviewProviderHostRelayMaterializeRuntime(runtime) || reviewProviderCaptureRuntime(runtime)
 							if providerRoleHost && record.State.State == reviewtransaction.StateReviewing && len(artifacts) == len(record.State.SelectedLenses) {
 								_, readErr := readCapturedProviderRefuterResult(ctx, root, store.Dir, record.State, record.State.CapturePhaseRevision)
 								switch {
@@ -1040,8 +1035,7 @@ func runReviewStatus(ctx context.Context, args []string, stdout io.Writer) error
 								case readErr == nil:
 									capturedProviderTargetedValidator = true
 								case errors.Is(readErr, errReviewProviderTargetedValidatorResultNotCaptured):
-									// OpenCode and the pi host relay are the
-									// host-mediated providers. When no current slot
+									// When no current slot
 									// exists, they receive the Go-issued task that can
 									// fill one; a readable occupied slot is
 									// provider-generic.

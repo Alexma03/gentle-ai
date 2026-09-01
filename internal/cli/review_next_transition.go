@@ -64,8 +64,7 @@ type ReviewTransitionInput struct {
 	ValidationRequest   *reviewtransaction.TargetedValidationRequest  `json:"validation_request,omitempty"`
 }
 
-// ReviewProviderTask is a Go-issued host task. OpenCode relays its opaque
-// prompt and final bytes through one live child process; Go owns admission.
+// ReviewProviderTask is a Go-issued host task whose opaque prompt and final bytes remain Go-owned.
 type ReviewProviderTask struct {
 	Agent  string `json:"agent"`
 	Role   string `json:"role"`
@@ -367,7 +366,7 @@ func reviewProviderRoleTransition(reason string, binding ReviewTransitionBinding
 		Name: reviewProviderRoleInputName(role), Schema: reviewProviderRoleTaskSchema(role), CaptureOperation: "external.run_provider_role",
 		Arguments: append(reviewBindingArguments(binding),
 			reviewRepositoryContextArguments(binding)[0],
-			ReviewTransitionArgument{Name: "agent", Value: string(model.AgentOpenCode)},
+			ReviewTransitionArgument{Name: "agent", Value: string(runtime)},
 			ReviewTransitionArgument{Name: "role", Value: string(role)}),
 		ProviderTask: &task,
 	})

@@ -90,7 +90,7 @@ func injectSeparateFile(homeDir string, adapter agents.Adapter) (InjectionResult
 	return InjectionResult{Changed: writeResult.Changed, Files: []string{path}}, nil
 }
 
-// injectMergeIntoSettings merges MCP servers into a config file (OpenCode opencode.json, Gemini settings.json).
+// injectMergeIntoSettings merges MCP servers into a retained client settings file.
 func injectMergeIntoSettings(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
 	settingsPath := adapter.SettingsPath(homeDir)
 	if settingsPath == "" {
@@ -98,60 +98,7 @@ func injectMergeIntoSettings(homeDir string, adapter agents.Adapter) (InjectionR
 	}
 
 	overlay := DefaultContext7OverlayJSON()
-	if adapter.Agent() == model.AgentOpenCode {
-		return injectOpenCodeMergeIntoSettings(settingsPath)
-	}
-
 	settingsWrite, err := mergeJSONFile(settingsPath, overlay)
-	if err != nil {
-		return InjectionResult{}, err
-	}
-
-	return InjectionResult{Changed: settingsWrite.Changed, Files: []string{settingsPath}}, nil
-}
-
-func injectOpenCodeMergeIntoSettings(settingsPath string) (InjectionResult, error) {
-	baseJSON, err := osReadFile(settingsPath)
-	if err != nil {
-		return InjectionResult{}, err
-	}
-
-	overlay := OpenCodeContext7OverlayJSON()
-	if settings, parseErr := filemerge.UnmarshalJSONObject(baseJSON); parseErr == nil {
-		mcp, _ := settings["mcp"].(map[string]any)
-		context7, _ := mcp["context7"].(map[string]any)
-		if headers, ok := context7["headers"].(map[string]any); ok {
-			validHeaders := make(map[string]string, len(headers))
-			for name, value := range headers {
-				if header, valid := value.(string); valid {
-					validHeaders[name] = header
-				}
-			}
-			replacement := map[string]any{
-				"type":    "remote",
-				"url":     "https://mcp.context7.com/mcp",
-				"enabled": true,
-			}
-			if len(validHeaders) > 0 {
-				replacement["headers"] = validHeaders
-			}
-			overlay, err = json.Marshal(map[string]any{
-				"mcp": map[string]any{
-					"context7": map[string]any{"__replace__": replacement},
-				},
-			})
-			if err != nil {
-				return InjectionResult{}, fmt.Errorf("marshal opencode context7 overlay: %w", err)
-			}
-		}
-	}
-
-	merged, err := filemerge.MergeJSONObjects(baseJSON, overlay)
-	if err != nil {
-		return InjectionResult{}, err
-	}
-
-	settingsWrite, err := filemerge.WriteFileAtomic(settingsPath, merged, 0o644)
 	if err != nil {
 		return InjectionResult{}, err
 	}

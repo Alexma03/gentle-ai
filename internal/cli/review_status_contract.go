@@ -571,7 +571,7 @@ func (result ReviewTargetStatusResult) validateSubmissionDescriptors() error {
 		}
 		input := transition.Collect.Inputs[0]
 		if input.ProviderTask != nil {
-			// The OpenCode host-mediated form: a Go-issued provider validator
+			// The host-mediated form: a Go-issued provider validator
 			// task bound to the current correction authority. It carries no
 			// submission descriptor.
 			return result.validateTargetedValidatorProviderTaskInput(input)
@@ -625,7 +625,7 @@ func validateReviewProviderTaskInput(input ReviewTransitionInput, arguments map[
 	role := reviewerprovider.Role(task.Role)
 	contract, err := reviewerprovider.ContractFor(role)
 	if err != nil || input.CaptureOperation != "external.run_provider_role" || input.Schema != string(contract.ResultSchema) ||
-		task.Agent != reviewProviderRoleOpenCodeAgent(role) || len(arguments) != 6 || arguments["agent"] != string(model.AgentOpenCode) ||
+		task.Agent != reviewProviderRoleAgent(role) || len(arguments) != 6 || arguments["agent"] == "" ||
 		arguments["role"] != task.Role || arguments["repository-context"] == "" {
 		return errors.New("provider role collection is not an exact Go-owned binding") // refusal:by-design world-action: provider role collection must remain an exact Go-issued binding
 	}

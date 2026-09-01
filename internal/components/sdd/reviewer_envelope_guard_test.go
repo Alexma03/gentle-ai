@@ -201,41 +201,6 @@ func declaredLensTools(t *testing.T, path string) (tools []string, readOnlyAsser
 // TestLensAgentPromptsStateWhereTheirInputComesFrom is the input-side twin of
 // the envelope guard. Claude Code receives immutable prompt context, while
 // unsupported runtimes stop before they can inspect mutable workspace files.
-func TestLensAgentPromptsStateWhereTheirInputComesFrom(t *testing.T) {
-	envelope := reviewtransaction.NewReviewerResultEnvelope()
-
-	// The orchestrator contract is the source for the current immutable
-	// inspection route that rendered reviewer prompts must preserve.
-	contract := assets.MustRead(boundedReviewContractAsset)
-	if !strings.Contains(contract, "Claude Code, OpenCode, Codex, and Pi use the shared Go provider contract") ||
-		!strings.Contains(contract, "Reviewers inspect only the provider-bound immutable trees") {
-		t.Fatalf("%s no longer requires provider-bound frozen-tree inspection; update the guard's derivation", boundedReviewContractAsset)
-	}
-
-	for _, paths := range lensAgentAssetPaths(t, envelope.LensAgentNames) {
-		for _, path := range paths {
-			if strings.HasPrefix(path, "claude/agents/") {
-				continue // Claude's separate prompt transport is pinned in bounded_review_contract_test.go.
-			}
-			prompt := strings.ToLower(renderBoundedReviewAsset(agentForAssetPath(t, path), path))
-			for claim, why := range map[string]string{
-				"artifact_subject":      "does not name the bound artifact subject",
-				"changed_path_manifest": "does not name the ordered manifest",
-				"base_tree":             "does not name the immutable base tree",
-				"candidate_tree":        "does not name the immutable candidate tree",
-				"inspect-candidate":     "does not require provider-owned native inspection",
-				"--operation numstat":   "does not require compact numstat discovery",
-				"--path-index":          "does not select paths by canonical manifest index",
-				"provider binding":      "does not resolve trees from the provider binding",
-				"never read the live":   "does not prohibit mutable workspace inspection",
-			} {
-				if !strings.Contains(prompt, claim) {
-					t.Errorf("%s %s (missing %q)", path, why, claim)
-				}
-			}
-		}
-	}
-}
 
 // TestJudgmentDayPromptsDoNotClaimTheLensEnvelope pins the resolution of the
 // contradiction between the two documents: a judgment-day judge result is a

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,13 +12,12 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/claude"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/codex"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/cursor"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
 
-func claudeAdapter() agents.Adapter   { return claude.NewAdapter() }
-func opencodeAdapter() agents.Adapter { return opencode.NewAdapter() }
-func cursorAdapter() agents.Adapter   { return cursor.NewAdapter() }
+func claudeAdapter() agents.Adapter { return claude.NewAdapter() }
+
+func cursorAdapter() agents.Adapter { return cursor.NewAdapter() }
 
 func codexAdapter() agents.Adapter       { return codex.NewAdapter() }
 func antigravityAdapter() agents.Adapter { return antigravity.NewAdapter() }
@@ -82,50 +80,6 @@ func writeCodexConfig(t *testing.T, home, content string) string {
 
 // TestInjectHermesSkipsPermissions verifies that Hermes returns nil (no file written)
 // because Hermes permission format is undocumented — §14 of spec.
-
-func TestInjectOpenCodeIsIdempotent(t *testing.T) {
-	home := t.TempDir()
-
-	first, err := Inject(home, opencodeAdapter())
-	if err != nil {
-		t.Fatalf("Inject() first error = %v", err)
-	}
-	if !first.Changed {
-		t.Fatalf("Inject() first changed = false")
-	}
-
-	second, err := Inject(home, opencodeAdapter())
-	if err != nil {
-		t.Fatalf("Inject() second error = %v", err)
-	}
-	if second.Changed {
-		t.Fatalf("Inject() second changed = true")
-	}
-
-	path := filepath.Join(home, ".config", "opencode", "opencode.json")
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("expected config file %q: %v", path, err)
-	}
-
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile(opencode.json) error = %v", err)
-	}
-
-	text := string(content)
-	if !strings.Contains(text, `"permission"`) {
-		t.Fatal("opencode.json missing permission key")
-	}
-	if strings.Contains(text, `"permissions"`) {
-		t.Fatal("opencode.json should use 'permission' (singular), not 'permissions'")
-	}
-	if !strings.Contains(text, `"bash"`) {
-		t.Fatal("opencode.json permission missing bash section")
-	}
-	if !strings.Contains(text, `"read"`) {
-		t.Fatal("opencode.json permission missing read section")
-	}
-}
 
 func TestInjectAddsEnvToDenyList(t *testing.T) {
 	home := t.TempDir()
@@ -369,67 +323,6 @@ func TestInjectClaudeCodeSensitivePathsDenied(t *testing.T) {
 
 // TestInjectOpenCodeSensitivePathsDenied verifies that the default sensitive-path
 // deny list is present in the OpenCode/Kilocode read permissions block.
-func TestInjectOpenCodeSensitivePathsDenied(t *testing.T) {
-	sensitivePatterns := []string{
-		"**/.ssh/**",
-		"**/.credentials/**",
-		"**/Library/Keychains/**",
-		"**/.aws/credentials",
-		"**/.config/gh/hosts.yml",
-		"**/*.pem",
-		"**/*.key",
-	}
-
-	tests := []struct {
-		name    string
-		adapter agents.Adapter
-	}{
-		{"opencode", opencodeAdapter()},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			home := t.TempDir()
-			if _, err := Inject(home, tt.adapter); err != nil {
-				t.Fatalf("Inject() error = %v", err)
-			}
-
-			settingsPath := tt.adapter.SettingsPath(home)
-			content, err := os.ReadFile(settingsPath)
-			if err != nil {
-				t.Fatalf("read settings file %q: %v", settingsPath, err)
-			}
-
-			var settings map[string]any
-			if err := json.Unmarshal(content, &settings); err != nil {
-				t.Fatalf("unmarshal settings json: %v", err)
-			}
-
-			permNode, ok := settings["permission"].(map[string]any)
-			if !ok {
-				t.Fatalf("permission node missing or invalid: %#v", settings["permission"])
-			}
-
-			readNode, ok := permNode["read"].(map[string]any)
-			if !ok {
-				t.Fatalf("read node missing or invalid: %#v", permNode["read"])
-			}
-
-			for _, pattern := range sensitivePatterns {
-				t.Run(pattern, func(t *testing.T) {
-					val, exists := readNode[pattern]
-					if !exists {
-						t.Errorf("read deny list missing pattern %q", pattern)
-						return
-					}
-					if val != "deny" {
-						t.Errorf("pattern %q has value %q, want %q", pattern, val, "deny")
-					}
-				})
-			}
-		})
-	}
-}
 
 // TestInjectClaudeCodeDefaultDenyRulesApplied ensures that the default deny
 // rules (including sensitive paths) are written into settings.json even when
@@ -498,55 +391,3 @@ func TestInjectClaudeCodeDefaultDenyRulesApplied(t *testing.T) {
 
 // TestInjectOpenCodePreservesExistingDenyRules ensures that user-managed read deny
 // entries already present in settings.json are not removed when the overlay is applied.
-func TestInjectOpenCodePreservesExistingDenyRules(t *testing.T) {
-	home := t.TempDir()
-	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
-	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll() error = %v", err)
-	}
-
-	existing := `{
-  "permission": {
-    "read": {
-      "**/my-secret/**": "deny"
-    }
-  }
-}`
-	if err := os.WriteFile(settingsPath, []byte(existing), 0o644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
-
-	if _, err := Inject(home, opencodeAdapter()); err != nil {
-		t.Fatalf("Inject() error = %v", err)
-	}
-
-	content, err := os.ReadFile(settingsPath)
-	if err != nil {
-		t.Fatalf("read settings file: %v", err)
-	}
-
-	var settings map[string]any
-	if err := json.Unmarshal(content, &settings); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-
-	permNode, ok := settings["permission"].(map[string]any)
-	if !ok {
-		t.Fatalf("permission node missing")
-	}
-
-	readNode, ok := permNode["read"].(map[string]any)
-	if !ok {
-		t.Fatalf("read node missing")
-	}
-
-	// Original user rule must still be present
-	if readNode["**/my-secret/**"] != "deny" {
-		t.Errorf("user-managed read deny rule '**/my-secret/**' was removed; got: %v", readNode)
-	}
-
-	// New sensitive-path rules must also be present
-	if readNode["**/.ssh/**"] != "deny" {
-		t.Errorf("default read deny rule '**/.ssh/**' was not added; got: %v", readNode)
-	}
-}

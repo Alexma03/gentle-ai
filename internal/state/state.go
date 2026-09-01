@@ -16,8 +16,8 @@ const stateDir = ".gentle-ai"
 const stateFile = "state.json"
 
 // ModelAssignmentState is the JSON-serialisable form of a provider+model pair
-// used by OpenCode-style model assignments. It mirrors model.ModelAssignment
-// but lives in the state package to avoid an import cycle.
+// used by retired profile assignments. It remains solely for reversible
+// migration and mirrors model.ModelAssignment without creating an import cycle.
 // Effort is the reasoning effort level ("" | "low" | "medium" | "high");
 // omitempty ensures backward-compatibility with existing state files.
 type ModelAssignmentState struct {
@@ -69,9 +69,7 @@ type InstallState struct {
 	// It supersedes ClaudeModelAssignments while preserving backward compatibility.
 	ClaudePhaseAssignments map[string]ClaudePhaseAssignmentState `json:"claude_phase_assignments,omitempty"`
 
-	// KiroModelAssignments maps SDD phase names to a Kiro-native model alias.
-	// Values like "opus", "sonnet", and "haiku" remain valid for state files
-	// written before Kiro had its own picker options.
+	// KiroModelAssignments preserves a retired client field for reversible migration.
 	KiroModelAssignments map[string]string `json:"kiro_model_assignments,omitempty"`
 
 	// CodexModelAssignments maps SDD phase names to a Codex reasoning_effort value
@@ -96,7 +94,7 @@ type InstallState struct {
 	// unchanged for backward-compatibility).
 	CodexPhaseModelAssignments map[string]string `json:"codexPhaseModelAssignments,omitempty"`
 
-	// ModelAssignments maps sub-agent names to provider/model pairs (OpenCode).
+	// ModelAssignments preserves retired provider/model pairs for rollback.
 	ModelAssignments map[string]ModelAssignmentState `json:"model_assignments,omitempty"`
 
 	// Persona records the persona the user installed ("gentleman", "neutral",
@@ -143,8 +141,7 @@ type InstallState struct {
 	BackgroundIntent model.OpenCodeBackgroundIntent `json:"opencode_background_subagents,omitempty"`
 
 	// PiBackgroundIntent is the managed Pi background-subagent choice. It is
-	// persisted separately from the OpenCode field because each key is part of
-	// an independent state contract.
+	// persisted independently from retired compatibility fields.
 	PiBackgroundIntent model.PiBackgroundIntent `json:"pi_background_subagents,omitempty"`
 }
 

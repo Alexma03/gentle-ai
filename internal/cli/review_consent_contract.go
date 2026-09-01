@@ -282,7 +282,7 @@ func newReviewIntegrationConsentResult(
 	}
 	if contract == ReviewIntegrationContractV2 {
 		// Issue #2676: this literal used to be unconditional, so a negotiated
-		// START explicitly bound to another runtime (OpenCode, Codex) still
+		// START explicitly bound to another runtime (retired host, Codex) still
 		// reported "claude-code" here while its own follow-up invocations
 		// below were already rendered from the real binding. Bind the same
 		// declared identity the caller proved eligible; only the undeclared
@@ -324,9 +324,9 @@ func (result ReviewIntegrationConsentResult) Validate() error {
 	// reviewRuntimeWithImmutableTransport gates negotiated START on (Wave 4
 	// S4's fixed RDD policy) -- rather than a fresh allowlist that could drift
 	// from it. This accepts every declared runtime proven eligible at START
-	// (claude-code, opencode, codex today), and fail-closed rejects an empty
+	// (claude-code, retired-host, codex today), and fail-closed rejects an empty
 	// identity, an unknown string, and a runtime that is eligible under the
-	// RDD policy but still dormant for this contract (e.g. Kilocode has no
+	// RDD policy but still dormant for this contract (e.g. legacy client has no
 	// proven fresh-reviewer boundary yet), because none of those can ever
 	// legitimately reach this envelope.
 	currentNativeGitContract := result.Schema == ReviewIntegrationConsentSchemaV3 && result.Contract == ReviewIntegrationContractV2 &&

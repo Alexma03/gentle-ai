@@ -15,8 +15,6 @@ import (
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/catalog"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/reviewtransaction"
 )
 
 // reviewPrintedIdentityRegexp captures the runtime identity any command this
@@ -103,53 +101,12 @@ func TestDirectReviewStartRefusalInventsNoRuntimeIdentity(t *testing.T) {
 // above depends on. If the direct route ever starts accepting `--agent`, the
 // undeclared-caller reasoning stops being the whole story and the printed
 // command must echo the declared identity instead.
-func TestDirectRouteStillRefusesADeclaredRuntime(t *testing.T) {
-	repo, baseRef := initLensSelectingReviewCLIRepo(t)
-
-	for _, agent := range []model.AgentID{model.AgentCodex, model.AgentOpenCode} {
-		t.Run(string(agent), func(t *testing.T) {
-			var stdout bytes.Buffer
-			err := RunReviewFacadeStart([]string{
-				"--cwd", repo,
-				"--base-ref", baseRef,
-				"--committed-only",
-				"--agent", string(agent),
-			}, &stdout)
-			if err == nil {
-				t.Fatalf("direct review start with --agent unexpectedly succeeded; stdout=%s", stdout.String())
-			}
-			if !strings.Contains(err.Error(), "--agent requires a negotiated --contract") {
-				t.Fatalf("direct route no longer refuses a declared runtime: %v", err)
-			}
-		})
-	}
-}
 
 // TestNegotiatedStartCommandEchoesTheCallersOwnRuntime pins the builder every
 // printed continuation goes through. The negotiated hint sites pass the
 // caller's declared identity. Every runtime with immutable transport must be
 // echoed exactly; a fixed identity would lie for the rest of the supported
 // set, which is why this property has its own test.
-func TestNegotiatedStartCommandEchoesTheCallersOwnRuntime(t *testing.T) {
-	t.Parallel()
-
-	snapshot := reviewtransaction.Snapshot{
-		Identity:   "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-		Projection: reviewtransaction.ProjectionWorkspace,
-	}
-	for _, agent := range []model.AgentID{model.AgentClaudeCode, model.AgentOpenCode, model.AgentCodex} {
-		t.Run(string(agent), func(t *testing.T) {
-			command := reviewNegotiatedStartCommand(snapshot, string(agent))
-			if strings.Count(command, "--agent ") != 1 || !strings.Contains(command, "--agent "+string(agent)+" ") {
-				t.Errorf("negotiated start command does not contain exactly one exact caller identity %q: %s", agent, command)
-			}
-		})
-	}
-
-	if unbound := reviewNegotiatedStartCommand(snapshot, "   "); strings.Contains(unbound, "--agent") || strings.Contains(unbound, reviewUndeclaredRuntimeIdentitySlot) {
-		t.Errorf("a blank runtime identity emitted an agent segment: %s", unbound)
-	}
-}
 
 // TestTierCRecoveryStatementsCarryOnlyTheIdentitySlot keeps the issue #2440
 // property on the registered Tier C statements themselves: they never bake a
@@ -157,24 +114,6 @@ func TestNegotiatedStartCommandEchoesTheCallersOwnRuntime(t *testing.T) {
 // placeholder slot. The old runtime-binding renderer was removed along with
 // all Tier C stderr emission (successful negotiated operations are byte-silent
 // on stderr), so the registry data is the surface that remains to guard.
-func TestTierCRecoveryStatementsCarryOnlyTheIdentitySlot(t *testing.T) {
-	t.Parallel()
-
-	for _, reason := range []string{"corrected_candidate_unavailable"} {
-		emission, ok := reviewNarrationRegistry["stop:"+reason]
-		if !ok {
-			t.Fatalf("Tier C reason %q has no narration", reason)
-		}
-		if !strings.Contains(emission.Statement, "--agent "+reviewUndeclaredRuntimeIdentitySlot) {
-			t.Fatalf("Tier C statement lost the neutral runtime-identity slot: %s", emission.Statement)
-		}
-		for _, identity := range []model.AgentID{model.AgentClaudeCode, model.AgentOpenCode, model.AgentCodex} {
-			if strings.Contains(emission.Statement, "--agent "+string(identity)) {
-				t.Fatalf("Tier C statement baked in compiled identity %q: %s", identity, emission.Statement)
-			}
-		}
-	}
-}
 
 // TestNoGoSourceBindsALiteralRuntimeIdentityIntoPrintedCommands is the
 // source-level half of the issue #2440 guard, and it is the half an

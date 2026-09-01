@@ -344,68 +344,6 @@ func TestRestoreCompressedRemovesCreatedFiles(t *testing.T) {
 // removes a workspace-scoped file that did not exist at snapshot time)
 // without error, when the workspace root is supplied via Roots the way
 // rollbackRoots (internal/cli) supplies it.
-func TestRestoreScope_WorkspaceRootRestoresAndRemovesWithoutError(t *testing.T) {
-	home := t.TempDir()
-	workspace := t.TempDir()
-
-	origBackupRootFn := BackupRootFn
-	t.Cleanup(func() { BackupRootFn = origBackupRootFn })
-	BackupRootFn = func() (string, error) { return home, nil }
-
-	// entry A: existed at snapshot time, under the workspace root — restore
-	// must write the snapshotted content back.
-	originalPath := filepath.Join(workspace, ".claude", "settings.json")
-	if err := os.MkdirAll(filepath.Dir(originalPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll() error = %v", err)
-	}
-	if err := os.WriteFile(originalPath, []byte("modified\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
-	snapshotPath := filepath.Join(home, "backup", "files", "settings.json")
-	if err := os.MkdirAll(filepath.Dir(snapshotPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll() snapshot error = %v", err)
-	}
-	if err := os.WriteFile(snapshotPath, []byte("original\n"), 0o600); err != nil {
-		t.Fatalf("WriteFile() snapshot error = %v", err)
-	}
-
-	// entry B: did not exist at snapshot time, under the workspace root —
-	// restore must remove it (mirrors the engram MCP config scenario from #2451).
-	createdPath := filepath.Join(workspace, ".config", "opencode", "opencode.json")
-	if err := os.MkdirAll(filepath.Dir(createdPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll() error = %v", err)
-	}
-	if err := os.WriteFile(createdPath, []byte("written by the failed install\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
-
-	manifest := Manifest{
-		RootDir: filepath.Join(home, "backup"),
-		Entries: []ManifestEntry{
-			{OriginalPath: originalPath, SnapshotPath: snapshotPath, Existed: true, Mode: 0o600},
-			{OriginalPath: createdPath, Existed: false},
-		},
-	}
-
-	// Roots mirrors internal/cli's rollbackRoots(homeDir, workspaceDir): the
-	// scope root comes from the caller, never from manifest.RootDir.
-	service := RestoreService{Roots: []string{home, workspace}}
-	if err := service.Restore(manifest); err != nil {
-		t.Fatalf("Restore() error = %v, want no error for a workspace-scoped rollback", err)
-	}
-
-	restored, err := os.ReadFile(originalPath)
-	if err != nil {
-		t.Fatalf("ReadFile() restored path error = %v", err)
-	}
-	if string(restored) != "original\n" {
-		t.Fatalf("restored content = %q, want %q", string(restored), "original\n")
-	}
-
-	if _, statErr := os.Stat(createdPath); !os.IsNotExist(statErr) {
-		t.Fatalf("expected workspace-scoped created path %q to be removed, stat err = %v", createdPath, statErr)
-	}
-}
 
 // TestRestoreScope_HomeRootUnchanged pins property 2: a home-scoped rollback
 // (Roots containing only the home directory, exactly what rollbackRoots

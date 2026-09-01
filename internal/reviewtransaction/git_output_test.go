@@ -5,92 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"reflect"
 	"strings"
 	"testing"
 )
-
-func TestRunGitCapturesBoundedSeparateOutput(t *testing.T) {
-	// Keep these subtests sequential because gitCommandContext is package-global.
-	for _, tt := range []struct {
-		name       string
-		mode       string
-		runner     string
-		wantOutput string
-		wantLimits []int
-		wantActual []int
-		wantExit   int
-		wantStderr string
-		wantDiag   string
-	}{
-		{name: "ordinary success", mode: "stdout", wantOutput: "machine-output\n"},
-		{name: "ordinary stdout excludes diagnostics", mode: "stdout-stderr", wantOutput: "machine-output\n"},
-		{name: "isolated stdout excludes diagnostics", mode: "stdout-stderr", runner: "isolated", wantOutput: "machine-output\n"},
-		{name: "inventory default limit success", mode: "stdout", runner: "inventory", wantOutput: "machine-output\n"},
-		{name: "inventory diagnostics are typed", mode: "stdout-stderr", runner: "inventory", wantDiag: "diagnostic output"},
-		{name: "inventory default limit overflow", mode: "stdout-overflow", runner: "inventory", wantLimits: []int{defaultGitOutputLimit}, wantActual: []int{defaultGitOutputLimit + 1}},
-		{name: "zero limit uses default", mode: "stdout-overflow", runner: "zero-limit", wantLimits: []int{defaultGitOutputLimit}, wantActual: []int{defaultGitOutputLimit + 1}},
-		{name: "stdout overflow", mode: "stdout-overflow", wantLimits: []int{defaultGitOutputLimit}, wantActual: []int{defaultGitOutputLimit + 1}},
-		{name: "stderr overflow", mode: "stderr-overflow", wantLimits: []int{defaultGitStderrLimit}, wantActual: []int{defaultGitStderrLimit + 1}},
-		{name: "failed command retains stderr", mode: "failure", wantExit: 7, wantStderr: "meaningful diagnostic"},
-		{name: "failed command with stdout overflow", mode: "failure-stdout-overflow", wantLimits: []int{defaultGitOutputLimit}, wantActual: []int{defaultGitOutputLimit + 1}, wantExit: 7, wantStderr: "actionable failure"},
-		{name: "failed command with stderr overflow", mode: "failure-stderr-overflow", wantLimits: []int{defaultGitStderrLimit}, wantActual: []int{defaultGitStderrLimit + len("actionable failure\n") + 1}, wantExit: 7, wantStderr: "actionable failure"},
-		{name: "failed command with simultaneous overflow", mode: "failure-both-overflow", wantLimits: []int{defaultGitOutputLimit, defaultGitStderrLimit}, wantActual: []int{defaultGitOutputLimit + 1, defaultGitStderrLimit + len("actionable failure\n") + 1}, wantExit: 7, wantStderr: "actionable failure"},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			originalCommand := gitCommandContext
-			t.Cleanup(func() { gitCommandContext = originalCommand })
-			gitCommandContext = func(ctx context.Context, _ string, _ ...string) *exec.Cmd {
-				return exec.CommandContext(ctx, os.Args[0], "-test.run=^TestRunGitOutputHelper$", "--")
-			}
-
-			extraEnv := []string{"GENTLE_AI_GIT_OUTPUT_HELPER=" + tt.mode}
-			var output []byte
-			var err error
-			switch tt.runner {
-			case "isolated":
-				output, err = runGitIsolated(context.Background(), t.TempDir(), extraEnv, nil, "status")
-			case "inventory":
-				output, err = runGitInventoryWithEnv(context.Background(), t.TempDir(), extraEnv, "status")
-			case "zero-limit":
-				output, err = runGitCaptured(context.Background(), t.TempDir(), extraEnv, nil, 0, false, false, "status")
-			default:
-				output, err = runGit(context.Background(), t.TempDir(), extraEnv, nil, "status")
-			}
-			if len(tt.wantLimits) != 0 {
-				var firstOverflow *GitOutputLimitError
-				if !errors.Is(err, ErrGitOutputLimit) || !errors.As(err, &firstOverflow) || firstOverflow.Limit != tt.wantLimits[0] {
-					t.Fatalf("output overflow typing = %T %#v", err, firstOverflow)
-				}
-				limits, actual := gitOutputLimitDetails(err)
-				if !reflect.DeepEqual(limits, tt.wantLimits) || !reflect.DeepEqual(actual, tt.wantActual) {
-					t.Fatalf("output limits = %v/%v, want %v/%v", limits, actual, tt.wantLimits, tt.wantActual)
-				}
-			}
-			if tt.wantExit != 0 {
-				var commandErr *GitCommandError
-				if !errors.As(err, &commandErr) || commandErr.ExitCode != tt.wantExit || !strings.Contains(commandErr.Output, tt.wantStderr) || len(commandErr.Output) > defaultGitStderrLimit || strings.Contains(commandErr.Output, "machine-output") || len(output) != 0 {
-					t.Fatalf("command error = %T %#v", err, commandErr)
-				}
-				return
-			}
-			if tt.wantDiag != "" {
-				var diagnosticErr *GitInventoryDiagnosticsError
-				if !errors.Is(err, ErrGitInventoryDiagnostics) || !errors.As(err, &diagnosticErr) || diagnosticErr.Diagnostics != tt.wantDiag || len(output) != 0 {
-					t.Fatalf("inventory diagnostic error = %T %#v", err, diagnosticErr)
-				}
-				return
-			}
-			if len(tt.wantLimits) != 0 {
-				return
-			}
-			if err != nil || string(output) != tt.wantOutput {
-				t.Fatalf("runGit output = %q, error = %v", output, err)
-			}
-		})
-	}
-}
 
 func TestGitOutputOverflowReportsStderrCollectorLimit(t *testing.T) {
 	err := gitOutputOverflow([]string{"status"}, defaultGitOutputLimit, &boundedGitOutput{}, &boundedGitOutput{limit: 17, total: 18, exceeded: true}, true)

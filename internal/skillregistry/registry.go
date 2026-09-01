@@ -60,24 +60,15 @@ func UserSkillDirs(home string) []string {
 		filepath.Join(home, ".pi", "agent", "skills"),
 		filepath.Join(home, ".config", "agents", "skills"),
 		filepath.Join(home, ".agents", "skills"),
-		filepath.Join(home, ".kimi", "skills"),
 
 		// Agent-specific global skill locations supported by Gentle AI adapters.
-		filepath.Join(home, ".config", "opencode", "skills"),
-		filepath.Join(home, ".config", "kilo", "skills"),
 		filepath.Join(home, ".claude", "skills"),
 		filepath.Join(home, ".gemini", "skills"),
 		filepath.Join(home, ".gemini", "antigravity", "skills"),
 		filepath.Join(home, ".gemini", "antigravity-desktop", "skills"),
 		filepath.Join(home, ".gemini", "antigravity-cli", "skills"),
 		filepath.Join(home, ".cursor", "skills"),
-		filepath.Join(home, ".copilot", "skills"),
 		filepath.Join(home, ".codex", "skills"),
-		filepath.Join(home, ".codeium", "windsurf", "skills"),
-		filepath.Join(home, ".qwen", "skills"),
-		filepath.Join(home, ".kiro", "skills"),
-		filepath.Join(home, ".openclaw", "skills"),
-		filepath.Join(home, ".hermes", "skills"),
 	}
 }
 
@@ -87,22 +78,16 @@ func ProjectSkillDirs(cwd string) []string {
 		filepath.Join(cwd, "skills"),
 
 		// Agent-native workspace skill locations.
-		filepath.Join(cwd, ".opencode", "skills"),
 		filepath.Join(cwd, ".claude", "skills"),
 		filepath.Join(cwd, ".gemini", "skills"),
 		filepath.Join(cwd, ".cursor", "skills"),
-		filepath.Join(cwd, ".github", "skills"),
 		filepath.Join(cwd, ".codex", "skills"),
-		filepath.Join(cwd, ".qwen", "skills"),
-		filepath.Join(cwd, ".kiro", "skills"),
-		filepath.Join(cwd, ".openclaw", "skills"),
 
 		// Gentle AI/Pi and generic Agent Skills workspace locations.
 		filepath.Join(cwd, ".pi", "skills"),
 		filepath.Join(cwd, ".agent", "skills"),
 		filepath.Join(cwd, ".agents", "skills"),
 		filepath.Join(cwd, ".atl", "skills"),
-		filepath.Join(cwd, ".hermes", "skills"),
 	}
 }
 
@@ -209,7 +194,7 @@ func EnsureATLIgnored(cwd string) error {
 	if !strings.Contains(existing, "# Local AI runtime state") && !strings.Contains(existing, "# Local Pi runtime state") {
 		header = "# Local AI runtime state\n"
 	}
-	// Atomic write guards against concurrent startup hooks (Codex + OpenCode +
+	// Atomic write guards against concurrent startup hooks (Codex + Pi +
 	// Claude) racing on .gitignore, matching how the registry file is written.
 	if _, err := filemerge.WriteFileAtomic(gitignorePath, []byte(existing+prefix+header+atlIgnoreEntry+"\n"), 0o644); err != nil {
 		return fmt.Errorf("write .gitignore: %w", err)

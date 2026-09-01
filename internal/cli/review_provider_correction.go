@@ -17,7 +17,7 @@ import (
 // grants exactly one corrective re-invocation whose prompt is the original
 // materialized prompt plus the exact admission error and the three rules the
 // result broke. The bound is a named constant, the retry lives only here, and
-// it never applies to --input submissions or the OpenCode host relay: those
+// it never applies to --input submissions or the retired host host relay: those
 // hosts own their reviewer and receive the same preserved payload instead.
 const (
 	maxReviewerResultAdmissionAttempts     = 2

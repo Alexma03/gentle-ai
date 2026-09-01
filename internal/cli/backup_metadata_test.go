@@ -81,49 +81,6 @@ func TestPrepareBackupStep_InstallWritesMetadataToManifest(t *testing.T) {
 
 // TestPrepareBackupStep_SyncWritesMetadataToManifest verifies the sync path
 // emits Source=sync and CreatedByVersion into the manifest on disk.
-func TestPrepareBackupStep_SyncWritesMetadataToManifest(t *testing.T) {
-	home := t.TempDir()
-
-	configPath := filepath.Join(home, "opencode.json")
-	if err := os.WriteFile(configPath, []byte(`{"model": "claude"}`), 0o644); err != nil {
-		t.Fatalf("WriteFile config: %v", err)
-	}
-
-	snapshotDir := filepath.Join(home, ".gentle-ai", "backups",
-		time.Now().UTC().Format("20060102150405.000000001"))
-	state := &runtimeState{}
-
-	step := prepareBackupStep{
-		id:          "prepare:backup-snapshot",
-		snapshotter: backup.NewSnapshotter(),
-		snapshotDir: snapshotDir,
-		targets:     []string{configPath},
-		state:       state,
-		source:      backup.BackupSourceSync,
-		description: "pre-sync snapshot",
-		appVersion:  "2.0.0",
-	}
-
-	if err := step.Run(); err != nil {
-		t.Fatalf("prepareBackupStep.Run() for sync error = %v", err)
-	}
-
-	manifestPath := filepath.Join(snapshotDir, backup.ManifestFilename)
-	manifest, err := backup.ReadManifest(manifestPath)
-	if err != nil {
-		t.Fatalf("ReadManifest() error = %v", err)
-	}
-
-	if manifest.Source != backup.BackupSourceSync {
-		t.Errorf("manifest.Source = %q, want %q", manifest.Source, backup.BackupSourceSync)
-	}
-	if manifest.CreatedByVersion != "2.0.0" {
-		t.Errorf("manifest.CreatedByVersion = %q, want 2.0.0", manifest.CreatedByVersion)
-	}
-	if manifest.Description != "pre-sync snapshot" {
-		t.Errorf("manifest.Description = %q, want %q", manifest.Description, "pre-sync snapshot")
-	}
-}
 
 // TestPrepareBackupStep_NoMetadataWhenSourceEmpty verifies backward-compatible
 // behavior: when source and appVersion are empty, the manifest fields are

@@ -100,29 +100,6 @@ func newCompactReviewerCaptureFixture(t *testing.T, lineage string) compactRevie
 // TestCompactReviewerResultSidecarOwnersAreAbsent prevents the retired result
 // directory from becoming a lifecycle owner again. Lens result bytes and their
 // digests live only in CompactState.AdmittedRoleResults.
-func TestCompactReviewerResultSidecarOwnersAreAbsent(t *testing.T) {
-	for _, source := range []string{
-		"compact_store.go",
-		"compact_reclaim.go",
-		filepath.Join("..", "cli", "review_opencode_transport.go"),
-	} {
-		payload, err := os.ReadFile(source)
-		if err != nil {
-			t.Fatalf("read production owner %s: %v", source, err)
-		}
-		for _, forbidden := range []string{
-			"CompactReviewerResultsDir", "reviewer-results", "reviewResultArtifactPath",
-			"CompactIncidentsDir", "EnsureCompactIncidentsDir", "ResultDispositions",
-		} {
-			if strings.Contains(string(payload), forbidden) {
-				t.Fatalf("retired compact result owner %q remains in %s", forbidden, source)
-			}
-		}
-	}
-	if _, err := os.Stat("compact_result_disposition.go"); !os.IsNotExist(err) {
-		t.Fatalf("retired compact result disposition owner remains: %v", err)
-	}
-}
 
 func TestApprovedAcknowledgementHasNoImmediateBurnOrSidecarRevival(t *testing.T) {
 	root := filepath.Join("..", "..")
@@ -135,7 +112,7 @@ func TestApprovedAcknowledgementHasNoImmediateBurnOrSidecarRevival(t *testing.T)
 		filepath.Join(root, "internal", "reviewtransaction", "compact_burn.go"),
 		filepath.Join(root, "scripts", "crosslane", "battery.go"),
 		filepath.Join(root, "bench", "journeys_wave3.go"),
-		filepath.Join(root, "bench", "journeys_provider_capture.go"), filepath.Join(root, "e2e", "organicruntime", "organic_runtime_test.go"),
+		filepath.Join(root, "bench", "journeys_provider_capture.go"),
 	} {
 		payload, err := os.ReadFile(source)
 		if err != nil {

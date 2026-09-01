@@ -22,9 +22,7 @@ const retryGuidance = "Do not retry or advance SDD; inspect the existing artifac
 // told to preserve verbatim.
 var routeToken = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,255}$`)
 
-// handoffPayload field order is the wire order. It matches the shape the
-// OpenCode transport already emits so a consumer cannot tell which side
-// produced it.
+// handoffPayload field order is the wire order shared by retained runtimes.
 type handoffPayload struct {
 	SchemaName   string `json:"schemaName"`
 	Status       string `json:"status"`

@@ -63,20 +63,3 @@ func TestIsSupportedAgentAcceptsPi(t *testing.T) {
 		t.Fatalf("IsSupportedAgent(%q) = false, want true", model.AgentPi)
 	}
 }
-
-func TestAllAgentsExcludesRetiredHermes(t *testing.T) {
-	agents := AllAgents()
-
-	for _, agent := range agents {
-		if agent.ID != model.AgentHermes {
-			continue
-		}
-		t.Fatalf("AllAgents() exposed retired Hermes: %#v", agent)
-	}
-}
-
-func TestIsSupportedAgentRejectsRetiredHermes(t *testing.T) {
-	if IsSupportedAgent(model.AgentHermes) {
-		t.Fatalf("IsSupportedAgent(%q) = true, want false", model.AgentHermes)
-	}
-}

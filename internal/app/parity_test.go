@@ -14,30 +14,6 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/tui"
 )
 
-func TestInstallDefaultsMatchTUIModelDefaults(t *testing.T) {
-	detection := system.DetectionResult{
-		Configs: []system.ConfigState{
-			{Agent: "claude-code", Exists: true, IsDirectory: true},
-			{Agent: "opencode", Exists: false},
-		},
-	}
-
-	flags, err := cli.ParseInstallFlags(nil)
-	if err != nil {
-		t.Fatalf("ParseInstallFlags() error = %v", err)
-	}
-
-	input, err := cli.NormalizeInstallFlags(flags, detection)
-	if err != nil {
-		t.Fatalf("NormalizeInstallFlags() error = %v", err)
-	}
-
-	model := tui.NewModel(detection, "dev")
-	if !reflect.DeepEqual(input.Selection, model.Selection) {
-		t.Fatalf("selection mismatch\ncli=%#v\ntui=%#v", input.Selection, model.Selection)
-	}
-}
-
 func TestInstallPlannerParityWithTUISelection(t *testing.T) {
 	detection := system.DetectionResult{}
 	model := tui.NewModel(detection, "dev")
@@ -228,16 +204,6 @@ func TestRunArgsSyncUnknownFlagReturnsError(t *testing.T) {
 	// Must not be "unknown command" — sync IS a known command.
 	if err.Error() == `unknown command "sync"` {
 		t.Fatalf("sync command is not registered in app.go dispatch")
-	}
-}
-
-func TestRunArgsSyncHelpIncludesBackgroundFlag(t *testing.T) {
-	var buf bytes.Buffer
-	if err := RunArgs([]string{"sync", "--help"}, &buf); err != nil {
-		t.Fatalf("RunArgs(sync --help) error = %v", err)
-	}
-	if !strings.Contains(buf.String(), "--opencode-background-subagents=auto|on|off") || !strings.Contains(buf.String(), cli.OpenCodeBackgroundSubagentsEnv) {
-		t.Fatalf("sync help omits background contract: %s", buf.String())
 	}
 }
 

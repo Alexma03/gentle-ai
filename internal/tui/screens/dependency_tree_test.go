@@ -56,33 +56,3 @@ func TestRenderDependencyTreeGenericEmptyPlanKeepsExistingCopy(t *testing.T) {
 		t.Fatalf("RenderDependencyTree() showed Pi copy for generic empty plan; output:\n%s", out)
 	}
 }
-
-func TestRenderDependencyTreeMixedPiEmptyPlanShowsPiInstallCopy(t *testing.T) {
-	selection := model.Selection{
-		Agents: []model.AgentID{model.AgentPi, model.AgentOpenCode},
-		Preset: model.PresetFullGentleman,
-	}
-	plan := planner.ResolvedPlan{Agents: selection.Agents}
-
-	out := RenderDependencyTree(plan, selection, 0)
-
-	if strings.Contains(out, "No components selected yet.") {
-		t.Fatalf("RenderDependencyTree() showed generic empty copy for mixed Pi plan; output:\n%s", out)
-	}
-	for _, want := range []string{
-		"Pi agent support will be installed.",
-		"pi install npm:gentle-pi",
-		"pi install npm:gentle-engram",
-		"pi install npm:pi-mcp-adapter",
-		"npm exec --yes --package gentle-engram@latest -- pi-engram init",
-		"pi install npm:pi-subagents",
-		"pi install npm:@juicesharp/rpiv-ask-user-question",
-		"pi install npm:pi-web-access",
-		"pi install npm:@juicesharp/rpiv-todo",
-		"pi install npm:pi-btw",
-	} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("RenderDependencyTree() missing %q for mixed Pi plan; output:\n%s", want, out)
-		}
-	}
-}

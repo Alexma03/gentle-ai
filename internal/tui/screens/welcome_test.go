@@ -11,63 +11,12 @@ import (
 
 // TestWelcomeOptions_WithoutProfiles verifies that when showProfiles is false,
 // the profile option is not present and retired marketplace entries stay gone.
-func TestWelcomeOptions_WithoutProfiles(t *testing.T) {
-	opts := screens.WelcomeOptions(nil, true, false, 0, true)
-	for _, opt := range opts {
-		if strings.Contains(opt, "OpenCode SDD Profiles") {
-			t.Errorf("expected no 'OpenCode SDD Profiles' option when showProfiles=false; got: %v", opts)
-			break
-		}
-		if strings.Contains(opt, "Community Plugins") || strings.Contains(opt, "Uninstall OpenCode") {
-			t.Errorf("retired marketplace option still present: %q", opt)
-		}
-	}
-}
 
 // TestWelcomeOptions_WithProfiles_ZeroCount shows "OpenCode SDD Profiles" without a badge.
-func TestWelcomeOptions_WithProfiles_ZeroCount(t *testing.T) {
-	opts := screens.WelcomeOptions(nil, true, true, 0, true)
-	found := false
-	for _, opt := range opts {
-		if opt == "OpenCode SDD Profiles" {
-			found = true
-		}
-		if strings.HasPrefix(opt, "OpenCode SDD Profiles (") {
-			t.Errorf("expected no badge for 0 profiles, got: %q", opt)
-		}
-	}
-	if !found {
-		t.Errorf("expected 'OpenCode SDD Profiles' option when showProfiles=true, profileCount=0; got: %v", opts)
-	}
-}
 
 // TestWelcomeOptions_WithProfiles_CountTwo shows "OpenCode SDD Profiles (2)".
-func TestWelcomeOptions_WithProfiles_CountTwo(t *testing.T) {
-	opts := screens.WelcomeOptions(nil, true, true, 2, true)
-	found := false
-	for _, opt := range opts {
-		if opt == "OpenCode SDD Profiles (2)" {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("expected 'OpenCode SDD Profiles (2)' in options; got: %v", opts)
-	}
-}
 
 // TestWelcomeOptions_WithProfiles_CountOne shows "OpenCode SDD Profiles (1)".
-func TestWelcomeOptions_WithProfiles_CountOne(t *testing.T) {
-	opts := screens.WelcomeOptions(nil, true, true, 1, true)
-	found := false
-	for _, opt := range opts {
-		if opt == "OpenCode SDD Profiles (1)" {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("expected 'OpenCode SDD Profiles (1)' in options; got: %v", opts)
-	}
-}
 
 // TestWelcomeOptions_OptionCount_WithoutProfiles verifies 12 options when showProfiles=false
 // and hasEngines=true.
@@ -82,14 +31,6 @@ func TestWelcomeOptions_OptionCount_WithoutProfiles(t *testing.T) {
 
 // TestWelcomeOptions_OptionCount_WithProfiles verifies 13 options when showProfiles=true
 // and hasEngines=true.
-func TestWelcomeOptions_OptionCount_WithProfiles(t *testing.T) {
-	opts := screens.WelcomeOptions(nil, true, true, 2, true)
-	// Includes the Receipt-Driven Development entry.
-	want := 13
-	if len(opts) != want {
-		t.Errorf("WelcomeOptions(showProfiles=true, hasEngines=true) = %d options, want %d; opts: %v", len(opts), want, opts)
-	}
-}
 
 // TestWelcomeOptions_NoEngines_ShowsDisabledLabel verifies that when hasEngines=false,
 // the agent option is labelled "(no agents)" to signal unavailability.
@@ -108,42 +49,6 @@ func TestWelcomeOptions_NoEngines_ShowsDisabledLabel(t *testing.T) {
 
 // TestWelcomeOptions_ProfilesInsertedBeforeManageBackups verifies the ordering:
 // the retained profiles option sits immediately before "Manage backups".
-func TestWelcomeOptions_ProfilesInsertedBeforeManageBackups(t *testing.T) {
-	opts := screens.WelcomeOptions(nil, true, true, 1, true)
-
-	agentIdx := -1
-	profilesIdx := -1
-	manageBackupsIdx := -1
-	for i, opt := range opts {
-		if strings.HasPrefix(opt, "Create your own Agent") {
-			agentIdx = i
-		}
-		if strings.HasPrefix(opt, "OpenCode SDD Profiles") {
-			profilesIdx = i
-		}
-		if opt == "Manage backups" {
-			manageBackupsIdx = i
-		}
-	}
-
-	if agentIdx < 0 {
-		t.Fatal("option 'Create your own Agent' not found")
-	}
-	if profilesIdx < 0 {
-		t.Fatal("option 'OpenCode SDD Profiles' not found")
-	}
-	if manageBackupsIdx < 0 {
-		t.Fatal("option 'Manage backups' not found")
-	}
-
-	if profilesIdx != agentIdx+1 {
-		t.Errorf("profiles option at index %d, expected %d (right after 'Create your own Agent' at %d)",
-			profilesIdx, agentIdx+1, agentIdx)
-	}
-	if manageBackupsIdx != profilesIdx+1 {
-		t.Errorf("'Manage backups' at index %d, expected %d (right after profiles at %d)", manageBackupsIdx, profilesIdx+1, profilesIdx)
-	}
-}
 
 func containsOption(opts []string, want string) bool {
 	for _, opt := range opts {
@@ -173,40 +78,9 @@ func TestWelcomeOptions_IncludesManagedUninstall(t *testing.T) {
 // ─── RenderWelcome ────────────────────────────────────────────────────────────
 
 // TestRenderWelcome_WithoutProfiles verifies no "OpenCode SDD Profiles" in output.
-func TestRenderWelcome_WithoutProfiles(t *testing.T) {
-	output := screens.RenderWelcome(0, "1.0.0", "", nil, true, false, 0, true)
-	if strings.Contains(output, "OpenCode SDD Profiles") {
-		snippet := output
-		if len(snippet) > 200 {
-			snippet = snippet[:200]
-		}
-		t.Errorf("RenderWelcome(showProfiles=false) should not contain 'OpenCode SDD Profiles'; output snippet: %q", snippet)
-	}
-}
 
 // TestRenderWelcome_WithProfiles_ZeroCount contains "OpenCode SDD Profiles" but no badge.
-func TestRenderWelcome_WithProfiles_ZeroCount(t *testing.T) {
-	output := screens.RenderWelcome(0, "1.0.0", "", nil, true, true, 0, true)
-	if !strings.Contains(output, "OpenCode SDD Profiles") {
-		t.Errorf("RenderWelcome(showProfiles=true, count=0) missing 'OpenCode SDD Profiles'")
-	}
-	if strings.Contains(output, "OpenCode SDD Profiles (") {
-		t.Errorf("RenderWelcome(showProfiles=true, count=0) should NOT have badge")
-	}
-}
 
 // TestRenderWelcome_WithProfiles_CountTwo contains "OpenCode SDD Profiles (2)".
-func TestRenderWelcome_WithProfiles_CountTwo(t *testing.T) {
-	output := screens.RenderWelcome(0, "1.0.0", "", nil, true, true, 2, true)
-	if !strings.Contains(output, "OpenCode SDD Profiles (2)") {
-		t.Errorf("RenderWelcome(showProfiles=true, count=2) missing 'OpenCode SDD Profiles (2)'")
-	}
-}
 
 // TestRenderWelcome_WithProfiles_CountOne contains "OpenCode SDD Profiles (1)".
-func TestRenderWelcome_WithProfiles_CountOne(t *testing.T) {
-	output := screens.RenderWelcome(0, "1.0.0", "", nil, true, true, 1, true)
-	if !strings.Contains(output, "OpenCode SDD Profiles (1)") {
-		t.Errorf("RenderWelcome(showProfiles=true, count=1) missing 'OpenCode SDD Profiles (1)'")
-	}
-}

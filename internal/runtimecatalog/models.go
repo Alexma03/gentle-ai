@@ -1,19 +1,9 @@
-package opencode
+package runtimecatalog
 
-import (
-	"os"
-	"path/filepath"
-	"sort"
-)
+import "sort"
 
-// DefaultSettingsPath returns the default path to the OpenCode settings file.
-func DefaultSettingsPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(home, ".config", "opencode", "opencode.json")
-}
+// DefaultSettingsPath returns no active settings path; the retired profile state is read-only.
+func DefaultSettingsPath() string { return "" }
 
 // ModelCost holds the per-million-token pricing.
 type ModelCost struct {
@@ -120,16 +110,4 @@ func ReviewLensPhases() []string {
 func ReviewPhases() []string {
 	phases := ReviewLensPhases()
 	return append(phases, ReviewRefuterAgent, ReviewValidatorAgent)
-}
-
-// ConfigurableAgentPhases returns all agent names that support per-agent
-// model configuration. This includes SDD, Judgment Day, and review agents.
-// Used by the inject model assignment table builder and the configurable agent set
-// in ReadCurrentModelAssignments. The TUI uses each role family separately
-// for row layout control.
-func ConfigurableAgentPhases() []string {
-	phases := SDDPhases()
-	phases = append(phases, JDPhases()...)
-	phases = append(phases, ReviewPhases()...)
-	return phases
 }

@@ -13,7 +13,7 @@ import (
 )
 
 // hostCommandTimeout bounds every command a --with-host lane runs: real
-// reviewer model processes (codex exec, pi print mode, an OpenCode session)
+// reviewer model processes (codex exec and pi print mode)
 // are spawned underneath these commands, so a stalled provider must surface
 // as a bounded lane failure instead of hanging the battery.
 const hostCommandTimeout = 12 * time.Minute
@@ -311,15 +311,27 @@ func (b *battery) noteHostCost(lane, note string) {
 	b.hostCosts = append(b.hostCosts, lane+": "+note)
 }
 
-// runHostLanes drives the three real host applications end to end.
+// runHostLanes drives the retained real host applications end to end.
 func (b *battery) runHostLanes() {
 	if !b.withHost {
 		b.skip(hostCodexLane, "real codex host tier", "pass --with-host to spawn real host applications (dev subscription)")
 		b.skip(hostPiLane, "typed SKIP: separate gentle-pi dev-binary evidence contract", "default battery does not fake/copy the relay; --with-host is independent live-host proof")
-		b.skip(hostOpenCodeLane, "real opencode host tier", "pass --with-host to spawn real host applications (dev subscription)")
 		return
 	}
 	b.runHostCodexLane()
 	b.runHostPiLane()
-	b.runHostOpenCodeLane()
+}
+
+func grantedInvocation(consent map[string]any) string {
+	for _, raw := range getSlice(consent, "choices") {
+		choice, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if choice["answer"] == "granted" {
+			invocation, _ := choice["invocation"].(string)
+			return invocation
+		}
+	}
+	return ""
 }

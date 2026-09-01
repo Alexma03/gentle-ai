@@ -566,8 +566,6 @@ func tuiExecuteWithBackground(
 	selection model.Selection,
 	resolved planner.ResolvedPlan,
 	detection system.DetectionResult,
-	background model.OpenCodeBackgroundIntent,
-	backgroundPersist model.OpenCodeBackgroundIntent,
 	piBackground model.PiBackgroundIntent,
 	piBackgroundPersist model.PiBackgroundIntent,
 	onProgress pipeline.ProgressFunc,
@@ -583,7 +581,7 @@ func tuiExecuteWithBackground(
 	profile := cli.ResolveInstallProfile(detection)
 	resolved.PlatformDecision = planner.PlatformDecisionFromProfile(profile)
 
-	execResult, orchestrator := cli.ExecuteTUIInstallWithBackgroundAndOrchestrator(homeDir, selection, resolved, profile, background, piBackground, onProgress)
+	execResult, orchestrator := cli.ExecuteTUIInstallWithBackgroundAndOrchestrator(homeDir, selection, resolved, profile, piBackground, onProgress)
 	if execResult.Err == nil {
 		// Persist the user's agent selection and model assignments so that future
 		// `sync` runs target only the installed agents and preserve model choices.
@@ -617,9 +615,6 @@ func tuiExecuteWithBackground(
 		installState.ModelAssignments = modelAssignmentsToState(selection.ModelAssignments)
 		installState.Persona = string(selection.Persona)
 		installState.SetSelection(selection)
-		if backgroundPersist != "" {
-			installState.BackgroundIntent = backgroundPersist
-		}
 		if piBackgroundPersist != "" {
 			installState.PiBackgroundIntent = piBackgroundPersist
 		}
@@ -801,7 +796,7 @@ func applyOverrides(selection *model.Selection, overrides *model.SyncOverrides) 
 	}
 	if len(overrides.Profiles) > 0 {
 		selection.Profiles = overrides.Profiles
-		// Profiles are an OpenCode multi-mode feature — if profiles are being
+		// Profiles are retained only for persisted migration compatibility — if profiles are being
 		// created/synced, SDDModeMulti is required so that WriteSharedPromptFiles
 		// runs and the {file:...} prompt references resolve correctly.
 		if selection.SDDMode == "" {

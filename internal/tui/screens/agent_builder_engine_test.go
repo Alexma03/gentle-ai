@@ -7,14 +7,6 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
 
-func TestRenderABEngine_NonEmpty(t *testing.T) {
-	engines := []model.AgentID{model.AgentClaudeCode, model.AgentOpenCode}
-	out := RenderABEngine(engines, 0)
-	if out == "" {
-		t.Fatal("RenderABEngine returned empty string")
-	}
-}
-
 func TestRenderABEngine_HeadingPresent(t *testing.T) {
 	engines := []model.AgentID{model.AgentClaudeCode}
 	out := RenderABEngine(engines, 0)
@@ -46,16 +38,5 @@ func TestRenderABEngine_EmptyEngines_ShowsWarning(t *testing.T) {
 	out := RenderABEngine([]model.AgentID{}, 0)
 	if !strings.Contains(out, "No supported AI agent") {
 		t.Errorf("expected warning for no engines; output:\n%s", out)
-	}
-}
-
-func TestABEngineOptions_IncludesBack(t *testing.T) {
-	engines := []model.AgentID{model.AgentClaudeCode, model.AgentOpenCode}
-	opts := ABEngineOptions(engines)
-	if len(opts) != 3 { // 2 engines + Back
-		t.Errorf("len(opts) = %d, want 3", len(opts))
-	}
-	if opts[len(opts)-1] != "Back" {
-		t.Errorf("last option = %q, want 'Back'", opts[len(opts)-1])
 	}
 }

@@ -12,6 +12,15 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/state"
 )
 
+func syncPiBackgroundTestHome(t *testing.T) string {
+	t.Helper()
+	home := t.TempDir()
+	old := osUserHomeDir
+	osUserHomeDir = func() (string, error) { return home, nil }
+	t.Cleanup(func() { osUserHomeDir = old })
+	return home
+}
+
 func TestPiBackgroundIntentValidation(t *testing.T) {
 	for _, tt := range []struct {
 		raw, want, errText string
@@ -446,7 +455,7 @@ func TestSyncPiBackgroundPrecedenceAndDryRunReporting(t *testing.T) {
 		{name: "unresolved auto stays off", wantIntent: model.PiBackgroundAuto, wantEffect: model.PiBackgroundOff},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			home := syncBackgroundTestHome(t)
+			home := syncPiBackgroundTestHome(t)
 			var before []byte
 			if tt.prior != "" {
 				if err := state.Write(home, state.InstallState{SchemaVersion: state.CurrentSchemaVersion, InstalledAgents: []string{"pi"}, PiBackgroundIntent: tt.prior}); err != nil {

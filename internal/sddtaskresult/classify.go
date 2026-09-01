@@ -2,13 +2,8 @@
 // decides whether a delegated phase produced a usable result, the two public
 // failure codes, and the typed terminal handoff every runtime must emit.
 //
-// #3818: this contract used to live only in
-// internal/assets/opencode/plugins/sdd-task-result-artifacts.ts. Every other
-// runtime carried it as prose in a Markdown prompt with nothing enforcing it,
-// so the typed terminal failure was reliably produced only where that plugin
-// ran; elsewhere the failure mode was whatever the model did when its
-// instructions did not resolve. The plugin is now a transport for this
-// decision rather than the place the decision is made.
+// The contract is runtime-neutral so every retained client applies the same
+// grammar and terminal-failure behavior.
 package sddtaskresult
 
 import (
@@ -40,10 +35,8 @@ func (class Class) FailureCode() string {
 	}
 }
 
-// taskResultEnvelope and taskTag are ports of the shipped grammar, kept
-// character-for-character so this package and the transport cannot disagree
-// about what a well-formed result is. Go's default (?m)-off semantics match the
-// JavaScript source's unflagged anchors.
+// taskResultEnvelope and taskTag define the shipped grammar. Go's default
+// (?m)-off semantics keep the anchors bound to the complete payload.
 var (
 	taskResultEnvelope = regexp.MustCompile(`^<task id="[^"\r\n]+" state="completed">\n(?:<summary>[^<>\r\n]+</summary>\n)?<task_result>\n([\s\S]*?)\n</task_result>\n</task>$`)
 	taskTag            = regexp.MustCompile(`</?(?:task|task_result|summary)(?:\s|>)`)

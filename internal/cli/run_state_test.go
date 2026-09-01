@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,80 +9,6 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/state"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
 )
-
-func TestMergeExplicitAgentInstallStatePreservesExistingAssignmentsWhenFreshStateIsEmpty(t *testing.T) {
-	home := t.TempDir()
-	if err := state.Write(home, state.InstallState{
-		InstalledAgents: []string{"opencode"},
-		ModelAssignments: map[string]state.ModelAssignmentState{
-			"sdd-init": {ProviderID: "anthropic", ModelID: "claude-sonnet-4"},
-		},
-		ClaudeModelAssignments: map[string]string{
-			"sdd-apply": "opus",
-		},
-		KiroModelAssignments: map[string]string{
-			"sdd-design": "auto",
-		},
-		CodexModelAssignments: map[string]string{
-			"sdd-apply": "low",
-		},
-		CodexCarrilModelAssignments: map[string]string{
-			"sdd-strong": "gpt-5.5",
-		},
-		CodexPhaseModelAssignments: map[string]string{
-			"sdd-verify": "gpt-5.4",
-		},
-		Persona: "neutral",
-	}); err != nil {
-		t.Fatalf("state.Write: %v", err)
-	}
-
-	merged, err := mergeExplicitAgentInstallState(home, state.InstallState{InstalledAgents: []string{"codex"}, Persona: "gentleman"}, []string{"codex"}, InstallFlags{})
-	if err != nil {
-		t.Fatalf("mergeExplicitAgentInstallState() error = %v, want nil", err)
-	}
-	if got := merged.InstalledAgents; len(got) != 2 || got[0] != "opencode" || got[1] != "codex" {
-		t.Fatalf("InstalledAgents = %#v, want [opencode codex]", got)
-	}
-	if merged.ModelAssignments["sdd-init"].ModelID != "claude-sonnet-4" {
-		t.Fatalf("ModelAssignments not preserved: %#v", merged.ModelAssignments)
-	}
-	if merged.ClaudeModelAssignments["sdd-apply"] != "opus" {
-		t.Fatalf("ClaudeModelAssignments not preserved: %#v", merged.ClaudeModelAssignments)
-	}
-	if merged.KiroModelAssignments["sdd-design"] != "auto" {
-		t.Fatalf("KiroModelAssignments not preserved: %#v", merged.KiroModelAssignments)
-	}
-	if merged.CodexModelAssignments["sdd-apply"] != "low" {
-		t.Fatalf("CodexModelAssignments not preserved: %#v", merged.CodexModelAssignments)
-	}
-	if merged.CodexCarrilModelAssignments["sdd-strong"] != "gpt-5.5" {
-		t.Fatalf("CodexCarrilModelAssignments not preserved: %#v", merged.CodexCarrilModelAssignments)
-	}
-	if merged.CodexPhaseModelAssignments["sdd-verify"] != "gpt-5.4" {
-		t.Fatalf("CodexPhaseModelAssignments not preserved: %#v", merged.CodexPhaseModelAssignments)
-	}
-	if merged.Persona != "neutral" {
-		t.Fatalf("Persona = %q, want existing neutral", merged.Persona)
-	}
-}
-
-func TestMergeExplicitAgentInstallStateMergesOnlyExplicitSelectionField(t *testing.T) {
-	original := state.InstallState{InstalledAgents: []string{"opencode"}, SelectionConfigured: true, Components: []model.ComponentID{model.ComponentEngram}, Skills: []model.SkillID{model.SkillCommentWriter}, Preset: model.PresetCustom, SDDMode: model.SDDModeSingle, StrictTDD: true, Persona: "neutral"}
-	fresh := state.InstallState{InstalledAgents: []string{"codex"}, SelectionConfigured: true, Components: []model.ComponentID{model.ComponentSDD}, Skills: []model.SkillID{model.SkillSDDInit}, Preset: model.PresetFullGentleman, SDDMode: model.SDDModeMulti, Persona: "gentleman"}
-	cases := []InstallFlags{{Components: []string{"sdd"}}, {Skills: []string{"sdd-init"}}, {Preset: "full-gentleman"}, {SDDMode: "multi"}, {Persona: "gentleman"}}
-	wants := []string{"[sdd]|[comment-writer]|custom|single|true|neutral", "[engram]|[sdd-init]|custom|single|true|neutral", "[engram]|[comment-writer]|full-gentleman|single|true|neutral", "[engram]|[comment-writer]|custom|multi|true|neutral", "[engram]|[comment-writer]|custom|single|true|gentleman"}
-	for i, flags := range cases {
-		home := t.TempDir()
-		if err := state.Write(home, original); err != nil {
-			t.Fatal(err)
-		}
-		got, err := mergeExplicitAgentInstallState(home, fresh, []string{"codex"}, flags)
-		if key := fmt.Sprintf("%v|%v|%s|%s|%t|%s", got.Components, got.Skills, got.Preset, got.SDDMode, got.StrictTDD, got.Persona); err != nil || key != wants[i] {
-			t.Errorf("flags %#v merged selection %s, err %v", flags, key, err)
-		}
-	}
-}
 
 func TestRunInstallPersistsConfiguredSelection(t *testing.T) {
 	home := t.TempDir()
@@ -110,52 +35,6 @@ func TestRunInstallPersistsConfiguredSelection(t *testing.T) {
 	}
 	if got.ManagedAssetDigest != wantDigest {
 		t.Fatalf("managed asset digest = %q, want %q", got.ManagedAssetDigest, wantDigest)
-	}
-}
-
-func TestMergeExplicitAgentInstallStatePreservesFreshAssignments(t *testing.T) {
-	home := t.TempDir()
-	if err := state.Write(home, state.InstallState{
-		InstalledAgents: []string{"opencode"},
-		CodexModelAssignments: map[string]string{
-			"sdd-apply": "low",
-		},
-	}); err != nil {
-		t.Fatalf("state.Write: %v", err)
-	}
-
-	fresh := state.InstallState{
-		InstalledAgents: []string{"codex"},
-		CodexModelAssignments: codexEffortsToStrings(map[string]model.CodexEffort{
-			"sdd-apply": model.CodexEffortHigh,
-		}),
-		CodexCarrilModelAssignments: map[string]string{
-			"sdd-strong": "gpt-5.5",
-		},
-		CodexPhaseModelAssignments: map[string]string{
-			"sdd-apply": "gpt-5.4",
-		},
-		Persona: "gentleman",
-	}
-
-	merged, err := mergeExplicitAgentInstallState(home, fresh, []string{"codex"}, InstallFlags{})
-	if err != nil {
-		t.Fatalf("mergeExplicitAgentInstallState() error = %v, want nil", err)
-	}
-	if got := merged.InstalledAgents; len(got) != 2 || got[0] != "opencode" || got[1] != "codex" {
-		t.Fatalf("InstalledAgents = %#v, want [opencode codex]", got)
-	}
-	if merged.CodexModelAssignments["sdd-apply"] != "high" {
-		t.Fatalf("CodexModelAssignments[sdd-apply] = %q, want high", merged.CodexModelAssignments["sdd-apply"])
-	}
-	if merged.CodexCarrilModelAssignments["sdd-strong"] != "gpt-5.5" {
-		t.Fatalf("CodexCarrilModelAssignments not preserved: %#v", merged.CodexCarrilModelAssignments)
-	}
-	if merged.CodexPhaseModelAssignments["sdd-apply"] != "gpt-5.4" {
-		t.Fatalf("CodexPhaseModelAssignments not preserved: %#v", merged.CodexPhaseModelAssignments)
-	}
-	if merged.Persona != "gentleman" {
-		t.Fatalf("Persona = %q, want gentleman", merged.Persona)
 	}
 }
 

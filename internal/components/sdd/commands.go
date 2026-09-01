@@ -1,13 +1,13 @@
 package sdd
 
-type OpenCodeCommand struct {
+type SDDCommand struct {
 	Name        string
 	Description string
 	Body        string
 }
 
-func OpenCodeCommands() []OpenCodeCommand {
-	return []OpenCodeCommand{
+func SDDCommands() []SDDCommand {
+	return []SDDCommand{
 		{Name: "sdd-init", Description: "Initialize SDD context", Body: "/sdd-init"},
 		{Name: "sdd-new", Description: "Start a new SDD change", Body: "/sdd-new ${change-name}"},
 		{Name: "sdd-continue", Description: "Continue next pending artifact", Body: "/sdd-continue ${change-name}"},

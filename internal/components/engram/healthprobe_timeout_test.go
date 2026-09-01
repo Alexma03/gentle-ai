@@ -17,38 +17,6 @@ import (
 // reverted it. They were right that it did nothing: StdioCommand carried
 // Command, Args and Source, so a configured timeout had no wire to travel
 // down. It does now.
-func TestConfiguredStdioTimeoutIsRead(t *testing.T) {
-	tests := []struct {
-		name   string
-		server map[string]any
-		want   time.Duration
-	}{
-		{name: "absent", server: map[string]any{"command": "engram"}, want: 0},
-		// A bare number is seconds: that is how the OpenCode MCP config
-		// expresses it, and it is what #3068's reporter set.
-		{name: "seconds as number", server: map[string]any{"command": "engram", "timeout": float64(15)}, want: 15 * time.Second},
-		{name: "seconds as integer", server: map[string]any{"command": "engram", "timeout": 20}, want: 20 * time.Second},
-		{name: "duration string", server: map[string]any{"command": "engram", "timeout": "12s"}, want: 12 * time.Second},
-		// Nonsense is ignored rather than fatal. A malformed timeout must not
-		// make an otherwise valid Engram configuration unreadable, because the
-		// consequence would be worse than the defect being fixed.
-		{name: "unparseable string", server: map[string]any{"command": "engram", "timeout": "soon"}, want: 0},
-		{name: "negative", server: map[string]any{"command": "engram", "timeout": -3}, want: 0},
-		{name: "zero", server: map[string]any{"command": "engram", "timeout": 0}, want: 0},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			command, err := stdioCommandFromServer(tt.server)
-			if err != nil {
-				t.Fatalf("stdioCommandFromServer() error = %v", err)
-			}
-			if command.Timeout != tt.want {
-				t.Fatalf("Timeout = %v, want %v", command.Timeout, tt.want)
-			}
-		})
-	}
-}
 
 // TestStdioProbeDeadlineHonorsTheConfiguredTimeout proves the value reaches
 // the deadline instead of being parsed and dropped.

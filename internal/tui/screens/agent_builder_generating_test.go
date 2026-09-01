@@ -20,13 +20,6 @@ func TestRenderABGenerating_HeadingPresent(t *testing.T) {
 	}
 }
 
-func TestRenderABGenerating_ShowsEngineName(t *testing.T) {
-	out := RenderABGenerating("opencode", 2, nil, 0)
-	if !strings.Contains(out, "opencode") {
-		t.Errorf("engine name not found; output:\n%s", out)
-	}
-}
-
 func TestRenderABGenerating_WithError_ShowsErrorMessage(t *testing.T) {
 	genErr := errors.New("connection timeout")
 	out := RenderABGenerating("claude-code", 0, genErr, 0)

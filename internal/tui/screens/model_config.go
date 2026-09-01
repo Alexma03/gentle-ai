@@ -10,14 +10,13 @@ import (
 func ModelConfigOptions() []string {
 	return []string{
 		"Configure Claude models",
-		"Configure OpenCode models",
 		"Configure Codex models",
 		"Back",
 	}
 }
 
 // RenderModelConfig renders the model configuration entry screen.
-// It shows a 3-option menu: Claude models, OpenCode models, Codex models, Back.
+// It shows Claude models, Codex models, and Back.
 // cursor indicates which option is currently highlighted.
 func RenderModelConfig(cursor int) string {
 	var b strings.Builder

@@ -197,7 +197,7 @@ func RenderUninstallProfiles(available []string, selected []string, engramProjec
 	b.WriteString("\n\n")
 
 	if len(available) > 0 {
-		b.WriteString(styles.SubtextStyle.Render("Choose which OpenCode SDD profiles should be removed from opencode.json."))
+		b.WriteString(styles.SubtextStyle.Render("Choose which legacy SDD profiles should be removed."))
 		b.WriteString("\n\n")
 	}
 
@@ -342,7 +342,7 @@ func RenderUninstallConfirm(mode model.UninstallMode, selected []model.AgentID, 
 		b.WriteString("\n")
 		b.WriteString(styles.SubtextStyle.Render("  Removing SDD or Skills will delete workspace-scoped files like:"))
 		b.WriteString("\n")
-		b.WriteString(styles.SubtextStyle.Render("  • .windsurf/workflows/ (SDD workflows)"))
+		b.WriteString(styles.SubtextStyle.Render("  • legacy workflow files"))
 		b.WriteString("\n")
 		b.WriteString(styles.SubtextStyle.Render("  • .engram/ (persistent memory context)"))
 		b.WriteString("\n")

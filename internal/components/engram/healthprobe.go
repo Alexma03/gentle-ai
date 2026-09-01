@@ -60,7 +60,7 @@ func stdioProbeDeadline(configured time.Duration) time.Duration {
 }
 
 // stdioTimeoutFromConfig reads an MCP server's timeout. A bare number is
-// seconds, which is how the OpenCode MCP configuration expresses it and what
+// seconds, which is how the managed MCP configuration expresses it and what
 // #3068's reporter set; a string is a Go duration.
 //
 // Anything unparseable, zero, or negative yields 0 and falls back to the

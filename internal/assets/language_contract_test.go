@@ -36,41 +36,10 @@ var directReplyEnglishNoCodeSwitchRequired = []string{
 	"Prompts starting with or dominated by hi, hello, hey, or similar English greetings are English prompts unless the user explicitly asks for another language.",
 }
 
-func TestManagedDirectReplyAssetsEnforceEnglishNoCodeSwitching(t *testing.T) {
-	tests := []struct {
-		name        string
-		path        string
-		combineWith string // "" when the asset alone still carries the contract
-	}{
-		{name: "claude gentleman output style", path: "claude/output-style-gentleman.md"},
-		{name: "claude neutral output style", path: "claude/output-style-neutral.md"},
-		// Claude's persona is a residual — evaluate the combined persona-residual
-		// and output-style channel, not the persona file alone.
-		{name: "claude gentleman persona", path: "claude/persona-gentleman.md", combineWith: "claude/output-style-gentleman.md"},
-		{name: "generic gentleman persona", path: "generic/persona-gentleman.md"},
-		{name: "generic neutral persona", path: "generic/persona-neutral.md"},
-		{name: "opencode gentleman persona", path: "opencode/persona-gentleman.md"},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			content := MustRead(tc.path)
-			if tc.combineWith != "" {
-				content += "\n" + MustRead(tc.combineWith)
-			}
-			for _, required := range directReplyEnglishNoCodeSwitchRequired {
-				if !strings.Contains(content, required) {
-					t.Fatalf("%s (combined=%q) missing direct-reply English no-code-switch contract %q", tc.path, tc.combineWith, required)
-				}
-			}
-		})
-	}
-}
-
 func TestSDDOrchestratorAssetsEnforceLanguageContract(t *testing.T) {
 	assetPaths := allSDDOrchestratorAssetPaths(t)
-	if len(assetPaths) < 6 {
-		t.Fatalf("SDD orchestrator asset count = %d, want at least 6", len(assetPaths))
+	if len(assetPaths) < 5 {
+		t.Fatalf("SDD orchestrator asset count = %d, want at least 5", len(assetPaths))
 	}
 
 	for _, path := range assetPaths {
@@ -115,31 +84,6 @@ func TestSDDPhaseSkillsEnforceLanguageContract(t *testing.T) {
 	}
 }
 
-func TestSupportedAgentSDDLanguageMatrix(t *testing.T) {
-	tests := []struct {
-		agent string
-		path  string
-	}{
-		{agent: "claude-code", path: "claude/sdd-orchestrator.md"},
-		{agent: "opencode", path: "opencode/sdd-orchestrator.md"},
-		{agent: "cursor", path: "cursor/sdd-orchestrator.md"},
-		{agent: "codex", path: "codex/sdd-orchestrator.md"},
-		{agent: "antigravity", path: "antigravity/sdd-orchestrator.md"},
-		{agent: "pi", path: "generic/sdd-orchestrator.md"},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.agent, func(t *testing.T) {
-			content := resolveSharedOrchestratorSections(MustRead(tc.path))
-			for _, required := range sddOrchestratorLanguageContractRequired {
-				if !strings.Contains(content, required) {
-					t.Fatalf("agent %s asset %s missing language contract wording %q", tc.agent, tc.path, required)
-				}
-			}
-		})
-	}
-}
-
 func allSDDPhaseSkillAssetPaths(t *testing.T) []string {
 	t.Helper()
 	paths, err := fs.Glob(FS, "skills/sdd-*/SKILL.md")
@@ -164,8 +108,8 @@ func TestShippedReviewAssetsDoNotInstructFixTouchedLineDiscovery(t *testing.T) {
 
 func TestSDDOrchestratorAssetsUseCanonicalResearchGate(t *testing.T) {
 	assetPaths := allSDDOrchestratorAssetPaths(t)
-	if len(assetPaths) != 6 {
-		t.Fatalf("SDD orchestrator family count = %d, want 6", len(assetPaths))
+	if len(assetPaths) != 5 {
+		t.Fatalf("SDD orchestrator family count = %d, want 5", len(assetPaths))
 	}
 
 	for _, path := range assetPaths {
@@ -245,32 +189,6 @@ func TestCommentWriterLanguageContractSources(t *testing.T) {
 			} {
 				if strings.Contains(tc.content, forcedDefault) {
 					t.Fatalf("%s comment-writer source demonstrates regional Spanish as the default via %q", tc.name, forcedDefault)
-				}
-			}
-		})
-	}
-}
-
-func TestGentlemanPersonaKeepsDirectConversationVoice(t *testing.T) {
-	// Claude's persona is a residual — the direct-conversation voice now lives
-	// exclusively in the output style; evaluate the combined channel.
-	tests := []struct {
-		path        string
-		combineWith string
-	}{
-		{path: "claude/persona-gentleman.md", combineWith: "claude/output-style-gentleman.md"},
-		{path: "generic/persona-gentleman.md"},
-		{path: "opencode/persona-gentleman.md"},
-	}
-	for _, tc := range tests {
-		t.Run(tc.path, func(t *testing.T) {
-			content := MustRead(tc.path)
-			if tc.combineWith != "" {
-				content += "\n" + MustRead(tc.combineWith)
-			}
-			for _, required := range []string{"Rioplatense", "voseo", "Passionate teacher"} {
-				if !strings.Contains(content, required) {
-					t.Fatalf("%s (combined=%q) missing Gentleman direct-conversation voice marker %q", tc.path, tc.combineWith, required)
 				}
 			}
 		})
@@ -419,24 +337,6 @@ func readRepoRootFile(t *testing.T, rel string) string {
 const preWriteArtifactSelfCheckRequired = "Before any Write/Edit whose content is an artifact, re-verify the artifact language rules."
 
 const neutralToneDialectAntiDriftRequired = "The same rule applies to tone and dialect: do not adopt regional forms from memory context, prior turns, or quoted material."
-
-func TestPersonaChannelsCarryPreWriteArtifactSelfCheck(t *testing.T) {
-	paths := []string{
-		"claude/output-style-gentleman.md",
-		"claude/output-style-neutral.md",
-		"generic/persona-gentleman.md",
-		"generic/persona-neutral.md",
-		"opencode/persona-gentleman.md",
-	}
-	for _, path := range paths {
-		t.Run(path, func(t *testing.T) {
-			content := resolveSharedOrchestratorSections(MustRead(path))
-			if !strings.Contains(content, preWriteArtifactSelfCheckRequired) {
-				t.Fatalf("%s: missing pre-write artifact self-check sentence", path)
-			}
-		})
-	}
-}
 
 func TestNeutralChannelsExtendAntiDriftToToneAndDialect(t *testing.T) {
 	paths := []string{

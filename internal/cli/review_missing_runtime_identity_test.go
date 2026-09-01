@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-
-	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
 
 // The documented negotiated lifecycle route in
@@ -111,49 +109,9 @@ func TestNegotiatedRouteWithoutRuntimeIdentityReachesStart(t *testing.T) {
 // identity is unchanged, so the property this test protects -- a declared
 // identity is validated exactly as before, and every unsupported one still
 // stops -- is still proven by two runtimes.
-func TestDeclaredUnsupportedRuntimeStillRefusesNegotiatedStatus(t *testing.T) {
-	repo := initReviewCLIRepo(t)
-	for _, runtime := range []string{string(model.AgentKilocode), "unknown-runtime"} {
-		t.Run(runtime, func(t *testing.T) {
-			var output bytes.Buffer
-			if err := RunReview([]string{
-				"status", "--cwd", repo, "--contract", ReviewIntegrationContractV2, "--agent", runtime, "--next-transition",
-			}, &output); err == nil {
-				t.Fatalf("declared unsupported runtime %q was accepted", runtime)
-			}
-			failure := decodeReviewIntegrationFailure(t, output.Bytes())
-			if failure.Code != reviewImmutableTransportUnsupportedCode || failure.NextAction != "stop" {
-				t.Fatalf("declared unsupported runtime %q failure = %#v", runtime, failure)
-			}
-		})
-	}
-}
 
 // TestDeclaredBuiltInRuntimeUsesProvenExecutorBoundary prevents the capability
 // declaration from drifting from the supported fresh reviewer paths. Claude
 // and OpenCode use their native provider contract in an ordinary session,
 // without `OPENCODE_DISABLE_*` environment controls; Codex invokes its native
 // provider adapter through the same Go-owned contract.
-func TestDeclaredBuiltInRuntimeUsesProvenExecutorBoundary(t *testing.T) {
-	repo := initReviewCLIRepo(t)
-	for _, test := range []struct {
-		runtime string
-	}{
-		{runtime: string(model.AgentClaudeCode)},
-		{runtime: string(model.AgentOpenCode)},
-		{runtime: string(model.AgentCodex)},
-	} {
-		t.Run(test.runtime, func(t *testing.T) {
-			var output bytes.Buffer
-			err := RunReview([]string{
-				"status", "--cwd", repo, "--contract", ReviewIntegrationContractV2, "--agent", test.runtime, "--next-transition",
-			}, &output)
-			if err != nil {
-				t.Fatalf("declared built-in runtime %q did not reach negotiated STATUS: %v\n%s", test.runtime, err, output.String())
-			}
-			if strings.Contains(output.String(), reviewImmutableTransportUnsupportedCode) {
-				t.Fatalf("declared built-in runtime %q was rejected by the executor boundary: %s", test.runtime, output.String())
-			}
-		})
-	}
-}

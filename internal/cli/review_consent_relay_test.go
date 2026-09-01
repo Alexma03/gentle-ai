@@ -578,36 +578,3 @@ func TestConsentQuestionMatchesVersionedFixture(t *testing.T) {
 		})
 	}
 }
-
-func TestV21ConsentInvocationMustMatchProviderOwnedRequest(t *testing.T) {
-	fixture, err := os.ReadFile(filepath.Join("..", "..", "contracts", "review-integration", "v2", "fixtures", "consent-v3.fixture.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var question ReviewIntegrationConsentResult
-	if err := json.Unmarshal(fixture, &question); err != nil {
-		t.Fatal(err)
-	}
-	base := reviewConsentFollowUpBase("/repo", question.TargetIdentity, question.Projection, "review-consent-fixture", "", "", "reliability", "", false, false, ReviewIntegrationContractV2, "", "", reviewIntendedUntrackedScope{})
-	if err := validateReviewConsentInvocations(question, base); err != nil {
-		t.Fatalf("canonical v2.1 consent invocation: %v", err)
-	}
-
-	for _, test := range []struct {
-		name       string
-		invocation string
-	}{
-		{name: "unexpected Claude agent", invocation: strings.Replace(question.Choices[0].Invocation, " --consent granted", " --agent claude-code --consent granted", 1)},
-		{name: "unexpected OpenCode agent", invocation: strings.Replace(question.Choices[0].Invocation, " --consent granted", " --agent opencode --consent granted", 1)},
-		{name: "duplicate unexpected agent", invocation: strings.Replace(question.Choices[0].Invocation, " --consent granted", " --agent claude-code --agent opencode --consent granted", 1)},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			mutated := question
-			mutated.Choices = append([]ReviewIntegrationConsentChoice(nil), question.Choices...)
-			mutated.Choices[0].Invocation = test.invocation
-			if err := validateReviewConsentInvocations(mutated, base); err == nil {
-				t.Fatalf("accepted non-canonical invocation %q", test.invocation)
-			}
-		})
-	}
-}

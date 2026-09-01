@@ -49,7 +49,7 @@ func MVPGraph() Graph {
 // the second when BOTH are present in the resolved plan. These are NOT hard
 // dependencies — selecting one does not force-install the other.
 //
-// This exists because StrategyFileReplace agents (OpenCode, Cursor, Gemini,
+// This exists because StrategyFileReplace agents (Cursor, Antigravity,
 // Codex) have Persona write the base file and SDD/Engram append to it. If
 // SDD ran before Persona, Persona would overwrite the SDD sections.
 //

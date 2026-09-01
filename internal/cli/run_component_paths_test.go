@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,48 +9,10 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/agentguidance"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/filemerge"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/opencodedefault"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/planner"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
 )
-
-func TestComponentPathsSDDIncludesSystemPromptForAllSupportedAgents(t *testing.T) {
-	home := t.TempDir()
-	adapters := resolveAdapters([]model.AgentID{
-		model.AgentClaudeCode,
-		model.AgentOpenCode,
-		model.AgentCursor,
-		model.AgentAntigravity,
-		model.AgentCodex,
-	})
-
-	paths := componentPaths(home, model.Selection{}, adapters, model.ComponentSDD)
-
-	for _, adapter := range adapters {
-		p := adapter.SystemPromptFile(home)
-		if !containsPath(paths, p) {
-			t.Fatalf("componentPaths(sdd) missing system prompt path %q\npaths=%v", p, paths)
-		}
-	}
-}
-
-func TestComponentPathsSDDIncludesOpenCodeSettingsAndCommands(t *testing.T) {
-	home := t.TempDir()
-	adapters := resolveAdapters([]model.AgentID{model.AgentOpenCode})
-
-	paths := componentPaths(home, model.Selection{}, adapters, model.ComponentSDD)
-
-	settings := filepath.Join(home, ".config", "opencode", "opencode.json")
-	if !containsPath(paths, settings) {
-		t.Fatalf("componentPaths(sdd) missing OpenCode settings path %q\npaths=%v", settings, paths)
-	}
-
-	command := filepath.Join(home, ".config", "opencode", "commands", "sdd-init.md")
-	if !containsPath(paths, command) {
-		t.Fatalf("componentPaths(sdd) missing OpenCode command path %q\npaths=%v", command, paths)
-	}
-}
 
 func TestComponentPathsSDDIncludesClaudeLazyWorkflow(t *testing.T) {
 	home := t.TempDir()
@@ -62,73 +23,6 @@ func TestComponentPathsSDDIncludesClaudeLazyWorkflow(t *testing.T) {
 	workflow := filepath.Join(home, ".claude", "skills", "_shared", "sdd-orchestrator-workflow.md")
 	if !containsPath(paths, workflow) {
 		t.Fatalf("componentPaths(sdd) missing Claude lazy workflow path %q\npaths=%v", workflow, paths)
-	}
-}
-
-func TestComponentPathsSDDMultiIncludesOpenCodePlugins(t *testing.T) {
-	home := t.TempDir()
-	adapters := resolveAdapters([]model.AgentID{model.AgentOpenCode})
-
-	paths := componentPaths(home, model.Selection{SDDMode: model.SDDModeMulti}, adapters, model.ComponentSDD)
-
-	for _, plugin := range []string{"background-agents.ts", "model-variants.ts", "opencode-review-transport.ts", "sdd-task-result-artifacts.ts", "skill-registry.ts"} {
-		path := filepath.Join(home, ".config", "opencode", "plugins", plugin)
-		if !containsPath(paths, path) {
-			t.Fatalf("componentPaths(sdd multi) missing OpenCode plugin path %q\npaths=%v", path, paths)
-		}
-	}
-}
-
-func TestComponentPathsSDDSingleIncludesOpenCodePlugins(t *testing.T) {
-	home := t.TempDir()
-	adapters := resolveAdapters([]model.AgentID{model.AgentOpenCode})
-
-	paths := componentPaths(home, model.Selection{SDDMode: model.SDDModeSingle}, adapters, model.ComponentSDD)
-
-	for _, plugin := range []string{"background-agents.ts", "model-variants.ts", "opencode-review-transport.ts", "sdd-task-result-artifacts.ts", "skill-registry.ts"} {
-		path := filepath.Join(home, ".config", "opencode", "plugins", plugin)
-		if !containsPath(paths, path) {
-			t.Fatalf("componentPaths(sdd single) missing OpenCode plugin path %q\npaths=%v", path, paths)
-		}
-	}
-}
-
-func TestComponentPathsWorkspaceScopedOpenCodeSDDUsesWorkspaceManagedPaths(t *testing.T) {
-	home := t.TempDir()
-	workspace := t.TempDir()
-	adapters := resolveAdapters([]model.AgentID{model.AgentOpenCode})
-	selection := model.Selection{SDDMode: model.SDDModeMulti}
-
-	paths := componentPathsWithWorkspaceScoped(home, workspace, ScopeWorkspace, selection, adapters, model.ComponentSDD)
-
-	for _, want := range []string{
-		filepath.Join(workspace, ".config", "opencode", "opencode.json"),
-		filepath.Join(workspace, ".config", "opencode", "commands", "sdd-init.md"),
-		filepath.Join(workspace, ".config", "opencode", "plugins", "background-agents.ts"),
-		filepath.Join(workspace, ".config", "opencode", "plugins", "model-variants.ts"),
-		filepath.Join(workspace, ".config", "opencode", "plugins", "opencode-review-transport.ts"),
-		filepath.Join(workspace, ".config", "opencode", "plugins", "sdd-task-result-artifacts.ts"),
-		filepath.Join(workspace, ".config", "opencode", "plugins", "skill-registry.ts"),
-		filepath.Join(workspace, ".config", "opencode", "prompts", "sdd", "sdd-apply.md"),
-		filepath.Join(workspace, ".config", "opencode", "skills", "sdd-apply", "SKILL.md"),
-	} {
-		if !containsPath(paths, want) {
-			t.Fatalf("componentPathsWithWorkspaceScoped(sdd,opencode,workspace) missing workspace-scoped path %q\npaths=%v", want, paths)
-		}
-	}
-
-	for _, unwanted := range []string{
-		filepath.Join(home, ".config", "opencode", "opencode.json"),
-		filepath.Join(home, ".config", "opencode", "commands", "sdd-init.md"),
-		filepath.Join(home, ".config", "opencode", "plugins", "background-agents.ts"),
-		filepath.Join(home, ".config", "opencode", "plugins", "model-variants.ts"),
-		filepath.Join(home, ".config", "opencode", "plugins", "skill-registry.ts"),
-		filepath.Join(home, ".config", "opencode", "prompts", "sdd", "sdd-apply.md"),
-		filepath.Join(home, ".config", "opencode", "skills", "sdd-apply", "SKILL.md"),
-	} {
-		if containsPath(paths, unwanted) {
-			t.Fatalf("componentPathsWithWorkspaceScoped(sdd,opencode,workspace) must not include home-scoped path %q\npaths=%v", unwanted, paths)
-		}
 	}
 }
 
@@ -202,38 +96,6 @@ func TestInstallPiPersonaWritesManagedScopePaths(t *testing.T) {
 			unwanted := filepath.Join(other, ".pi", "gentle-ai", "persona.json")
 			if _, err := os.Stat(unwanted); !os.IsNotExist(err) {
 				t.Fatalf("workspace-scoped Pi persona config %q was written outside scope; stat err = %v", unwanted, err)
-			}
-		})
-	}
-}
-
-func TestLegacyOpenCodeBackgroundAgentsPluginRequiresConfigOpenCodePluginsPath(t *testing.T) {
-	home := t.TempDir()
-
-	for _, tt := range []struct {
-		name string
-		path string
-		want bool
-	}{
-		{
-			name: "legacy plugin under opencode config",
-			path: filepath.Join(home, ".config", "opencode", "plugins", "background-agents.ts"),
-			want: true,
-		},
-		{
-			name: "same file under unrelated opencode directory",
-			path: filepath.Join(home, "opencode", "plugins", "background-agents.ts"),
-			want: false,
-		},
-		{
-			name: "managed replacement plugin is not legacy",
-			path: filepath.Join(home, ".config", "opencode", "plugins", "model-variants.ts"),
-			want: false,
-		},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := isLegacyOpenCodeBackgroundAgentsPlugin(tt.path); got != tt.want {
-				t.Fatalf("isLegacyOpenCodeBackgroundAgentsPlugin(%q) = %v, want %v", tt.path, got, tt.want)
 			}
 		})
 	}
@@ -481,23 +343,6 @@ func TestComponentPathsPermissionsSkipsAgentsWithoutInjectionTarget(t *testing.T
 	}
 }
 
-func TestComponentPathsPermissionsIncludesAgentsWithInjectionTarget(t *testing.T) {
-	home := t.TempDir()
-	adapters := resolveAdapters([]model.AgentID{
-		model.AgentClaudeCode,
-		model.AgentOpenCode,
-	})
-
-	paths := componentPaths(home, model.Selection{}, adapters, model.ComponentPermission)
-
-	for _, adapter := range adapters {
-		want := adapter.SettingsPath(home)
-		if !containsPath(paths, want) {
-			t.Fatalf("componentPaths(permissions) missing supported injection path %q\npaths=%v", want, paths)
-		}
-	}
-}
-
 func containsPath(paths []string, want string) bool {
 	for _, p := range paths {
 		if p == want {
@@ -584,27 +429,10 @@ func readTextFile(t *testing.T, path string) string {
 	return string(content)
 }
 
-func openCodeSettingsPath(home string) string {
-	return filepath.Join(home, ".config", "opencode", "opencode.json")
-}
-
 // openCodeOrchestratorPrompt returns the decoded managed orchestrator prompt.
 // Reading the raw settings bytes would not do: Go's JSON encoder escapes "<" to
 // "<", so the managed markers only exist as such in the decoded string the
 // agent actually loads.
-func openCodeOrchestratorPrompt(t *testing.T, home string) string {
-	t.Helper()
-
-	var settings struct {
-		Agent map[string]struct {
-			Prompt string `json:"prompt"`
-		} `json:"agent"`
-	}
-	if err := json.Unmarshal([]byte(readTextFile(t, openCodeSettingsPath(home))), &settings); err != nil {
-		t.Fatalf("decode OpenCode settings error = %v", err)
-	}
-	return settings.Agent[opencodedefault.ManagedAgent].Prompt
-}
 
 func TestInstallDeliversRoutingGuidanceWithoutSDDComponent(t *testing.T) {
 	home := t.TempDir()
@@ -666,29 +494,6 @@ func TestInstallRoutingGuidanceIsIndependentOfSDDSelection(t *testing.T) {
 // isolates the hazard from the staged step order: a fix that merely schedules
 // guidance last would still pass a full-plan run and still destroy guidance
 // here, which is the sequence a later sync actually performs.
-func TestInstallRoutingGuidanceSurvivesOpenCodeSDDInjection(t *testing.T) {
-	home := t.TempDir()
-	selection := model.Selection{
-		Agents:     []model.AgentID{model.AgentOpenCode},
-		Components: []model.ComponentID{model.ComponentSDD},
-		SDDMode:    model.SDDModeSingle,
-	}
-
-	runInstallInjectionSteps(t, newTestInstallRuntime(t, home, selection))
-	if installed := openCodeOrchestratorPrompt(t, home); !strings.Contains(installed, routingOpenMarker) {
-		t.Fatalf("install did not deliver routing guidance to the OpenCode orchestrator prompt:\n%s", installed)
-	}
-
-	runInstallComponentSteps(t, newTestInstallRuntime(t, home, selection))
-
-	prompt := openCodeOrchestratorPrompt(t, home)
-	if !strings.Contains(prompt, routingOpenMarker) || !strings.Contains(prompt, routingCloseMarker) {
-		t.Fatalf("SDD injection erased the routing guidance from the OpenCode orchestrator prompt:\n%s", prompt)
-	}
-	if !strings.Contains(prompt, "SDD Orchestrator") {
-		t.Fatalf("preserving routing guidance erased the SDD orchestrator prompt:\n%s", prompt)
-	}
-}
 
 func TestInstallStripsLegacyTriggerRulesSection(t *testing.T) {
 	home := t.TempDir()
@@ -721,33 +526,6 @@ func TestInstallStripsLegacyTriggerRulesSection(t *testing.T) {
 	}
 }
 
-func TestInstallRoutingGuidanceSecondRunIsByteIdentical(t *testing.T) {
-	home := t.TempDir()
-	selection := model.Selection{
-		Agents:     []model.AgentID{model.AgentOpenCode, model.AgentClaudeCode},
-		Components: []model.ComponentID{model.ComponentSDD},
-		SDDMode:    model.SDDModeSingle,
-	}
-
-	runInstallInjectionSteps(t, newTestInstallRuntime(t, home, selection))
-	first := map[string]string{
-		"opencode.json": readTextFile(t, openCodeSettingsPath(home)),
-		"claude prompt": readTextFile(t, systemPromptFileFor(t, home, model.AgentClaudeCode)),
-	}
-
-	runInstallInjectionSteps(t, newTestInstallRuntime(t, home, selection))
-	second := map[string]string{
-		"opencode.json": readTextFile(t, openCodeSettingsPath(home)),
-		"claude prompt": readTextFile(t, systemPromptFileFor(t, home, model.AgentClaudeCode)),
-	}
-
-	for label, before := range first {
-		if second[label] != before {
-			t.Fatalf("second install rewrote %s; routing delivery is not idempotent", label)
-		}
-	}
-}
-
 // ─── Workspace scope must not strand orchestrator-prompt guidance ──────────
 //
 // OpenCode and Kilocode only ever load the home-level settings document, so a
@@ -756,98 +534,8 @@ func TestInstallRoutingGuidanceSecondRunIsByteIdentical(t *testing.T) {
 // agents therefore resolves against the home directory in every scope, while
 // every other agent keeps its workspace-scoped delivery.
 
-func TestInstallRoutingGuidanceWorkspaceScopeDeliversOpenCodeToHome(t *testing.T) {
-	home := t.TempDir()
-	workspace := t.TempDir()
-
-	// Seed the home settings with the retired section so the strip is proven to
-	// resolve against the same home scope the injector writes.
-	seeded := filemerge.InjectMarkdownSection("", "trigger-rules", "Retired WorkRun ceremony\n")
-	seedOpenCodeOrchestratorPrompt(t, home, seeded)
-
-	step := agentRoutingGuidanceStep{
-		id:           "agent-guidance:" + string(model.AgentOpenCode),
-		agent:        model.AgentOpenCode,
-		homeDir:      home,
-		workspaceDir: workspace,
-		scope:        ScopeWorkspace,
-	}
-	if err := step.Run(); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	prompt := openCodeOrchestratorPrompt(t, home)
-	if !strings.Contains(prompt, routingOpenMarker) || !strings.Contains(prompt, routingCloseMarker) {
-		t.Fatalf("workspace-scoped install left the home OpenCode orchestrator prompt unrouted:\n%s", prompt)
-	}
-	if strings.Contains(prompt, "Retired WorkRun ceremony") {
-		t.Fatalf("legacy trigger-rules content survived the workspace-scoped install:\n%s", prompt)
-	}
-
-	stranded := filepath.Join(workspace, ".config", "opencode")
-	if _, err := os.Stat(stranded); !os.IsNotExist(err) {
-		t.Fatalf("workspace-scoped install created %q, a directory OpenCode never loads (stat err = %v)", stranded, err)
-	}
-
-	first := readTextFile(t, openCodeSettingsPath(home))
-	if err := step.Run(); err != nil {
-		t.Fatalf("second Run() error = %v", err)
-	}
-	if second := readTextFile(t, openCodeSettingsPath(home)); second != first {
-		t.Fatalf("second workspace-scoped run rewrote the home settings; delivery is not idempotent")
-	}
-}
-
-func TestRoutingGuidancePathsWorkspaceScopeReportOrchestratorPromptAgentsAtHome(t *testing.T) {
-	home := t.TempDir()
-	workspace := t.TempDir()
-	adapters := resolveAdapters([]model.AgentID{model.AgentOpenCode, model.AgentClaudeCode})
-
-	paths := routingGuidancePaths(home, workspace, ScopeWorkspace, adapters)
-
-	for _, want := range []string{
-		filepath.Join(home, ".config", "opencode", "opencode.json"),
-	} {
-		if !containsPath(paths, want) {
-			t.Fatalf("routingGuidancePaths(workspace) missing home settings path %q\npaths=%v", want, paths)
-		}
-	}
-	for _, unwanted := range []string{
-		filepath.Join(workspace, ".config", "opencode", "opencode.json"),
-	} {
-		if containsPath(paths, unwanted) {
-			t.Fatalf("routingGuidancePaths(workspace) reported %q, a path the agent never loads\npaths=%v", unwanted, paths)
-		}
-	}
-
-	// Every other agent keeps its workspace-scoped delivery.
-	claudePrompt := systemPromptFileFor(t, workspace, model.AgentClaudeCode)
-	if !containsPath(paths, claudePrompt) {
-		t.Fatalf("routingGuidancePaths(workspace) lost the workspace-scoped path %q for prompt-file agents\npaths=%v", claudePrompt, paths)
-	}
-}
-
 // seedOpenCodeOrchestratorPrompt writes a minimal home settings document whose
 // managed orchestrator agent already carries the given prompt.
-func seedOpenCodeOrchestratorPrompt(t *testing.T, home, prompt string) {
-	t.Helper()
-
-	settingsPath := openCodeSettingsPath(home)
-	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll(%q) error = %v", filepath.Dir(settingsPath), err)
-	}
-	payload, err := json.Marshal(map[string]any{
-		"agent": map[string]any{
-			opencodedefault.ManagedAgent: map[string]any{"prompt": prompt},
-		},
-	})
-	if err != nil {
-		t.Fatalf("marshal seeded settings error = %v", err)
-	}
-	if err := os.WriteFile(settingsPath, payload, 0o644); err != nil {
-		t.Fatalf("WriteFile(%q) error = %v", settingsPath, err)
-	}
-}
 
 // ─── Routing guidance is part of the rollback contract ─────────────────────
 //
@@ -952,24 +640,6 @@ func TestBackupTargetsClaudeContext7IncludeCleanupWithoutVerificationRequirement
 			}
 		})
 	}
-}
-
-func TestBackupTargetsContainNoDuplicatePaths(t *testing.T) {
-	home := t.TempDir()
-	agentIDs := []model.AgentID{model.AgentClaudeCode, model.AgentOpenCode, model.AgentCursor}
-	selection := model.Selection{
-		Agents:     agentIDs,
-		Components: []model.ComponentID{model.ComponentSDD, model.ComponentEngram, model.ComponentPersona},
-		SDDMode:    model.SDDModeSingle,
-	}
-	resolved := planner.ResolvedPlan{Agents: agentIDs, OrderedComponents: selection.Components}
-
-	targets, err := backupTargets(home, "", ScopeGlobal, selection, resolved)
-	if err != nil {
-		t.Fatalf("backupTargets() error = %v", err)
-	}
-
-	assertNoDuplicatePaths(t, "backupTargets", targets)
 }
 
 func assertNoDuplicatePaths(t *testing.T, label string, paths []string) {

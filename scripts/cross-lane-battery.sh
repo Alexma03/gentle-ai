@@ -8,7 +8,7 @@
 #   scripts/cross-lane-battery.sh --binary /path/to/gentle-ai [--with-model] [--with-host] [--keep-work]
 #
 # Deterministic lanes (always run):
-#   opencode  - drives the REAL OpenCode transport plugin bytes through an
+#   codex     - drives the retained Codex review transport through an
 #               emulated Task hook surface with HOST-assembled binding frames
 #               (lens frame and validator role frame).
 #   claude    - one low-risk full lifecycle to gate allow, plus one medium
@@ -26,7 +26,7 @@
 #   host-pi       - the INSTALLED gentle-pi review-host-relay code runs a real
 #                   locked-down print-mode `pi` reviewer; refuter/validator
 #                   legs run through the Go-owned pi spawn (--execute).
-#   host-opencode - a real headless `opencode run` session in a sandboxed HOME
+#   host-codex - a real headless Codex session in a sandboxed HOME
 #                   with the real transport plugin: relay start/completion
 #                   frames must flow through the live host hooks.
 # Every with-host lane is bounded, PASS/FAIL/SKIP(reason) per check, sandboxed

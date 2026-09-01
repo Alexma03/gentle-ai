@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/sdd"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/tui/styles"
 )
 
@@ -20,18 +19,12 @@ func RenderProfileDelete(profileName string, cursor int) string {
 	b.WriteString(styles.WarningStyle.Render(fmt.Sprintf("Are you sure you want to delete profile %q?", profileName)))
 	b.WriteString("\n\n")
 
-	b.WriteString(styles.SubtextStyle.Render("The following 11 agent keys will be removed from opencode.json:"))
+	b.WriteString(styles.SubtextStyle.Render("The managed profile keys will be removed:"))
 	b.WriteString("\n\n")
 
 	// Show orchestrator key.
 	b.WriteString(styles.UnselectedStyle.Render("  • sdd-orchestrator-" + profileName))
 	b.WriteString("\n")
-
-	// Show phase keys using the canonical phase list from the sdd package.
-	for _, phase := range sdd.ProfilePhaseOrder() {
-		b.WriteString(styles.UnselectedStyle.Render("  • " + phase + "-" + profileName))
-		b.WriteString("\n")
-	}
 
 	b.WriteString("\n")
 	b.WriteString(styles.WarningStyle.Render("This action cannot be undone."))

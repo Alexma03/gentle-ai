@@ -70,7 +70,7 @@ Core principle: **does this inflate the parent context without need?** If yes, u
 | Bash for state (`git`, `gh`) | ✅ | — |
 | Tests, builds, installs, or native review actions | allowed as a bounded action | ✅ fresh per-action worker without changing route |
 
-Use Claude Code's native Agent/Task mechanism for delegated-direct work; reserve `sdd-*` agents for a selected SDD route. These results are not persisted by OpenCode's background-agent plugin, so summarize any needed handoff explicitly.
+Use Claude Code's native Agent/Task mechanism for delegated-direct work; reserve `sdd-*` agents for a selected SDD route. These results are not persisted by a retired background-agent plugin, so summarize any needed handoff explicitly.
 
 Keep one writer and a short synthesized handoff. Delegation is mandatory at the mapping, write, preparation, and broad-research boundaries, but it remains a direct implementation route and must not synthesize SDD artifacts.
 

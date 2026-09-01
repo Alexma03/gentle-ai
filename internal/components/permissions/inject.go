@@ -60,46 +60,12 @@ var claudeCodeOverlayJSON = []byte(`{
 }
 `)
 
-// openCodeOverlayJSON uses the OpenCode "permission" key with bash/read granularity.
-var openCodeOverlayJSON = []byte(`{
-  "permission": {
-    "bash": {
-      "*": "allow",
-      "git commit *": "ask",
-      "git push *": "ask",
-      "git push": "ask",
-      "git push --force *": "ask",
-      "git rebase *": "ask",
-      "git reset --hard *": "ask"
-    },
-    "read": {
-      "*": "allow",
-      "*.env": "deny",
-      "*.env.*": "deny",
-      "**/.env": "deny",
-      "**/.env.*": "deny",
-      "**/secrets/**": "deny",
-      "**/credentials.json": "deny",
-      "**/.ssh/**": "deny",
-      "**/.credentials/**": "deny",
-      "**/Library/Keychains/**": "deny",
-      "**/.aws/credentials": "deny",
-      "**/.config/gh/hosts.yml": "deny",
-      "**/*.pem": "deny",
-      "**/*.key": "deny"
-    }
-  }
-}
-`)
-
 // agentOverlay returns the correct permission overlay for the given agent,
 // or nil if the agent does not support permission injection via settings.json.
 func agentOverlay(id model.AgentID) []byte {
 	switch id {
 	case model.AgentClaudeCode:
 		return claudeCodeOverlayJSON
-	case model.AgentOpenCode:
-		return openCodeOverlayJSON
 	case model.AgentAntigravity:
 		// Antigravity manages permissions via IDE UI (Artifact Review Policy /
 		// Terminal Command Auto Execution). No injectable settings.json schema.

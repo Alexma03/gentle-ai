@@ -39,9 +39,9 @@ type reviewProviderTaskBinding struct {
 }
 
 // newReviewProviderTask produces an opaque host task that only Go may
-// materialize and admit through the live OpenCode relay.
+// materialize and admit through the managed host relay.
 func newReviewProviderTask(role reviewProviderRole, binding ReviewTransitionBinding) (ReviewProviderTask, error) {
-	agent := reviewProviderRoleOpenCodeAgent(role)
+	agent := reviewProviderRoleAgent(role)
 	if agent == "" || binding.LineageID == "" || !providerSHA256(binding.Revision) || !providerSHA256(binding.TargetIdentity) ||
 		reviewtransaction.ValidateReviewRepositoryContextHandle(binding.RepositoryContext) != nil {
 		return ReviewProviderTask{}, errors.New("provider role task binding is incomplete") // refusal:by-design world-action: only a Go-issued STATUS transition may bind a managed provider role task
@@ -56,7 +56,7 @@ func newReviewProviderTask(role reviewProviderRole, binding ReviewTransitionBind
 	return ReviewProviderTask{Agent: agent, Role: string(role), Prompt: reviewProviderTaskBindingHeader + " " + string(payload)}, nil
 }
 
-func reviewProviderRoleOpenCodeAgent(role reviewProviderRole) string {
+func reviewProviderRoleAgent(role reviewProviderRole) string {
 	switch role {
 	case reviewerprovider.RoleRefuter:
 		return "review-refuter"
@@ -73,29 +73,6 @@ func reviewProviderRoleTaskSchema(role reviewProviderRole) string {
 		return ""
 	}
 	return string(contract.ResultSchema)
-}
-
-func reviewProviderRoleTaskRequest(ctx context.Context, repo, storeDir string, state reviewtransaction.CompactState, revision string, role reviewProviderRole) (reviewerprovider.Invocation, error) {
-	switch role {
-	case reviewerprovider.RoleRefuter:
-		request, err := reviewProviderNewRefuterRequest(ctx, repo, storeDir, state, revision)
-		if err != nil {
-			return reviewerprovider.Invocation{}, err
-		}
-		return request.Invocation, nil
-	case reviewerprovider.RoleTargetedValidator:
-		correction, err := reviewProviderTargetedValidatorCorrection(ctx, repo, state)
-		if err != nil {
-			return reviewerprovider.Invocation{}, err
-		}
-		request, err := reviewProviderNewTargetedValidatorRequest(ctx, repo, state, revision, correction)
-		if err != nil {
-			return reviewerprovider.Invocation{}, err
-		}
-		return request.Invocation, nil
-	default:
-		return reviewerprovider.Invocation{}, fmt.Errorf("unsupported provider role task %q", role) // refusal:by-design world-action: OpenCode may invoke only compiled provider roles
-	}
 }
 
 type reviewProviderRefuterRequest struct {

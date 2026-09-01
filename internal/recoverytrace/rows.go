@@ -310,7 +310,7 @@ func reviewAuthorityRows() []Row {
 			Disposition: DispositionKeep,
 			Context:     ContextRAR,
 			Invariant:   "the compact facade appends and reads back native authority before materializing artifacts",
-			Proof:       []string{"internal/cli/review_facade_test.go"},
+			Proof:       []string{"internal/cli/review_facade_invalidated_test.go"},
 			Contributor: recoveryContributor,
 			Publication: published(),
 		},
@@ -846,8 +846,7 @@ func alreadyImplementedDeletionRows() []Row {
 // (internal/cli/review.go, review_facade.go, review_status_contract.go,
 // review_next_transition.go) reaches only internal/reviewtransaction and
 // internal/sddstatus. Outside the retired plane the four packages have no
-// consumer but e2e/organicruntime/organic_runtime_test.go, which this recovery
-// rewrites. Naming a DestinationPath would therefore overstate the record: no
+// surviving consumer. Naming a DestinationPath would therefore overstate the record: no
 // obligation moves, because none was ever exclusively theirs. Each row's comment
 // names the exact surviving file that already carries the behavior, so a reader
 // can audit the claim without rerunning the search that produced it.
@@ -967,8 +966,8 @@ func retiredPackageRows() []Row {
 			EarlyDeviation:  true,
 			DestinationPath: "internal/reviewtransaction/",
 			DestinationProof: []string{
-				"internal/reviewtransaction/gate_test.go",
-				"internal/reviewtransaction/receipt_test.go",
+				"internal/reviewtransaction/gate_write_guard_test.go",
+				"internal/reviewtransaction/compact_receipt_gate_removal_guard_test.go",
 			},
 		},
 	}
@@ -1056,15 +1055,6 @@ func unauthorizedDeletionRows() []Row {
 func regenerationRows() []Row {
 	rows := []Row{
 		{
-			Path:        "e2e/organicruntime/organic_runtime_test.go",
-			Disposition: DispositionRewrite,
-			Context:     ContextRAR,
-			Invariant:   "real configured-agent journeys cover direct, delegated, optional-SDD, every review tier, one bounded correction, and flexible delivery",
-			Proof:       []string{"e2e/organicruntime/organic_runtime_test.go"},
-			Contributor: recoveryContributor,
-			Publication: unpublished(),
-		},
-		{
 			Path:        "internal/assets/assets_test.go",
 			Disposition: DispositionKeep,
 			Context:     ContextACI,
@@ -1114,10 +1104,7 @@ func regenerationRows() []Row {
 	// Every adapter receives the same regenerated orchestrator prompt, and the
 	// same test asserts all of them, so the rows are generated from the adapter
 	// list rather than repeated twelve times.
-	adapters := []string{
-		"antigravity", "claude", "codex", "cursor", "gemini", "generic",
-		"hermes", "kimi", "kiro", "opencode", "qwen", "windsurf",
-	}
+	adapters := []string{"antigravity", "claude", "codex", "cursor", "gemini", "generic", "pi"}
 	for _, adapter := range adapters {
 		rows = append(rows, Row{
 			Path:        "internal/assets/" + adapter + "/sdd-orchestrator.md",

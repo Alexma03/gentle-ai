@@ -31,13 +31,6 @@ const (
 	piCodingAgentDirEnv      = "PI_CODING_AGENT_DIR"
 )
 
-var legacyPiSubagentPackageIdentities = map[string]struct{}{
-	"npm:pi-subagents-j0k3r":      {},
-	"npm:@tintinweb/pi-subagents": {},
-	"vendor/pi-subagents":         {},
-	"vendor/pi-subagents-fixed":   {},
-}
-
 func piSubagentsInstallCommand(system.PlatformProfile) []string {
 	return []string{"pi", "install", piSubagentsPackageSpec}
 }
@@ -321,17 +314,11 @@ func piPackageIdentity(pkg any) string {
 	if strings.HasPrefix(source, piSubagentsPackageSpec+"@") || source == piSubagentsPackageSpec {
 		return piSubagentsPackageSpec
 	}
-	for legacy := range legacyPiSubagentPackageIdentities {
-		if source == legacy || strings.HasPrefix(source, legacy+"@") {
-			return legacy
-		}
-	}
 	return source
 }
 
 func isRetiredPiSubagentPackage(identity string) bool {
-	_, ok := legacyPiSubagentPackageIdentities[identity]
-	return ok
+	return identity != piSubagentsPackageSpec && strings.Contains(strings.ToLower(identity), "pi-subagents")
 }
 
 func mergePiJSONFile(path string, overlay []byte) (filemerge.WriteResult, error) {

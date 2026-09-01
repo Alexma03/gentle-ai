@@ -84,37 +84,6 @@ func assertReviewInstructionsBindRuntime(t *testing.T, agent model.AgentID, labe
 // TestGeneratedOrchestratorInstructionsNameTheExecutingRuntime keeps the
 // lifecycle contract bound to the four runtimes that advertise it and absent
 // from every other SDD composition.
-func TestGeneratedOrchestratorInstructionsNameTheExecutingRuntime(t *testing.T) {
-	t.Parallel()
-
-	for _, agent := range catalog.AllAgents() {
-		t.Run(string(agent.ID), func(t *testing.T) {
-			content := renderSDDOrchestratorAsset(agent.ID)
-			if expectedReviewLifecycleRuntime(agent.ID) {
-				assertReviewInstructionsBindRuntime(t, agent.ID, "orchestrator", content)
-				return
-			}
-			if strings.Contains(content, "gentle-ai review status --cwd <repo> --contract gentle-ai.review-integration/v2") {
-				t.Fatal("non-RDD runtime received negotiated review lifecycle instructions")
-			}
-			if !strings.Contains(content, "## SDD Workflow") {
-				t.Fatal("non-RDD runtime lost its normal SDD workflow")
-			}
-		})
-	}
-
-	for _, agent := range []model.AgentID{model.AgentCodex, model.AgentOpenCode} {
-		t.Run("bypass-affected/"+string(agent), func(t *testing.T) {
-			content := renderSDDOrchestratorAsset(agent)
-			if strings.Contains(content, string(model.AgentClaudeCode)) && agent != model.AgentClaudeCode {
-				t.Errorf("%s orchestrator instructions still carry the literal %q identity", agent, model.AgentClaudeCode)
-			}
-			if !strings.Contains(content, "--agent "+string(agent)+" --next-transition") {
-				t.Errorf("%s orchestrator instructions never bind its own identity on the negotiated STATUS route", agent)
-			}
-		})
-	}
-}
 
 func TestAdvertisedRenderedReviewProtocolsBindRuntimeOnce(t *testing.T) {
 	for _, agent := range catalog.AllAgents() {

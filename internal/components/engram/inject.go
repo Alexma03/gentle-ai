@@ -55,7 +55,7 @@ func SetLookPathForTest(t interface {
 // If not found (e.g. binary not yet installed), it returns "engram" and false.
 // This is used to write the most stable command possible into MCP configs:
 // an absolute path survives across environments where PATH is not fully
-// inherited (e.g. Windsurf, IDEs that launch without a login shell).
+// inherited (e.g. IDEs, IDEs that launch without a login shell).
 func resolveEngramCommand() (string, bool) {
 	p, err := EngramLookPath("engram")
 	if err != nil || p == "" {
@@ -88,43 +88,11 @@ func engramServerJSONWithCmd(cmd string) []byte {
 // engramOverlayJSON returns the settings overlay JSON (used for merge-into-settings
 // and MCPConfigFile strategies), with the resolved engram command.
 func engramOverlayJSON(agentID model.AgentID, cmd string) []byte {
-	var cfg map[string]any
-	if agentID == model.AgentOpenCode {
-		// OpenCode 1.3.3+ requires command as an array for type:local servers.
-		// The separate "args" field is not accepted; all args must be in the
-		// command array itself.
-		//
-		// Use the __replace__ sentinel so that MergeJSONObjects replaces the
-		// entire mcp.engram object atomically instead of deep-merging into it.
-		// Without this, users upgrading from v1.11.3 (which had a separate
-		// "args" key) would end up with both "args" and the new array "command"
-		// in their config, which is invalid for OpenCode 1.3.3.
-		cfg = map[string]any{
-			"mcp": map[string]any{
-				"engram": map[string]any{
-					"__replace__": map[string]any{
-						"command": []string{cmd, "mcp", "--tools=agent"},
-						"type":    "local",
-					},
-				},
-			},
-		}
-	} else {
-		args := []string{"mcp", "--tools=agent"}
-		if agentID == model.AgentAntigravity {
-			// Antigravity should launch the default Engram MCP server without
-			// narrowing the exposed tool set.
-			args = []string{"mcp"}
-		}
-		cfg = map[string]any{
-			"mcpServers": map[string]any{
-				"engram": map[string]any{
-					"command": cmd,
-					"args":    args,
-				},
-			},
-		}
+	args := []string{"mcp", "--tools=agent"}
+	if agentID == model.AgentAntigravity {
+		args = []string{"mcp"}
 	}
+	cfg := map[string]any{"mcpServers": map[string]any{"engram": map[string]any{"command": cmd, "args": args}}}
 	b, _ := json.MarshalIndent(cfg, "", "  ")
 	return append(b, '\n')
 }
@@ -181,11 +149,8 @@ func InjectWorkspaceWithOptions(workspaceDir string, adapter agents.Adapter, opt
 
 // InjectWithPromptDir writes Engram's MCP configuration using configHomeDir and
 // writes prompt protocol files using promptDir. This is needed for agents such
-// as OpenClaw where MCP is loaded from the global config but instructions are
+// as legacy clients where MCP is loaded from the global config but instructions are
 // read from an active workspace.
-func InjectWithPromptDir(configHomeDir, promptDir string, adapter agents.Adapter) (InjectionResult, error) {
-	return injectWithOptions(configHomeDir, promptDir, adapter, InjectOptions{}, true)
-}
 
 const antigravityEngramPluginJSON = `{
   "name": "gentle-ai-engram",
@@ -660,21 +625,11 @@ func existingMergedEngramCommand(raw []byte, agentID model.AgentID) (string, boo
 		return "", false
 	}
 
-	var server any
-	switch agentID {
-	case model.AgentOpenCode:
-		mcp, ok := root["mcp"].(map[string]any)
-		if !ok {
-			return "", false
-		}
-		server = mcp["engram"]
-	default:
-		mcpServers, ok := root["mcpServers"].(map[string]any)
-		if !ok {
-			return "", false
-		}
-		server = mcpServers["engram"]
+	mcpServers, ok := root["mcpServers"].(map[string]any)
+	if !ok {
+		return "", false
 	}
+	server := mcpServers["engram"]
 
 	serverMap, ok := server.(map[string]any)
 	if !ok {
@@ -707,7 +662,7 @@ func executableFromCommandValue(command any) (string, bool) {
 
 func isStandardAgent(id model.AgentID) bool {
 	switch id {
-	case model.AgentOpenCode, model.AgentCodex, model.AgentAntigravity, model.AgentClaudeCode:
+	case model.AgentCodex, model.AgentAntigravity, model.AgentClaudeCode:
 		return true
 	default:
 		return false

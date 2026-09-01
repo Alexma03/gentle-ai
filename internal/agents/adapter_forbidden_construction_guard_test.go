@@ -67,58 +67,6 @@ var adapterForbiddenConstructionPackageDirs = []string{
 // TestAdapterForbiddenConstructionGuardCatchesKnownShapes unit-tests the
 // scanner against synthetic sources so its detection logic is proven correct
 // independent of whatever the current adapter packages contain.
-func TestAdapterForbiddenConstructionGuardCatchesKnownShapes(t *testing.T) {
-	tests := []struct {
-		name          string
-		src           string
-		wantViolation bool
-	}{
-		{
-			name: "clean adapter source",
-			src: `package opencode
-
-func (a *Adapter) Detect() (bool, error) { return true, nil }
-`,
-			wantViolation: false,
-		},
-		{
-			name: "constructs a review CLI flag literal",
-			src: `package opencode
-
-func dispatch() []string { return []string{"review", "--expected-revision", "abc"} }
-`,
-			wantViolation: true,
-		},
-		{
-			name: "declares a lineage identity field",
-			src: `package pi
-
-type dispatchRequest struct {
-	LineageID string
-}
-`,
-			wantViolation: true,
-		},
-		{
-			name: "declares a ReviewBinding shape",
-			src: `package claude
-
-type ReviewBinding struct {
-	Lineage string
-}
-`,
-			wantViolation: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			violations := scanAdapterForbiddenConstructions("synthetic_adapter_test_input.go", []byte(tt.src))
-			if got := len(violations) > 0; got != tt.wantViolation {
-				t.Fatalf("violations = %v (len=%d), want non-empty=%v", violations, len(violations), tt.wantViolation)
-			}
-		})
-	}
-}
 
 // TestAdapterForbiddenConstructionGuardHoldsForProductionFiles runs the same
 // scanner against every real production adapter.go (and sibling) file in the

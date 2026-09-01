@@ -4,91 +4,15 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/claude"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/skillregistry"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
 )
 
-func claudeAdapter() agents.Adapter   { return claude.NewAdapter() }
-func opencodeAdapter() agents.Adapter { return opencode.NewAdapter() }
-
-func TestInjectCommentWriterLanguageContractForOpenCode(t *testing.T) {
-	home := t.TempDir()
-
-	result, err := Inject(home, opencodeAdapter(), []model.SkillID{model.SkillCommentWriter})
-	if err != nil {
-		t.Fatalf("Inject() error = %v", err)
-	}
-	if !result.Changed {
-		t.Fatalf("Inject() first changed = false")
-	}
-
-	path := filepath.Join(home, ".config", "opencode", "skills", "comment-writer", "SKILL.md")
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile() error = %v", err)
-	}
-	text := string(content)
-
-	for _, required := range []string{
-		"target context language",
-		"explicitly requests a language",
-		"neutral/professional Spanish by default",
-	} {
-		if !strings.Contains(text, required) {
-			t.Fatalf("installed comment-writer missing language contract %q", required)
-		}
-	}
-	if strings.Contains(text, "If writing in Spanish, use Rioplatense Spanish/voseo") {
-		t.Fatal("installed comment-writer still forces Rioplatense Spanish for all Spanish comments")
-	}
-}
-
-func TestInjectWritesSkillFilesForOpenCode(t *testing.T) {
-	home := t.TempDir()
-
-	result, err := Inject(home, opencodeAdapter(), []model.SkillID{model.SkillCreator})
-	if err != nil {
-		t.Fatalf("Inject() error = %v", err)
-	}
-	if !result.Changed {
-		t.Fatalf("Inject() first changed = false")
-	}
-
-	if len(result.Files) != 2 {
-		t.Fatalf("Inject() files len = %d, want SKILL.md plus local reference", len(result.Files))
-	}
-
-	path := filepath.Join(home, ".config", "opencode", "skills", "skill-creator", "SKILL.md")
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("expected skill file %q: %v", path, err)
-	}
-	assertNonEmptyFile(t, filepath.Join(home, ".config", "opencode", "skills", "skill-creator", "references", "skill-style-guide.md"))
-
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile() error = %v", err)
-	}
-	if len(content) == 0 {
-		t.Fatalf("skill file is empty")
-	}
-
-	// Idempotent: second inject should not change.
-	second, err := Inject(home, opencodeAdapter(), []model.SkillID{model.SkillCreator})
-	if err != nil {
-		t.Fatalf("Inject() second error = %v", err)
-	}
-
-	if second.Changed {
-		t.Fatalf("Inject() second changed = true")
-	}
-}
+func claudeAdapter() agents.Adapter { return claude.NewAdapter() }
 
 func TestInjectWritesSkillFilesForClaude(t *testing.T) {
 	home := t.TempDir()
@@ -117,33 +41,6 @@ func TestInjectWritesSkillFilesForClaude(t *testing.T) {
 	}
 }
 
-func TestInjectCopiesNonSDDSkillReferences(t *testing.T) {
-	home := t.TempDir()
-
-	result, err := Inject(home, opencodeAdapter(), []model.SkillID{model.SkillGoTesting, model.SkillChainedPR})
-	if err != nil {
-		t.Fatalf("Inject() error = %v", err)
-	}
-	if !result.Changed {
-		t.Fatal("Inject() changed = false")
-	}
-
-	skillsDir := filepath.Join(home, ".config", "opencode", "skills")
-	tests := []struct {
-		name string
-		path string
-	}{
-		{name: "go-testing examples", path: filepath.Join(skillsDir, "go-testing", "references", "examples.md")},
-		{name: "chained-pr details", path: filepath.Join(skillsDir, "chained-pr", "references", "chaining-details.md")},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assertNonEmptyFile(t, tt.path)
-		})
-	}
-}
-
 func TestInjectSkipsSddSkills(t *testing.T) {
 	home := t.TempDir()
 
@@ -168,30 +65,6 @@ func TestInjectSkipsSddSkills(t *testing.T) {
 		if _, statErr := os.Stat(path); statErr == nil {
 			t.Fatalf("skills component must not write SDD skill %q — it belongs to the SDD component", id)
 		}
-	}
-}
-
-func TestInjectSkipsUnknownSkillGracefully(t *testing.T) {
-	home := t.TempDir()
-
-	result, err := Inject(home, opencodeAdapter(), []model.SkillID{
-		model.SkillCreator,
-		model.SkillID("nonexistent-skill"),
-	})
-	if err != nil {
-		t.Fatalf("Inject() error = %v", err)
-	}
-
-	if len(result.Files) != 2 {
-		t.Fatalf("Inject() files len = %d, want 2", len(result.Files))
-	}
-
-	if len(result.Skipped) != 1 {
-		t.Fatalf("Inject() skipped len = %d, want 1", len(result.Skipped))
-	}
-
-	if result.Skipped[0] != "nonexistent-skill" {
-		t.Fatalf("Inject() skipped[0] = %q, want nonexistent-skill", result.Skipped[0])
 	}
 }
 
@@ -308,76 +181,6 @@ func TestInjectRequiredBundledSkillsForEverySkillsCapableDefaultAdapter(t *testi
 	}
 }
 
-func TestInjectBundledSkillsAreRegistryDiscoverable(t *testing.T) {
-	for _, skill := range []model.SkillID{
-		model.SkillRDDDefectWorkflow,
-		model.SkillSystemicIssueTriage,
-		model.SkillGentleAIBench,
-	} {
-		t.Run(string(skill), func(t *testing.T) {
-			home := t.TempDir()
-			project := t.TempDir()
-
-			_, err := Inject(home, opencodeAdapter(), []model.SkillID{skill})
-			if err != nil {
-				t.Fatalf("Inject() error = %v", err)
-			}
-
-			wantPath := filepath.Join(home, ".config", "opencode", "skills", string(skill), "SKILL.md")
-			for _, entry := range skillregistry.List(project, home) {
-				if entry.Name == string(skill) && entry.Path == wantPath {
-					return
-				}
-			}
-
-			t.Fatalf("skill registry did not discover %q at %q", skill, wantPath)
-		})
-	}
-}
-
-func TestInjectSkillCreatorAndImproverInstallLocalStyleGuideReference(t *testing.T) {
-	home := t.TempDir()
-
-	_, err := Inject(home, opencodeAdapter(), []model.SkillID{model.SkillCreator, model.SkillImprover})
-	if err != nil {
-		t.Fatalf("Inject() error = %v", err)
-	}
-
-	skillsDir := filepath.Join(home, ".config", "opencode", "skills")
-	for _, id := range []model.SkillID{model.SkillCreator, model.SkillImprover} {
-		t.Run(string(id), func(t *testing.T) {
-			guidePath := filepath.Join(skillsDir, string(id), "references", "skill-style-guide.md")
-			assertNonEmptyFile(t, guidePath)
-
-			skillContent, readErr := os.ReadFile(filepath.Join(skillsDir, string(id), "SKILL.md"))
-			if readErr != nil {
-				t.Fatalf("ReadFile(SKILL.md) error = %v", readErr)
-			}
-			text := string(skillContent)
-			if !strings.Contains(text, "docs/skill-style-guide.md") {
-				t.Fatalf("%s SKILL.md must preserve repo normative guide reference", id)
-			}
-			if !strings.Contains(text, "references/skill-style-guide.md") {
-				t.Fatalf("%s SKILL.md must reference installed local style guide", id)
-			}
-		})
-	}
-}
-
-func TestSkillPathForAgent(t *testing.T) {
-	path := SkillPathForAgent("/home/test", claudeAdapter(), model.SkillCreator)
-	want := filepath.Join("/home/test", ".claude", "skills", "skill-creator", "SKILL.md")
-	if path != want {
-		t.Fatalf("SkillPathForAgent() = %q, want %q", path, want)
-	}
-
-	path = SkillPathForAgent("/home/test", opencodeAdapter(), model.SkillCreator)
-	want = filepath.Join("/home/test", ".config", "opencode", "skills", "skill-creator", "SKILL.md")
-	if path != want {
-		t.Fatalf("SkillPathForAgent() = %q, want %q", path, want)
-	}
-}
-
 func assertNonEmptyFile(t *testing.T, path string) {
 	t.Helper()
 
@@ -387,55 +190,6 @@ func assertNonEmptyFile(t *testing.T, path string) {
 	}
 	if info.Size() == 0 {
 		t.Fatalf("expected file %q to be non-empty", path)
-	}
-}
-
-func TestInjectWithCapability_SkipsSDDSkillsWhenCapabilityEmpty(t *testing.T) {
-	home := t.TempDir()
-
-	// When capability is empty, SDD skills are skipped (same as Inject).
-	// The skills component skips SDD skills to avoid conflicts with SDD component.
-	result, err := InjectWithCapability(home, opencodeAdapter(), []model.SkillID{model.SkillSDDApply}, "")
-	if err != nil {
-		t.Fatalf("InjectWithCapability() error = %v", err)
-	}
-	// SDD skills are skipped when capability is empty.
-	if len(result.Files) != 0 {
-		t.Fatalf("InjectWithCapability(capability=%q) files len = %d, want 0 (SDD skills skipped)", "", len(result.Files))
-	}
-}
-
-func TestInjectWithCapability_WritesNonSDDSkillsRegardlessOfCapability(t *testing.T) {
-	home := t.TempDir()
-
-	// Non-SDD skills should always be written, regardless of capability.
-	result, err := InjectWithCapability(home, opencodeAdapter(), []model.SkillID{model.SkillCreator}, "capable")
-	if err != nil {
-		t.Fatalf("InjectWithCapability() error = %v", err)
-	}
-	if len(result.Files) != 2 {
-		t.Fatalf("InjectWithCapability() files len = %d, want 2", len(result.Files))
-	}
-	if len(result.Skipped) != 0 {
-		t.Fatalf("InjectWithCapability() skipped len = %d, want 0", len(result.Skipped))
-	}
-}
-
-func TestInjectWithCapability_WritesExtractedSDDSkillWithFrontmatterAtStart(t *testing.T) {
-	home := t.TempDir()
-
-	_, err := InjectWithCapability(home, opencodeAdapter(), []model.SkillID{model.SkillSDDApply}, "capable")
-	if err != nil {
-		t.Fatalf("InjectWithCapability() error = %v", err)
-	}
-
-	path := filepath.Join(home, ".config", "opencode", "skills", "sdd-apply", "SKILL.md")
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile() error = %v", err)
-	}
-	if !strings.HasPrefix(string(content), "---\n") {
-		t.Fatalf("extracted SDD skill must start with YAML frontmatter delimiter, got prefix %q", string(content[:min(len(content), 16)]))
 	}
 }
 

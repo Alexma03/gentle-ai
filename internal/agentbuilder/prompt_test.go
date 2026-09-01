@@ -3,8 +3,6 @@ package agentbuilder
 import (
 	"strings"
 	"testing"
-
-	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
 
 func TestComposePrompt_StandaloneMode_NoSDDContext(t *testing.T) {
@@ -60,21 +58,6 @@ func TestComposePrompt_NewPhaseMode_SDDContextPresent(t *testing.T) {
 	// New phase references the dependency graph integration
 	if !strings.Contains(prompt, "dependency graph") {
 		t.Errorf("new-phase should mention dependency graph; got:\n%s", prompt)
-	}
-}
-
-func TestComposePrompt_InstalledAgentsIncluded(t *testing.T) {
-	agents := []model.AgentID{model.AgentClaudeCode, model.AgentOpenCode}
-	prompt := ComposePrompt("build an agent", nil, agents)
-
-	if !strings.Contains(prompt, "<installed_agents>") || !strings.Contains(prompt, "</installed_agents>") {
-		t.Errorf("should include installed agents context wrapper; got:\n%s", prompt)
-	}
-	if !strings.Contains(prompt, string(model.AgentClaudeCode)) {
-		t.Errorf("should include claude-code agent; got:\n%s", prompt)
-	}
-	if !strings.Contains(prompt, string(model.AgentOpenCode)) {
-		t.Errorf("should include opencode agent; got:\n%s", prompt)
 	}
 }
 

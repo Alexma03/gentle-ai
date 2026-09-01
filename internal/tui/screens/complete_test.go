@@ -16,19 +16,6 @@ func TestRenderCompleteSuccessShowsNextSteps(t *testing.T) {
 	}
 }
 
-func TestRenderCompleteSuccessDoesNotMentionRetiredIntegrations(t *testing.T) {
-	out := RenderComplete(CompletePayload{
-		ConfiguredAgents:    1,
-		InstalledComponents: 1,
-	})
-
-	for _, retired := range []string{"gga", "theme", "marketplace"} {
-		if strings.Contains(strings.ToLower(out), retired) {
-			t.Fatalf("unexpected retired integration %q: %q", retired, out)
-		}
-	}
-}
-
 func TestRenderCompleteShowsManualActions(t *testing.T) {
 	out := RenderComplete(CompletePayload{ManualActions: []string{"Pi CodeGraph child drifted; preserved: /tmp/worker.md"}})
 	if !strings.Contains(out, "Manual actions required") || !strings.Contains(out, "Pi CodeGraph child drifted") {

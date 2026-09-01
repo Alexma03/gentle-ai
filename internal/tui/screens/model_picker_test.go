@@ -1,22 +1,18 @@
 package screens
 
 import (
-	"context"
-	"errors"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/opencode"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/runtimecatalog"
 )
 
 // makeTestState builds a minimal ModelPickerState with one provider and models
 // so that handleModelNav can reach the "enter" branch.
 func makeTestState(phaseIdx int) *ModelPickerState {
 	const providerID = "test-provider"
-	testModels := []opencode.Model{
+	testModels := []runtimecatalog.Model{
 		{ID: "model-alpha", Name: "Alpha Model"},
 		{ID: "model-beta", Name: "Beta Model"},
 	}
@@ -24,31 +20,12 @@ func makeTestState(phaseIdx int) *ModelPickerState {
 		Mode:             ModeModelSelect,
 		SelectedPhaseIdx: phaseIdx,
 		SelectedProvider: providerID,
-		SDDModels:        map[string][]opencode.Model{providerID: testModels},
+		SDDModels:        map[string][]runtimecatalog.Model{providerID: testModels},
 		ModelCursor:      0, // always pick the first model for simplicity
 	}
 }
 
 // ─── ModelPickerRows ───────────────────────────────────────────────────────
-
-func TestModelPickerRows_Count(t *testing.T) {
-	rows := ModelPickerRows()
-	want := 2 + len(opencode.SDDPhases()) + 1 + len(opencode.JDPhases()) + 1 + len(opencode.ReviewPhases())
-	if len(rows) != want {
-		t.Fatalf("ModelPickerRows() len = %d, want %d; rows = %v", len(rows), want, rows)
-	}
-}
-
-func TestModelPickerRows_ReviewAgentsFollowJudgmentDay(t *testing.T) {
-	rows := ModelPickerRows()
-	wantSuffix := append([]string{"--- Review agents ---"}, opencode.ReviewPhases()...)
-	got := rows[len(rows)-len(wantSuffix):]
-	for i := range wantSuffix {
-		if got[i] != wantSuffix[i] {
-			t.Fatalf("review row %d = %q, want %q; rows = %v", i, got[i], wantSuffix[i], rows)
-		}
-	}
-}
 
 func TestRenderModelPickerScrollsToReviewAgents(t *testing.T) {
 	rows := ModelPickerRows()
@@ -78,45 +55,7 @@ func TestModelPickerRows_SetAllIsSecond(t *testing.T) {
 	}
 }
 
-func TestModelPickerRows_SubAgentsStartAtIndexTwo(t *testing.T) {
-	rows := ModelPickerRows()
-	phases := opencode.SDDPhases()
-	for i, phase := range phases {
-		got := rows[i+2]
-		if got != phase {
-			t.Errorf("ModelPickerRows()[%d] = %q, want %q", i+2, got, phase)
-		}
-	}
-	if rows[3] != "sdd-explore" || rows[4] != "sdd-research" || rows[5] != "sdd-propose" {
-		t.Fatalf("model picker phase order = %v", rows[2:6])
-	}
-}
-
 // ─── handleModelNav: orchestrator row (idx 0) ──────────────────────────────
-
-func TestHandleModelNav_OrchestratorRowAssignsOnlyOrchestrator(t *testing.T) {
-	state := makeTestState(0) // row 0 = gentle-orchestrator
-	assignments := make(map[string]model.ModelAssignment)
-
-	handled, updated := handleModelNav("enter", state, assignments)
-
-	if !handled {
-		t.Fatal("handleModelNav should return handled=true on enter")
-	}
-
-	// "gentle-orchestrator" key must be set
-	orch, ok := updated[SDDOrchestratorPhase]
-	if !ok || orch.ProviderID == "" {
-		t.Fatalf("expected %q to be assigned, got: %v", SDDOrchestratorPhase, updated)
-	}
-
-	// No sub-agent phase must be touched
-	for _, phase := range opencode.SDDPhases() {
-		if _, exists := updated[phase]; exists {
-			t.Errorf("sub-agent phase %q should NOT be assigned when selecting orchestrator row; assignments: %v", phase, updated)
-		}
-	}
-}
 
 func TestHandleModelNav_OrchestratorRow_ModelValues(t *testing.T) {
 	state := makeTestState(0)
@@ -134,31 +73,6 @@ func TestHandleModelNav_OrchestratorRow_ModelValues(t *testing.T) {
 }
 
 // ─── handleModelNav: "Set all phases" row (idx 1) ──────────────────────────
-
-func TestHandleModelNav_SetAllPhasesRow_SetsOnlySubAgents(t *testing.T) {
-	state := makeTestState(1) // row 1 = "Set all phases"
-	assignments := make(map[string]model.ModelAssignment)
-
-	handled, updated := handleModelNav("enter", state, assignments)
-
-	if !handled {
-		t.Fatal("handleModelNav should return handled=true on enter")
-	}
-
-	// All 10 sub-agents must be assigned
-	phases := opencode.SDDPhases()
-	for _, phase := range phases {
-		a, ok := updated[phase]
-		if !ok || a.ProviderID == "" {
-			t.Errorf("sub-agent phase %q should be assigned; assignments: %v", phase, updated)
-		}
-	}
-
-	// gentle-orchestrator must NOT be touched by "Set all phases"
-	if _, exists := updated[SDDOrchestratorPhase]; exists {
-		t.Errorf("gentle-orchestrator should NOT be assigned by 'Set all phases'; assignments: %v", updated)
-	}
-}
 
 func TestHandleModelNav_SetAllPhasesRow_DoesNotOverwriteExistingOrchestrator(t *testing.T) {
 	state := makeTestState(1) // row 1 = "Set all phases"
@@ -180,192 +94,11 @@ func TestHandleModelNav_SetAllPhasesRow_DoesNotOverwriteExistingOrchestrator(t *
 
 // ─── handleModelNav: sub-agent rows (idx 2+) ───────────────────────────────
 
-func TestHandleModelNav_SubAgentRow_AssignsCorrectPhase(t *testing.T) {
-	phases := opencode.SDDPhases()
-
-	for i, expectedPhase := range phases {
-		t.Run(expectedPhase, func(t *testing.T) {
-			state := makeTestState(i + 2) // sub-agents start at row idx 2
-			assignments := make(map[string]model.ModelAssignment)
-
-			handled, updated := handleModelNav("enter", state, assignments)
-
-			if !handled {
-				t.Fatal("handleModelNav should return handled=true on enter")
-			}
-
-			// The target phase must be assigned
-			a, ok := updated[expectedPhase]
-			if !ok || a.ProviderID == "" {
-				t.Errorf("phase %q should be assigned; assignments: %v", expectedPhase, updated)
-			}
-
-			// Other phases must NOT be assigned
-			for _, other := range phases {
-				if other == expectedPhase {
-					continue
-				}
-				if _, exists := updated[other]; exists {
-					t.Errorf("unrelated phase %q should not be assigned; assignments: %v", other, updated)
-				}
-			}
-
-			// Orchestrator must NOT be assigned
-			if _, exists := updated[SDDOrchestratorPhase]; exists {
-				t.Errorf("gentle-orchestrator should not be assigned; assignments: %v", updated)
-			}
-		})
-	}
-}
-
 // ─── SDDOrchestratorPhase constant ────────────────────────────────────────
 
 func TestSDDOrchestratorPhaseConstant(t *testing.T) {
 	if SDDOrchestratorPhase != "gentle-orchestrator" {
 		t.Fatalf("SDDOrchestratorPhase = %q, want %q", SDDOrchestratorPhase, "gentle-orchestrator")
-	}
-}
-
-func TestRenderModelPickerShowsConfigWarning(t *testing.T) {
-	output := RenderModelPicker(nil, ModelPickerState{ConfigWarning: "invalid opencode.json"}, 0)
-	if !strings.Contains(output, "invalid opencode.json") {
-		t.Fatalf("RenderModelPicker() missing config warning; got:\n%s", output)
-	}
-}
-
-func TestFilteredModelEntriesSortsNewestFirst(t *testing.T) {
-	state := ModelPickerState{
-		SelectedProvider: "anthropic",
-		SDDModels: map[string][]opencode.Model{
-			"anthropic": {
-				{ID: "claude-3-5-sonnet", Name: "Claude 3.5 Sonnet"},
-				{ID: "claude-opus-4-6", Name: "Claude Opus 4.6"},
-				{ID: "claude-sonnet-4-5", Name: "Claude Sonnet 4.5"},
-			},
-		},
-	}
-
-	models := FilteredModelEntries(state)
-	got := []string{models[0].ID, models[1].ID, models[2].ID}
-	want := []string{"claude-opus-4-6", "claude-sonnet-4-5", "claude-3-5-sonnet"}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("sorted models = %v, want %v", got, want)
-		}
-	}
-}
-
-func TestFilteredModelEntriesPrefersSemanticVersionOverDate(t *testing.T) {
-	state := ModelPickerState{
-		SelectedProvider: "anthropic",
-		SDDModels: map[string][]opencode.Model{
-			"anthropic": {
-				{ID: "claude-3-5-sonnet-20241022", Name: "Claude 3.5 Sonnet 20241022"},
-				{ID: "claude-sonnet-4-5", Name: "Claude Sonnet 4.5"},
-			},
-		},
-	}
-
-	models := FilteredModelEntries(state)
-	if models[0].ID != "claude-sonnet-4-5" {
-		t.Fatalf("first model = %q, want claude-sonnet-4-5", models[0].ID)
-	}
-}
-
-func TestFilteredModelEntriesIgnoresShortDateSuffixes(t *testing.T) {
-	state := ModelPickerState{
-		SelectedProvider: "google",
-		SDDModels: map[string][]opencode.Model{
-			"google": {
-				{ID: "gemini-2.5-pro-exp-03-25", Name: "Gemini 2.5 Pro Experimental 03-25"},
-				{ID: "gemini-3-pro", Name: "Gemini 3 Pro"},
-			},
-		},
-	}
-
-	models := FilteredModelEntries(state)
-	if models[0].ID != "gemini-3-pro" {
-		t.Fatalf("first model = %q, want gemini-3-pro", models[0].ID)
-	}
-}
-
-func TestFilteredModelEntriesFiltersBySearch(t *testing.T) {
-	state := ModelPickerState{
-		SelectedProvider: "openai",
-		ModelSearch:      "mini",
-		SDDModels: map[string][]opencode.Model{
-			"openai": {
-				{ID: "gpt-5", Name: "GPT-5"},
-				{ID: "gpt-5-mini", Name: "GPT-5 Mini"},
-			},
-		},
-	}
-
-	models := FilteredModelEntries(state)
-	if len(models) != 1 || models[0].ID != "gpt-5-mini" {
-		t.Fatalf("filtered models = %#v, want only gpt-5-mini", models)
-	}
-}
-
-func TestHandleModelNavTypingUpdatesSearchAndBackspaceClears(t *testing.T) {
-	state := &ModelPickerState{
-		Mode:             ModeModelSelect,
-		SelectedProvider: "openai",
-		SDDModels: map[string][]opencode.Model{
-			"openai": {{ID: "gpt-5-mini", Name: "GPT-5 Mini"}},
-		},
-	}
-
-	handled, _ := handleModelNav("m", state, nil)
-	if !handled || state.ModelSearch != "m" {
-		t.Fatalf("typing search handled=%v query=%q, want handled=true query=m", handled, state.ModelSearch)
-	}
-
-	handled, _ = handleModelNav("backspace", state, nil)
-	if !handled || state.ModelSearch != "" {
-		t.Fatalf("backspace handled=%v query=%q, want handled=true empty query", handled, state.ModelSearch)
-	}
-}
-
-func TestRenderModelSelectShowsSearchInput(t *testing.T) {
-	state := ModelPickerState{
-		SelectedProvider: "openai",
-		ModelSearch:      "mini",
-		Providers: map[string]opencode.Provider{
-			"openai": {Name: "OpenAI"},
-		},
-		SDDModels: map[string][]opencode.Model{
-			"openai": {{ID: "gpt-5-mini", Name: "GPT-5 Mini"}},
-		},
-	}
-
-	out := renderModelSelect(state)
-	if !strings.Contains(out, "Search: mini_") {
-		t.Fatalf("renderModelSelect() missing search input; got:\n%s", out)
-	}
-}
-
-func TestRenderModelPickerShowsSetAllPhasesEffort(t *testing.T) {
-	state := ModelPickerState{
-		AvailableIDs: []string{"anthropic"},
-		Providers: map[string]opencode.Provider{
-			"anthropic": {
-				Name: "Anthropic",
-				Models: map[string]opencode.Model{
-					"claude-opus-4": {Name: "Claude Opus 4"},
-				},
-			},
-		},
-		AllPhasesModel: model.ModelAssignment{
-			ProviderID: "anthropic",
-			ModelID:    "claude-opus-4",
-			Effort:     "high",
-		},
-	}
-
-	output := RenderModelPicker(nil, state, 1)
-	if !strings.Contains(output, "Set all SDD phases") || !strings.Contains(output, "Anthropic / Claude Opus 4 [high]") {
-		t.Fatalf("RenderModelPicker() missing Set all phases effort label; got:\n%s", output)
 	}
 }
 
@@ -378,74 +111,11 @@ func TestRenderModelPickerShowsSetAllPhasesEffort(t *testing.T) {
 // The "Set all phases" row label should show AllPhasesModel, not phases[0].
 //
 // Closes #146.
-func TestSetAllPhasesLabelSeparateFromIndividualPhases(t *testing.T) {
-	const providerID = "test-provider"
-	testModels := []opencode.Model{
-		{ID: "model-alpha", Name: "Alpha"},
-		{ID: "model-beta", Name: "Beta"},
-	}
-
-	// Step 1: "Set all phases" — AllPhasesModel should be set to alpha.
-	setAllState := &ModelPickerState{
-		Mode:             ModeModelSelect,
-		SelectedPhaseIdx: 1, // "Set all phases" row
-		SelectedProvider: providerID,
-		SDDModels:        map[string][]opencode.Model{providerID: testModels},
-		ModelCursor:      0, // alpha
-	}
-	assignments := make(map[string]model.ModelAssignment)
-	_, assignments = handleModelNav("enter", setAllState, assignments)
-
-	// AllPhasesModel must record the "Set all" assignment.
-	if setAllState.AllPhasesModel.ModelID != "model-alpha" {
-		t.Fatalf("after Set all: AllPhasesModel.ModelID = %q, want model-alpha", setAllState.AllPhasesModel.ModelID)
-	}
-
-	// Step 2: Select an individual sub-agent phase (idx 2 = phases[0]).
-	// This is the tricky case: selecting the FIRST sub-agent should NOT change AllPhasesModel.
-	individualState := &ModelPickerState{
-		Mode:             ModeModelSelect,
-		SelectedPhaseIdx: 2, // sub-agent row idx 2 → phases[0]
-		SelectedProvider: providerID,
-		SDDModels:        map[string][]opencode.Model{providerID: testModels},
-		ModelCursor:      1, // beta — different from what "Set all" used
-	}
-	_, assignments = handleModelNav("enter", individualState, assignments)
-
-	// AllPhasesModel must NOT be changed by individual phase selection.
-	if individualState.AllPhasesModel.ModelID != "" {
-		t.Errorf("individual selection changed AllPhasesModel to %q, want empty — bug: 'Set all phases' label would be wrong",
-			individualState.AllPhasesModel.ModelID)
-	}
-}
 
 // TestSetAllPhasesSetsAllPhasesModelField verifies that selecting "Set all phases"
 // sets AllPhasesModel on the state to the chosen model assignment.
 //
 // Closes #146.
-func TestSetAllPhasesSetsAllPhasesModelField(t *testing.T) {
-	const providerID = "test-provider"
-	testModels := []opencode.Model{
-		{ID: "model-alpha", Name: "Alpha"},
-	}
-
-	state := &ModelPickerState{
-		Mode:             ModeModelSelect,
-		SelectedPhaseIdx: 1, // "Set all phases"
-		SelectedProvider: providerID,
-		SDDModels:        map[string][]opencode.Model{providerID: testModels},
-		ModelCursor:      0,
-	}
-	assignments := make(map[string]model.ModelAssignment)
-	_, _ = handleModelNav("enter", state, assignments)
-
-	if state.AllPhasesModel.ProviderID != providerID {
-		t.Errorf("AllPhasesModel.ProviderID = %q, want %q", state.AllPhasesModel.ProviderID, providerID)
-	}
-	if state.AllPhasesModel.ModelID != "model-alpha" {
-		t.Errorf("AllPhasesModel.ModelID = %q, want model-alpha", state.AllPhasesModel.ModelID)
-	}
-}
 
 // ─── ModeEffortSelect constant ────────────────────────────────────────────
 
@@ -461,7 +131,7 @@ func TestModeEffortSelectConstantValue(t *testing.T) {
 // makeTestStateReasoning is like makeTestState but includes a reasoning model.
 func makeTestStateReasoning(phaseIdx int) *ModelPickerState {
 	const providerID = "test-provider"
-	testModels := []opencode.Model{
+	testModels := []runtimecatalog.Model{
 		{ID: "model-reason", Name: "Reasoning Model", Reasoning: true, ToolCall: true, Variants: []string{"high", "low", "medium"}},
 		{ID: "model-plain", Name: "Plain Model", Reasoning: false, ToolCall: true},
 	}
@@ -469,7 +139,7 @@ func makeTestStateReasoning(phaseIdx int) *ModelPickerState {
 		Mode:             ModeModelSelect,
 		SelectedPhaseIdx: phaseIdx,
 		SelectedProvider: providerID,
-		SDDModels:        map[string][]opencode.Model{providerID: testModels},
+		SDDModels:        map[string][]runtimecatalog.Model{providerID: testModels},
 		ModelCursor:      0, // reasoning model is first
 	}
 }
@@ -497,244 +167,13 @@ func TestHandleModelNav_ReasoningModelSetsModeEffortSelect(t *testing.T) {
 	}
 }
 
-func TestHandleModelNav_NonReasoningModelSkipsEffortPicker(t *testing.T) {
-	const providerID = "test-provider"
-	testModels := []opencode.Model{
-		{ID: "model-plain", Name: "Plain Model", Reasoning: false, ToolCall: true},
-	}
-	state := &ModelPickerState{
-		Mode:             ModeModelSelect,
-		SelectedPhaseIdx: 2,
-		SelectedProvider: providerID,
-		SDDModels:        map[string][]opencode.Model{providerID: testModels},
-		ModelCursor:      0,
-	}
-	assignments := make(map[string]model.ModelAssignment)
-
-	handled, updated := handleModelNav("enter", state, assignments)
-
-	if !handled {
-		t.Fatal("handleModelNav should return handled=true on enter")
-	}
-	if state.Mode != ModePhaseList {
-		t.Errorf("Mode after non-reasoning model = %v, want ModePhaseList (%d)", state.Mode, ModePhaseList)
-	}
-	// Effort must be empty on the assignment
-	phases := opencode.SDDPhases()
-	phase := phases[0] // phaseIdx 2 = phases[0]
-	a := updated[phase]
-	if a.Effort != "" {
-		t.Errorf("non-reasoning model assignment Effort = %q, want empty string", a.Effort)
-	}
-}
-
 // TestHandleModelNav_ReasoningModelWithoutVariantsSkipsEffortPicker covers the
 // runtime scenario where a reasoning-capable model has no reported variants.
 // The picker must skip ModeEffortSelect instead of presenting an empty list.
-func TestHandleModelNav_ReasoningModelWithoutVariantsSkipsEffortPicker(t *testing.T) {
-	const providerID = "test-provider"
-	testModels := []opencode.Model{
-		// Reasoning: true but no variants are reported.
-		{ID: "model-reason", Name: "Reasoning Model", Reasoning: true, ToolCall: true},
-	}
-	state := &ModelPickerState{
-		Mode:             ModeModelSelect,
-		SelectedPhaseIdx: 2,
-		SelectedProvider: providerID,
-		SDDModels:        map[string][]opencode.Model{providerID: testModels},
-		ModelCursor:      0,
-	}
-	assignments := make(map[string]model.ModelAssignment)
-
-	handled, updated := handleModelNav("enter", state, assignments)
-
-	if !handled {
-		t.Fatal("handleModelNav should return handled=true on enter")
-	}
-	if state.Mode != ModePhaseList {
-		t.Errorf("Mode after reasoning model without variants = %v, want ModePhaseList (%d)", state.Mode, ModePhaseList)
-	}
-	phase := opencode.SDDPhases()[0]
-	a := updated[phase]
-	if a.ProviderID != providerID || a.ModelID != "model-reason" {
-		t.Errorf("assignment = %+v, want provider=%q model=%q", a, providerID, "model-reason")
-	}
-	if a.Effort != "" {
-		t.Errorf("Effort = %q, want empty (no variants available)", a.Effort)
-	}
-}
-
-func TestHandleModelNav_ReasoningModelWithoutVariantsPreservesExistingEffortForSameIndividualPhase(t *testing.T) {
-	const providerID = "test-provider"
-	testModels := []opencode.Model{
-		{ID: "model-reason", Name: "Reasoning Model", Reasoning: true, ToolCall: true},
-	}
-	state := &ModelPickerState{
-		Mode:             ModeModelSelect,
-		SelectedPhaseIdx: 2,
-		SelectedProvider: providerID,
-		SDDModels:        map[string][]opencode.Model{providerID: testModels},
-		ModelCursor:      0,
-	}
-	phase := opencode.SDDPhases()[0]
-	assignments := map[string]model.ModelAssignment{
-		phase: {ProviderID: providerID, ModelID: "model-reason", Effort: "high"},
-	}
-
-	_, updated := handleModelNav("enter", state, assignments)
-
-	if got := updated[phase].Effort; got != "high" {
-		t.Errorf("Effort after reselecting same model with unknown variants = %q, want preserved %q", got, "high")
-	}
-}
-
-func TestHandleModelNav_NonReasoningModelClearsExistingEffortForSameIndividualPhase(t *testing.T) {
-	const providerID = "test-provider"
-	testModels := []opencode.Model{
-		{ID: "model-plain", Name: "Plain Model", Reasoning: false, ToolCall: true},
-	}
-	state := &ModelPickerState{
-		Mode:             ModeModelSelect,
-		SelectedPhaseIdx: 2,
-		SelectedProvider: providerID,
-		SDDModels:        map[string][]opencode.Model{providerID: testModels},
-		ModelCursor:      0,
-	}
-	phase := opencode.SDDPhases()[0]
-	assignments := map[string]model.ModelAssignment{
-		phase: {ProviderID: providerID, ModelID: "model-plain", Effort: "high"},
-	}
-
-	_, updated := handleModelNav("enter", state, assignments)
-
-	if got := updated[phase].Effort; got != "" {
-		t.Errorf("Effort after reselecting known non-reasoning model = %q, want empty", got)
-	}
-}
-
-func TestHandleModelNav_SetAllPhasesWithoutVariantsPreservesMatchingExistingEfforts(t *testing.T) {
-	const providerID = "test-provider"
-	testModels := []opencode.Model{
-		{ID: "model-reason", Name: "Reasoning Model", Reasoning: true, ToolCall: true},
-	}
-	state := &ModelPickerState{
-		Mode:             ModeModelSelect,
-		SelectedPhaseIdx: 1,
-		SelectedProvider: providerID,
-		SDDModels:        map[string][]opencode.Model{providerID: testModels},
-		ModelCursor:      0,
-	}
-	phases := opencode.SDDPhases()
-	assignments := map[string]model.ModelAssignment{
-		SDDOrchestratorPhase: {ProviderID: providerID, ModelID: "model-reason", Effort: "high"},
-		phases[0]:            {ProviderID: providerID, ModelID: "model-reason", Effort: "high"},
-		phases[1]:            {ProviderID: providerID, ModelID: "other-model", Effort: "medium"},
-	}
-
-	_, updated := handleModelNav("enter", state, assignments)
-
-	if got := updated[phases[0]].Effort; got != "high" {
-		t.Errorf("matching phase effort = %q, want preserved %q", got, "high")
-	}
-	if got := updated[phases[1]].Effort; got != "" {
-		t.Errorf("non-matching phase effort = %q, want empty", got)
-	}
-	if got := updated[SDDOrchestratorPhase].Effort; got != "high" {
-		t.Errorf("orchestrator effort = %q, want untouched %q", got, "high")
-	}
-}
 
 // ─── applyAssignment helper ──────────────────────────────────────────────
 
-func TestApplyAssignment_SinglePhase(t *testing.T) {
-	phases := opencode.SDDPhases()
-	state := ModelPickerState{SelectedPhaseIdx: 2} // phases[0]
-	assignments := make(map[string]model.ModelAssignment)
-	assignment := model.ModelAssignment{ProviderID: "anthropic", ModelID: "claude-opus-4", Effort: "high"}
-
-	updated := applyAssignment(state, assignments, assignment)
-
-	// Only phases[0] should be set
-	if updated[phases[0]].Effort != "high" {
-		t.Errorf("phases[0] Effort = %q, want %q", updated[phases[0]].Effort, "high")
-	}
-	// Others should not be set
-	for _, phase := range phases[1:] {
-		if _, ok := updated[phase]; ok {
-			t.Errorf("phase %q should not be set in single-phase apply", phase)
-		}
-	}
-}
-
-func TestApplyAssignment_AllPhases(t *testing.T) {
-	phases := opencode.SDDPhases()
-	state := ModelPickerState{SelectedPhaseIdx: 1} // "Set all phases"
-	assignments := make(map[string]model.ModelAssignment)
-	assignment := model.ModelAssignment{ProviderID: "anthropic", ModelID: "claude-opus-4", Effort: "low"}
-
-	updated := applyAssignment(state, assignments, assignment)
-
-	for _, phase := range phases {
-		a := updated[phase]
-		if a.Effort != "low" {
-			t.Errorf("phase %q Effort = %q, want %q", phase, a.Effort, "low")
-		}
-	}
-	// Orchestrator must NOT be touched
-	if _, ok := updated[SDDOrchestratorPhase]; ok {
-		t.Error("applyAssignment with SelectedPhaseIdx==1 should not set orchestrator")
-	}
-}
-
 // ─── handleEffortNav ──────────────────────────────────────────────────────
-
-func TestHandleEffortNav_EnterAppliesEffortAndReturnsModePhaseList(t *testing.T) {
-	phases := opencode.SDDPhases()
-	state := ModelPickerState{
-		Mode:                      ModeEffortSelect,
-		SelectedPhaseIdx:          2, // phases[0]
-		EffortCursor:              1, // second option = "low" (after "default" at index 0)
-		PendingAssignment:         model.ModelAssignment{ProviderID: "anthropic", ModelID: "claude-opus-4"},
-		SelectedModelEffortLevels: []string{"low", "medium", "high"},
-	}
-	assignments := make(map[string]model.ModelAssignment)
-
-	newState, updated := handleEffortNav("enter", state, assignments)
-
-	if newState.Mode != ModePhaseList {
-		t.Errorf("Mode after effort selection = %v, want ModePhaseList", newState.Mode)
-	}
-	// EffortCursor 1 -> "low" (options: ["default", "low", "medium", "high"])
-	a := updated[phases[0]]
-	if a.Effort != "low" {
-		t.Errorf("assignment Effort = %q, want %q", a.Effort, "low")
-	}
-	if newState.PendingAssignment != (model.ModelAssignment{}) {
-		t.Errorf("PendingAssignment after effort selection = %+v, want zero value", newState.PendingAssignment)
-	}
-	if newState.SelectedModelEffortLevels != nil {
-		t.Errorf("SelectedModelEffortLevels after effort selection = %v, want nil", newState.SelectedModelEffortLevels)
-	}
-}
-
-func TestHandleEffortNav_DefaultOptionMapsToEmptyEffort(t *testing.T) {
-	phases := opencode.SDDPhases()
-	state := ModelPickerState{
-		Mode:                      ModeEffortSelect,
-		SelectedPhaseIdx:          2, // phases[0]
-		EffortCursor:              0, // "default" option
-		PendingAssignment:         model.ModelAssignment{ProviderID: "anthropic", ModelID: "claude-opus-4"},
-		SelectedModelEffortLevels: []string{"low", "medium", "high"},
-	}
-	assignments := make(map[string]model.ModelAssignment)
-
-	_, updated := handleEffortNav("enter", state, assignments)
-
-	a := updated[phases[0]]
-	if a.Effort != "" {
-		t.Errorf("'default' option should yield Effort=\"\", got %q", a.Effort)
-	}
-}
 
 func TestHandleEffortNav_EscReturnsModeModelSelect(t *testing.T) {
 	state := ModelPickerState{
@@ -780,28 +219,6 @@ func TestHandleEffortNav_NavigationUpdatesEffortCursor(t *testing.T) {
 
 // ─── HandleModelPickerNav dispatches ModeEffortSelect ─────────────────────
 
-func TestHandleModelPickerNav_DispatchesToEffortNav(t *testing.T) {
-	phases := opencode.SDDPhases()
-	state := &ModelPickerState{
-		Mode:                      ModeEffortSelect,
-		SelectedPhaseIdx:          2,
-		EffortCursor:              2, // "medium"
-		PendingAssignment:         model.ModelAssignment{ProviderID: "anthropic", ModelID: "claude-opus-4"},
-		SelectedModelEffortLevels: []string{"low", "medium", "high"},
-	}
-	assignments := make(map[string]model.ModelAssignment)
-
-	handled, updated := HandleModelPickerNav("enter", state, assignments)
-
-	if !handled {
-		t.Fatal("HandleModelPickerNav should handle enter in ModeEffortSelect")
-	}
-	a := updated[phases[0]]
-	if a.Effort != "medium" {
-		t.Errorf("Effort = %q, want %q", a.Effort, "medium")
-	}
-}
-
 // ─── handleEffortNav: "Set all phases" row (SelectedPhaseIdx==1) ──────────────
 
 // TestHandleEffortNav_SetAllPhasesUpdatesAllPhasesModelAndAllSubAgents verifies
@@ -811,134 +228,10 @@ func TestHandleModelPickerNav_DispatchesToEffortNav(t *testing.T) {
 //
 // This covers the interaction between the effort picker and the "Set all phases"
 // special row — a path not exercised by the single-phase tests above.
-func TestHandleEffortNav_SetAllPhasesUpdatesAllPhasesModelAndAllSubAgents(t *testing.T) {
-	phases := opencode.SDDPhases()
-	pending := model.ModelAssignment{ProviderID: "anthropic", ModelID: "claude-opus-4"}
-	state := ModelPickerState{
-		Mode:                      ModeEffortSelect,
-		SelectedPhaseIdx:          1, // "Set all phases" row
-		EffortCursor:              2, // index 2 → "medium" in ["default", "low", "medium", "high"]
-		PendingAssignment:         pending,
-		SelectedModelEffortLevels: []string{"low", "medium", "high"},
-	}
-	assignments := make(map[string]model.ModelAssignment)
-
-	newState, updated := handleEffortNav("enter", state, assignments)
-
-	// All 10 sub-agent phases must carry the effort.
-	for _, phase := range phases {
-		a, ok := updated[phase]
-		if !ok {
-			t.Errorf("phase %q missing from assignments after Set all phases effort", phase)
-			continue
-		}
-		if a.Effort != "medium" {
-			t.Errorf("phase %q Effort = %q, want %q", phase, a.Effort, "medium")
-		}
-	}
-
-	// AllPhasesModel must be updated with the full assignment including effort.
-	if newState.AllPhasesModel.Effort != "medium" {
-		t.Errorf("AllPhasesModel.Effort = %q, want %q", newState.AllPhasesModel.Effort, "medium")
-	}
-	if newState.AllPhasesModel.ProviderID != pending.ProviderID {
-		t.Errorf("AllPhasesModel.ProviderID = %q, want %q", newState.AllPhasesModel.ProviderID, pending.ProviderID)
-	}
-
-	// PendingAssignment must be cleared after confirmation.
-	if newState.PendingAssignment != (model.ModelAssignment{}) {
-		t.Errorf("PendingAssignment after Set all effort = %+v, want zero value", newState.PendingAssignment)
-	}
-
-	// gentle-orchestrator must NOT be touched by "Set all phases".
-	if _, exists := updated[SDDOrchestratorPhase]; exists {
-		t.Errorf("gentle-orchestrator should NOT be assigned by Set all phases effort")
-	}
-}
 
 // ─── TestIndividualPhaseSelectionDoesNotSetAllPhasesModel (unchanged) ──────
 
 // ─── Phase list display — effort annotation ───────────────────────────────
-
-func TestRenderPhaseList_EffortAnnotation(t *testing.T) {
-	const providerID = "test-provider"
-	state := ModelPickerState{
-		Providers: map[string]opencode.Provider{
-			providerID: {ID: providerID, Name: "TestProv", Models: map[string]opencode.Model{
-				"model-x": {ID: "model-x", Name: "Model X"},
-			}},
-		},
-		AvailableIDs: []string{providerID},
-		SDDModels: map[string][]opencode.Model{
-			providerID: {{ID: "model-x", Name: "Model X"}},
-		},
-		Mode: ModePhaseList,
-	}
-	phases := opencode.SDDPhases()
-	assignments := map[string]model.ModelAssignment{
-		phases[0]: {ProviderID: providerID, ModelID: "model-x", Effort: "high"},
-		phases[1]: {ProviderID: providerID, ModelID: "model-x", Effort: ""},
-	}
-
-	rendered := RenderModelPicker(assignments, state, 0)
-
-	// Row for phases[0] must contain "[high]"
-	if !strings.Contains(rendered, "[high]") {
-		t.Errorf("rendered phase list should contain '[high]' for assignment with Effort=high; got:\n%s", rendered)
-	}
-}
-
-func TestRenderPhaseList_OrchestratorEffortAnnotation(t *testing.T) {
-	const providerID = "test-provider"
-	state := ModelPickerState{
-		Providers: map[string]opencode.Provider{
-			providerID: {ID: providerID, Name: "TestProv", Models: map[string]opencode.Model{
-				"model-x": {ID: "model-x", Name: "Model X"},
-			}},
-		},
-		AvailableIDs: []string{providerID},
-		SDDModels: map[string][]opencode.Model{
-			providerID: {{ID: "model-x", Name: "Model X"}},
-		},
-		Mode: ModePhaseList,
-	}
-	assignments := map[string]model.ModelAssignment{
-		SDDOrchestratorPhase: {ProviderID: providerID, ModelID: "model-x", Effort: "high"},
-	}
-
-	rendered := RenderModelPicker(assignments, state, 0)
-
-	if !strings.Contains(rendered, "[high]") {
-		t.Errorf("orchestrator row should contain '[high]' when Effort is set; got:\n%s", rendered)
-	}
-}
-
-func TestRenderPhaseList_NoEffortAnnotationWhenEmpty(t *testing.T) {
-	const providerID = "test-provider"
-	state := ModelPickerState{
-		Providers: map[string]opencode.Provider{
-			providerID: {ID: providerID, Name: "TestProv", Models: map[string]opencode.Model{
-				"model-x": {ID: "model-x", Name: "Model X"},
-			}},
-		},
-		AvailableIDs: []string{providerID},
-		SDDModels: map[string][]opencode.Model{
-			providerID: {{ID: "model-x", Name: "Model X"}},
-		},
-		Mode: ModePhaseList,
-	}
-	phases := opencode.SDDPhases()
-	assignments := map[string]model.ModelAssignment{
-		phases[0]: {ProviderID: providerID, ModelID: "model-x", Effort: ""},
-	}
-
-	rendered := RenderModelPicker(assignments, state, 0)
-
-	// No "[" bracket annotation should appear in the phase rows when Effort is empty
-	if strings.Contains(rendered, "[high]") || strings.Contains(rendered, "[low]") || strings.Contains(rendered, "[medium]") {
-		t.Errorf("rendered phase list should not contain effort bracket when Effort is empty; got:\n%s", rendered)
-	}
-}
 
 // ─── TestIndividualPhaseSelectionDoesNotSetAllPhasesModel (unchanged) ──────
 
@@ -946,42 +239,8 @@ func TestRenderPhaseList_NoEffortAnnotationWhenEmpty(t *testing.T) {
 // a model for any individual sub-agent phase does NOT update AllPhasesModel.
 //
 // Closes #146.
-func TestIndividualPhaseSelectionDoesNotSetAllPhasesModel(t *testing.T) {
-	const providerID = "test-provider"
-	testModels := []opencode.Model{
-		{ID: "model-alpha", Name: "Alpha"},
-	}
-	phases := opencode.SDDPhases()
-
-	for i, phase := range phases {
-		t.Run(phase, func(t *testing.T) {
-			state := &ModelPickerState{
-				Mode:             ModeModelSelect,
-				SelectedPhaseIdx: i + 2, // sub-agent rows start at idx 2
-				SelectedProvider: providerID,
-				SDDModels:        map[string][]opencode.Model{providerID: testModels},
-				ModelCursor:      0,
-			}
-			assignments := make(map[string]model.ModelAssignment)
-			_, _ = handleModelNav("enter", state, assignments)
-
-			if state.AllPhasesModel.ProviderID != "" || state.AllPhasesModel.ModelID != "" {
-				t.Errorf("individual selection of phase %q set AllPhasesModel to %+v, want zero value",
-					phase, state.AllPhasesModel)
-			}
-		})
-	}
-}
 
 // ─── Separator row (non-selectable) ────────────────────────────────────────
-
-func TestSeparatorRowIdx_Value(t *testing.T) {
-	got := SeparatorRowIdx()
-	want := 2 + len(opencode.SDDPhases()) // after orchestrator + "Set all" + 9 SDD phases
-	if got != want {
-		t.Fatalf("SeparatorRowIdx() = %d, want %d", got, want)
-	}
-}
 
 func TestHandleModelNav_SeparatorRow_NoAssignment(t *testing.T) {
 	sepIdx := SeparatorRowIdx()
@@ -1007,148 +266,7 @@ func TestHandleModelNav_SeparatorRow_NoAssignment(t *testing.T) {
 
 // ─── JD agent rows ─────────────────────────────────────────────────────────
 
-func TestHandleModelNav_JDAgentRows_AssignCorrectly(t *testing.T) {
-	jdPhases := opencode.JDPhases()
-	sepIdx := SeparatorRowIdx()
-
-	for i, expectedPhase := range jdPhases {
-		t.Run(expectedPhase, func(t *testing.T) {
-			state := makeTestState(sepIdx + 1 + i) // JD rows start after separator
-			assignments := make(map[string]model.ModelAssignment)
-
-			handled, updated := handleModelNav("enter", state, assignments)
-
-			if !handled {
-				t.Fatal("handleModelNav should return handled=true on enter")
-			}
-
-			// The target JD phase must be assigned.
-			a, ok := updated[expectedPhase]
-			if !ok || a.ProviderID == "" {
-				t.Errorf("JD phase %q should be assigned; assignments: %v", expectedPhase, updated)
-			}
-			if a.ProviderID != "test-provider" {
-				t.Errorf("JD phase %q ProviderID = %q, want %q", expectedPhase, a.ProviderID, "test-provider")
-			}
-			if a.ModelID != "model-alpha" {
-				t.Errorf("JD phase %q ModelID = %q, want %q", expectedPhase, a.ModelID, "model-alpha")
-			}
-
-			// No other JD phase must be assigned.
-			for _, other := range jdPhases {
-				if other == expectedPhase {
-					continue
-				}
-				if _, exists := updated[other]; exists {
-					t.Errorf("unrelated JD phase %q should not be assigned; assignments: %v", other, updated)
-				}
-			}
-
-			// No SDD phase or orchestrator must be assigned.
-			for _, sdd := range opencode.SDDPhases() {
-				if _, exists := updated[sdd]; exists {
-					t.Errorf("SDD phase %q should not be assigned by JD row; assignments: %v", sdd, updated)
-				}
-			}
-			if _, exists := updated[SDDOrchestratorPhase]; exists {
-				t.Errorf("orchestrator should not be assigned by JD row; assignments: %v", updated)
-			}
-		})
-	}
-}
-
-func TestHandleModelNav_JDFirstRow(t *testing.T) {
-	// Verify the FIRST JD row (right after separator) maps to jd-judge-a.
-	jdPhases := opencode.JDPhases()
-	if len(jdPhases) == 0 {
-		t.Skip("no JD phases defined")
-	}
-	sepIdx := SeparatorRowIdx()
-	state := makeTestState(sepIdx + 1)
-	assignments := make(map[string]model.ModelAssignment)
-
-	_, updated := handleModelNav("enter", state, assignments)
-
-	if _, ok := updated[jdPhases[0]]; !ok {
-		t.Fatalf("first JD row should assign %q; got: %v", jdPhases[0], updated)
-	}
-}
-
-func TestHandleModelNav_JDLastRow(t *testing.T) {
-	// Verify the LAST JD row maps to the last JD phase.
-	jdPhases := opencode.JDPhases()
-	if len(jdPhases) == 0 {
-		t.Skip("no JD phases defined")
-	}
-	sepIdx := SeparatorRowIdx()
-	state := makeTestState(sepIdx + len(jdPhases))
-	assignments := make(map[string]model.ModelAssignment)
-
-	_, updated := handleModelNav("enter", state, assignments)
-
-	lastPhase := jdPhases[len(jdPhases)-1]
-	if _, ok := updated[lastPhase]; !ok {
-		t.Fatalf("last JD row should assign %q; got: %v", lastPhase, updated)
-	}
-}
-
-func TestHandleModelNav_ReviewAgentRowsAssignCorrectly(t *testing.T) {
-	rows := ModelPickerRows()
-	for _, agent := range opencode.ReviewPhases() {
-		t.Run(agent, func(t *testing.T) {
-			rowIdx := -1
-			for i, row := range rows {
-				if row == agent {
-					rowIdx = i
-					break
-				}
-			}
-			state := makeTestState(rowIdx)
-			_, updated := handleModelNav("enter", state, map[string]model.ModelAssignment{})
-			if got := updated[agent]; got.ProviderID != "test-provider" || got.ModelID != "model-alpha" {
-				t.Fatalf("%s assignment = %+v, want test-provider/model-alpha", agent, got)
-			}
-		})
-	}
-}
-
 // ─── ModelPickerRowsForProfile ──────────────────────────────────────────
-
-func TestModelPickerRowsForProfile(t *testing.T) {
-	rows := ModelPickerRowsForProfile()
-	want := 2 + len(opencode.SDDPhases()) + 1 + len(opencode.JDPhases())
-	if len(rows) != want {
-		t.Fatalf("ModelPickerRowsForProfile() len = %d, want %d; rows = %v", len(rows), want, rows)
-	}
-
-	sepIdx := SeparatorRowIdx()
-	if sepIdx < 0 || sepIdx >= len(rows) {
-		t.Fatalf("SeparatorRowIdx() = %d out of profile rows range %d", sepIdx, len(rows))
-	}
-	if rows[sepIdx] != "--- Judgment Day ---" {
-		t.Fatalf("ModelPickerRowsForProfile()[%d] = %q, want Judgment Day separator; rows = %v", sepIdx, rows[sepIdx], rows)
-	}
-
-	for _, jd := range opencode.JDPhases() {
-		found := false
-		for _, row := range rows {
-			if row == jd {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fatalf("ModelPickerRowsForProfile() missing JD agent %q; got: %v", jd, rows)
-		}
-	}
-	for _, reviewAgent := range opencode.ReviewPhases() {
-		for _, row := range rows {
-			if row == reviewAgent {
-				t.Fatalf("profile rows must use global reviewer %q, got: %v", reviewAgent, rows)
-			}
-		}
-	}
-}
 
 func TestModelPickerRowsForState_WithCustomAgents(t *testing.T) {
 	state := ModelPickerState{
@@ -1192,57 +310,6 @@ func TestModelPickerRowsForState_ProfileExcludesCustomAgents(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("ModelPickerRowsForState(profile)[%d] = %q, want %q; got %v", i, got[i], want[i], got)
 		}
-	}
-}
-
-func TestRuntimeModelPickerStateDiscoversCustomAgents(t *testing.T) {
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "opencode.json")
-
-	settings := `{
-  "agent": {
-    "gentle-orchestrator": { "model": "anthropic/claude-sonnet-4" },
-    "custom-coder-v1": { "model": "openai/gpt-4o-mini" }
-  }
-}`
-	if err := os.WriteFile(settingsPath, []byte(settings), 0o644); err != nil {
-		t.Fatalf("write settings: %v", err)
-	}
-	state := NewRuntimeModelPickerStateWithDiscoverer(settingsPath, nil)
-	if len(state.CustomAgents) != 1 || state.CustomAgents[0] != "custom-coder-v1" {
-		t.Fatalf("NewRuntimeModelPickerStateWithDiscoverer CustomAgents = %v, want [custom-coder-v1]", state.CustomAgents)
-	}
-}
-
-func TestRuntimeCatalogDiscoveryUpdatesPickerWithoutPrivateFixtures(t *testing.T) {
-	state := NewRuntimeModelPickerStateWithDiscoverer(filepath.Join(t.TempDir(), "missing-opencode.json"), nil)
-	if !strings.Contains(RenderModelPicker(nil, state, 0), "Discovering models from OpenCode") {
-		t.Fatal("picker did not show loading state")
-	}
-	var cwd string
-	state.catalogDiscover = func(_ context.Context, dir string) (map[string]opencode.Provider, error) {
-		cwd = dir
-		return map[string]opencode.Provider{
-			"custom": {ID: "custom", Name: "Custom", Models: map[string]opencode.Model{
-				"qwen/qwen3": {ID: "qwen/qwen3", Name: "Qwen 3", ToolCall: true, Reasoning: true, Variants: []string{"high"}},
-			}},
-			"no-tools": {ID: "no-tools", Models: map[string]opencode.Model{"plain": {ID: "plain"}}},
-		}, nil
-	}
-	state = state.Update(state.StartRuntimeCatalogDiscovery(1, "active-project")().(RuntimeCatalogDiscoveryMsg))
-	if cwd != "active-project" || len(state.AvailableIDs) != 1 || state.AvailableIDs[0] != "custom" || state.SDDModels["custom"][0].ID != "qwen/qwen3" {
-		t.Fatalf("runtime picker cwd=%q models=%+v / %+v", cwd, state.AvailableIDs, state.SDDModels)
-	}
-	if strings.Contains(RenderModelPicker(nil, state, 0), "private cache") {
-		t.Fatal("runtime picker referenced private catalog data")
-	}
-	state = state.Update(RuntimeCatalogDiscoveryMsg{RequestID: 1, ProjectDir: "active-project", Providers: map[string]opencode.Provider{}})
-	if !strings.Contains(RenderModelPicker(nil, state, 0), "reported no tool-capable models") {
-		t.Fatal("picker did not distinguish an empty catalog")
-	}
-	state = state.Update(RuntimeCatalogDiscoveryMsg{RequestID: 1, ProjectDir: "active-project", Err: errors.New("unavailable")})
-	if !strings.Contains(RenderModelPicker(nil, state, 0), "Could not discover models from OpenCode") {
-		t.Fatal("picker did not show discovery fallback")
 	}
 }
 

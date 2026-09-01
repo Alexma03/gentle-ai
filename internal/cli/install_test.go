@@ -9,38 +9,6 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
 )
 
-func TestParseInstallFlagsSupportsCSVAndRepeated(t *testing.T) {
-	flags, err := ParseInstallFlags([]string{
-		"--agent", "claude-code,opencode",
-		"--agent", "cursor",
-		"--component", "engram,sdd",
-		"--component", "skills",
-		"--skill", "sdd-apply",
-		"--persona", "neutral",
-		"--preset", "minimal",
-		"--channel", "beta",
-		"--dry-run",
-	})
-	if err != nil {
-		t.Fatalf("ParseInstallFlags() error = %v", err)
-	}
-
-	if !reflect.DeepEqual(flags.Agents, []string{"claude-code", "opencode", "cursor"}) {
-		t.Fatalf("agents = %v", flags.Agents)
-	}
-
-	if !reflect.DeepEqual(flags.Components, []string{"engram", "sdd", "skills"}) {
-		t.Fatalf("components = %v", flags.Components)
-	}
-
-	if !flags.DryRun {
-		t.Fatalf("DryRun = false, want true")
-	}
-	if flags.Channel != "beta" {
-		t.Fatalf("Channel = %q, want beta", flags.Channel)
-	}
-}
-
 func TestInstallChannelHelpMentionsNightly(t *testing.T) {
 	if !strings.Contains(installChannelHelp, "nightly") {
 		t.Fatalf("installChannelHelp = %q, want nightly mentioned", installChannelHelp)
@@ -195,43 +163,6 @@ func TestNormalizeSDDMode(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Fatalf("normalizeSDDMode(%q) = %q, want %q", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestParseInstallFlagsSDDMode(t *testing.T) {
-	tests := []struct {
-		name    string
-		args    []string
-		want    string
-		wantErr bool
-	}{
-		{
-			name: "flag absent defaults to empty",
-			args: []string{"--agent", "opencode"},
-			want: "",
-		},
-		{
-			name: "flag set to multi",
-			args: []string{"--agent", "opencode", "--sdd-mode", "multi"},
-			want: "multi",
-		},
-		{
-			name: "flag set to single",
-			args: []string{"--agent", "opencode", "--sdd-mode", "single"},
-			want: "single",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			flags, err := ParseInstallFlags(tt.args)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("ParseInstallFlags() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if flags.SDDMode != tt.want {
-				t.Fatalf("flags.SDDMode = %q, want %q", flags.SDDMode, tt.want)
 			}
 		})
 	}

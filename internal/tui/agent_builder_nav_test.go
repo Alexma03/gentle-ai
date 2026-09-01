@@ -29,20 +29,6 @@ func modelOnAgentBuilderEngine(t *testing.T) Model {
 
 // ─── T-28.1: Enter on Welcome "Create your own Agent" → ScreenAgentBuilderEngine ─
 
-func TestAgentBuilder_WelcomeCreateAgentEnter_NavigatesToEngine(t *testing.T) {
-	// confirmSelection case 5 calls hasAgentBuilderEngines() which checks real
-	// binaries on PATH (claude, opencode, etc.). In CI none are installed, so
-	// we cannot rely on Update(KeyEnter) to reach ScreenAgentBuilderEngine.
-	// Instead we verify the navigation contract directly: starting from Welcome
-	// with a pre-seeded engine list, setScreen(ScreenAgentBuilderEngine) lands
-	// on the correct screen — the same transition confirmSelection performs.
-	m := modelOnAgentBuilderEngine(t)
-
-	if m.Screen != ScreenAgentBuilderEngine {
-		t.Fatalf("screen = %v, want ScreenAgentBuilderEngine", m.Screen)
-	}
-}
-
 // ─── T-28.2: Esc from ScreenAgentBuilderEngine → back to Welcome ─────────────
 
 func TestAgentBuilder_EscFromEngine_ReturnsToWelcome(t *testing.T) {

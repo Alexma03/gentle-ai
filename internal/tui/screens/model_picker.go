@@ -10,9 +10,8 @@ import (
 	"unicode"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/sdd"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/opencode"
+	runtimecatalog "github.com/gentleman-programming/gentle-ai/v2/internal/runtimecatalog"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/tui/styles"
 )
 
@@ -30,11 +29,11 @@ const (
 const maxVisibleItems = 10
 const maxVisiblePhaseRows = 16
 
-// RuntimeCatalogDiscoveryMsg is delivered after OpenCode resolves project models.
+// RuntimeCatalogDiscoveryMsg is delivered after the runtime catalog resolves project models.
 type RuntimeCatalogDiscoveryMsg struct {
 	RequestID  uint64
 	ProjectDir string
-	Providers  map[string]opencode.Provider
+	Providers  map[string]runtimecatalog.Provider
 	Err        error
 }
 
@@ -47,7 +46,7 @@ const (
 	RuntimeCatalogFailed
 )
 
-type RuntimeCatalogDiscoverer func(context.Context, string) (map[string]opencode.Provider, error)
+type RuntimeCatalogDiscoverer func(context.Context, string) (map[string]runtimecatalog.Provider, error)
 
 // ProviderEntry holds a provider ID, display name, and model count for the provider list.
 type ProviderEntry struct {
@@ -78,9 +77,9 @@ type ModelPickerRow struct {
 // ModelPickerState holds the available providers and models for the picker screen,
 // plus navigation state for the two-step sub-selection modes.
 type ModelPickerState struct {
-	Providers         map[string]opencode.Provider
-	AvailableIDs      []string                    // provider IDs with tool_call-capable models
-	SDDModels         map[string][]opencode.Model // provider ID -> SDD-capable models
+	Providers         map[string]runtimecatalog.Provider
+	AvailableIDs      []string                          // provider IDs with tool_call-capable models
+	SDDModels         map[string][]runtimecatalog.Model // provider ID -> SDD-capable models
 	ConfigWarning     string
 	CatalogStatus     RuntimeCatalogStatus
 	CatalogRequestID  uint64
@@ -106,7 +105,7 @@ type ModelPickerState struct {
 	// AllCustomAgentsModel tracks the assignment last set via the "Set all custom agents" row.
 	AllCustomAgentsModel model.ModelAssignment
 
-	// CustomAgents holds discovered custom native agents defined in opencode.json.
+	// CustomAgents holds discovered custom native agents defined in runtimecatalog.json.
 	CustomAgents []string
 
 	// EffortCursor and EffortScroll manage navigation in ModeEffortSelect.
@@ -131,12 +130,8 @@ type ModelPickerState struct {
 }
 
 func NewRuntimeModelPickerStateWithDiscoverer(settingsPath string, discover RuntimeCatalogDiscoverer) ModelPickerState {
-	state := ModelPickerState{Providers: map[string]opencode.Provider{}, SDDModels: map[string][]opencode.Model{}, CatalogStatus: RuntimeCatalogLoading, Mode: ModePhaseList, catalogDiscover: discover}
-	if agents, err := sdd.DiscoverCustomAgents(settingsPath); err != nil {
-		state.ConfigWarning = fmt.Sprintf("Could not discover custom agents from opencode.json: %v", err)
-	} else {
-		state.CustomAgents = agents
-	}
+	state := ModelPickerState{Providers: map[string]runtimecatalog.Provider{}, SDDModels: map[string][]runtimecatalog.Model{}, CatalogStatus: RuntimeCatalogLoading, Mode: ModePhaseList, catalogDiscover: discover}
+	state.CustomAgents = nil
 	return state
 }
 
@@ -145,7 +140,7 @@ func (state *ModelPickerState) StartRuntimeCatalogDiscovery(requestID uint64, pr
 	state.CatalogProjectDir = projectDir
 	discover := state.catalogDiscover
 	if discover == nil {
-		discover = opencode.DiscoverCatalog
+		discover = runtimecatalog.DiscoverCatalog
 	}
 	return func() tea.Msg {
 		providers, err := discover(context.Background(), projectDir)
@@ -175,9 +170,9 @@ func (state ModelPickerState) Update(msg tea.Msg) ModelPickerState {
 
 func (state *ModelPickerState) refreshRuntimeModels() {
 	state.AvailableIDs = state.AvailableIDs[:0]
-	state.SDDModels = make(map[string][]opencode.Model, len(state.Providers))
+	state.SDDModels = make(map[string][]runtimecatalog.Model, len(state.Providers))
 	for id, provider := range state.Providers {
-		models := opencode.FilterModelsForSDD(provider)
+		models := runtimecatalog.FilterModelsForSDD(provider)
 		if len(models) == 0 {
 			continue
 		}
@@ -187,7 +182,7 @@ func (state *ModelPickerState) refreshRuntimeModels() {
 	sort.Strings(state.AvailableIDs)
 }
 
-// SDDOrchestratorPhase is the key used for the base OpenCode SDD coordinator model assignment.
+// SDDOrchestratorPhase is the key used for the base the runtime catalog SDD coordinator model assignment.
 const SDDOrchestratorPhase = "gentle-orchestrator"
 
 // ModelPickerRows returns the row labels for the model picker screen.
@@ -207,23 +202,23 @@ func modelPickerRowsWithCustom(includeReview bool, customAgents []string) []stri
 }
 
 func modelPickerRowsWithCustomIdentity(includeReview bool, customAgents []string) []ModelPickerRow {
-	rows := make([]ModelPickerRow, 0, 2+len(opencode.SDDPhases())+1+len(opencode.JDPhases())+1+len(opencode.ReviewPhases())+len(customAgents)+2)
+	rows := make([]ModelPickerRow, 0, 2+len(runtimecatalog.SDDPhases())+1+len(runtimecatalog.JDPhases())+1+len(runtimecatalog.ReviewPhases())+len(customAgents)+2)
 	rows = append(rows,
 		ModelPickerRow{Kind: ModelPickerRowKindAgent, Label: SDDOrchestratorPhase, AgentID: SDDOrchestratorPhase},
 		ModelPickerRow{Kind: ModelPickerRowKindSetAllSDD, Label: "Set all SDD phases"},
 	)
-	for _, phase := range opencode.SDDPhases() {
+	for _, phase := range runtimecatalog.SDDPhases() {
 		rows = append(rows, ModelPickerRow{Kind: ModelPickerRowKindAgent, Label: phase, AgentID: phase})
 	}
-	if len(opencode.JDPhases()) > 0 {
+	if len(runtimecatalog.JDPhases()) > 0 {
 		rows = append(rows, ModelPickerRow{Kind: ModelPickerRowKindSeparator, Label: "--- Judgment Day ---"})
-		for _, phase := range opencode.JDPhases() {
+		for _, phase := range runtimecatalog.JDPhases() {
 			rows = append(rows, ModelPickerRow{Kind: ModelPickerRowKindAgent, Label: phase, AgentID: phase})
 		}
 	}
-	if includeReview && len(opencode.ReviewPhases()) > 0 {
+	if includeReview && len(runtimecatalog.ReviewPhases()) > 0 {
 		rows = append(rows, ModelPickerRow{Kind: ModelPickerRowKindSeparator, Label: "--- Review agents ---"})
-		for _, phase := range opencode.ReviewPhases() {
+		for _, phase := range runtimecatalog.ReviewPhases() {
 			rows = append(rows, ModelPickerRow{Kind: ModelPickerRowKindAgent, Label: phase, AgentID: phase})
 		}
 	}
@@ -282,11 +277,11 @@ func ModelPickerRowAt(state ModelPickerState, index int) (ModelPickerRow, bool) 
 // no separator). This is used by the TUI to skip the separator during
 // cursor navigation and model selection.
 func SeparatorRowIdx() int {
-	jd := opencode.JDPhases()
+	jd := runtimecatalog.JDPhases()
 	if len(jd) == 0 {
 		return -1
 	}
-	return 2 + len(opencode.SDDPhases())
+	return 2 + len(runtimecatalog.SDDPhases())
 }
 
 // ProviderEntries returns sorted provider entries with display names and model counts.
@@ -474,14 +469,14 @@ func isModelSearchInput(key string) bool {
 
 var modelVersionPattern = regexp.MustCompile(`\d+(?:[._-]\d+)*`)
 
-func FilteredModelEntries(state ModelPickerState) []opencode.Model {
+func FilteredModelEntries(state ModelPickerState) []runtimecatalog.Model {
 	models := sortedModelsNewestFirst(state.SDDModels[state.SelectedProvider])
 	query := strings.ToLower(strings.TrimSpace(state.ModelSearch))
 	if query == "" {
 		return models
 	}
 
-	filtered := make([]opencode.Model, 0, len(models))
+	filtered := make([]runtimecatalog.Model, 0, len(models))
 	for _, m := range models {
 		haystack := strings.ToLower(strings.Join([]string{m.ID, m.Name, m.Family}, " "))
 		if strings.Contains(haystack, query) {
@@ -491,8 +486,8 @@ func FilteredModelEntries(state ModelPickerState) []opencode.Model {
 	return filtered
 }
 
-func sortedModelsNewestFirst(models []opencode.Model) []opencode.Model {
-	sorted := append([]opencode.Model(nil), models...)
+func sortedModelsNewestFirst(models []runtimecatalog.Model) []runtimecatalog.Model {
+	sorted := append([]runtimecatalog.Model(nil), models...)
 	sort.SliceStable(sorted, func(i, j int) bool {
 		left := modelVersionKey(sorted[i])
 		right := modelVersionKey(sorted[j])
@@ -504,7 +499,7 @@ func sortedModelsNewestFirst(models []opencode.Model) []opencode.Model {
 	return sorted
 }
 
-func modelVersionKey(m opencode.Model) []int {
+func modelVersionKey(m runtimecatalog.Model) []int {
 	text := strings.ToLower(strings.Join([]string{m.ID, m.Name, m.Family}, " "))
 	matches := modelVersionPattern.FindAllString(text, -1)
 	var bestFallback []int
@@ -559,7 +554,7 @@ func applyAssignmentPreservingMatchingEffort(state ModelPickerState, assignments
 	selectedRow, selectedRowOK := ModelPickerRowAt(state, state.SelectedPhaseIdx)
 	switch {
 	case selectedRowOK && selectedRow.Kind == ModelPickerRowKindSetAllSDD:
-		for _, phase := range opencode.SDDPhases() {
+		for _, phase := range runtimecatalog.SDDPhases() {
 			assignments[phase] = preserveMatchingEffort(assignments[phase], assignment, preserveEffort)
 		}
 	case selectedRowOK && selectedRow.Kind == ModelPickerRowKindSetAllCustom:
@@ -585,7 +580,7 @@ func ClearModelPickerAssignment(state *ModelPickerState, assignments map[string]
 	selectedRow, selectedRowOK := ModelPickerRowAt(*state, state.SelectedPhaseIdx)
 	switch {
 	case selectedRowOK && selectedRow.Kind == ModelPickerRowKindSetAllSDD:
-		for _, phase := range opencode.SDDPhases() {
+		for _, phase := range runtimecatalog.SDDPhases() {
 			delete(assignments, phase)
 		}
 		state.AllPhasesModel = model.ModelAssignment{}
@@ -629,7 +624,7 @@ func applyAssignment(state ModelPickerState, assignments map[string]model.ModelA
 	}
 	switch {
 	case selectedRow.Kind == ModelPickerRowKindSetAllSDD:
-		for _, phase := range opencode.SDDPhases() {
+		for _, phase := range runtimecatalog.SDDPhases() {
 			assignments[phase] = assignment
 		}
 	case selectedRow.Kind == ModelPickerRowKindSetAllCustom:
@@ -802,15 +797,15 @@ func renderPhaseList(
 	}
 
 	if len(state.AvailableIDs) == 0 {
-		message := "OpenCode reported no tool-capable models for this project."
-		subtext := "Configure a tool-capable model in OpenCode, then return to this picker."
+		message := "the runtime catalog reported no tool-capable models for this project."
+		subtext := "Configure a tool-capable model in the runtime catalog, then return to this picker."
 		switch state.CatalogStatus {
 		case RuntimeCatalogLoading:
-			message = "Discovering models from OpenCode..."
+			message = "Discovering models from the runtime catalog..."
 			subtext = "You can continue with default assignments while discovery runs."
 		case RuntimeCatalogFailed:
-			message = "Could not discover models from OpenCode."
-			subtext = "Verify OpenCode is installed and can run in this project, then return to this picker."
+			message = "Could not discover models from the runtime catalog."
+			subtext = "Verify the runtime catalog is installed and can run in this project, then return to this picker."
 		}
 		b.WriteString(styles.WarningStyle.Render(message))
 		b.WriteString("\n")

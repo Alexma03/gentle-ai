@@ -11,18 +11,6 @@ type ModelAssignment struct {
 }
 
 // SplitModelSpec splits a provider-qualified model spec at its first separator.
-func SplitModelSpec(spec string) (providerID, modelID string, ok bool) {
-	for i := 0; i < len(spec); i++ {
-		if spec[i] != '/' && spec[i] != ':' {
-			continue
-		}
-		if i == 0 || i == len(spec)-1 {
-			return "", "", false
-		}
-		return spec[:i], spec[i+1:], true
-	}
-	return "", "", false
-}
 
 // FullID returns the provider-qualified model identifier (e.g., "anthropic/claude-sonnet-4-20250514").
 func (m ModelAssignment) FullID() string {

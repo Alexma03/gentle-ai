@@ -21,7 +21,7 @@ func RenderSDDMode(selected model.SDDModeID, cursor int) string {
 
 	b.WriteString(styles.TitleStyle.Render("Select SDD Mode"))
 	b.WriteString("\n\n")
-	b.WriteString(styles.SubtextStyle.Render("How should the SDD orchestrator be configured for OpenCode?"))
+	b.WriteString(styles.SubtextStyle.Render("How should the SDD orchestrator be configured for the selected client?"))
 	b.WriteString("\n\n")
 
 	for idx, mode := range SDDModeOptions() {

@@ -24,15 +24,10 @@ type reviewImmutableTransport string
 const (
 	reviewImmutableTransportUnsupported         reviewImmutableTransport = "unsupported"
 	reviewImmutableTransportClaudePromptCarried reviewImmutableTransport = "claude_prompt_carried"
-	// reviewImmutableTransportOpenCodeProviderInjected is a one-Task,
-	// one-process relay. Go owns the provider contract, prompt materialization,
-	// admission, capture, and completion binding; the OpenCode plugin only
-	// relays opaque frames through its live child process.
-	reviewImmutableTransportOpenCodeProviderInjected reviewImmutableTransport = "opencode_provider_injected"
 	// reviewImmutableTransportCodexAdvisoryScratchProcess retains the canonical
 	// Go-owned provider contract across a fresh Codex subprocess boundary.
 	reviewImmutableTransportCodexAdvisoryScratchProcess reviewImmutableTransport = "codex_advisory_scratch_process"
-	// reviewImmutableTransportPiHostRelay is host-mediated like OpenCode's
+	// reviewImmutableTransportPiHostRelay is host-mediated.
 	// transport, but with the launcher owned by gentle-pi: the Pi host reads
 	// the negotiated collection input, launches a brand-new print-mode pi
 	// subprocess in an empty scratch directory with every discovery surface
@@ -65,8 +60,6 @@ func reviewImmutableRuntimeCapability(agent model.AgentID) reviewImmutableRuntim
 		policy.Eligible = true
 	case model.AgentCodex:
 		policy.Eligible = true
-	case model.AgentOpenCode:
-		policy.Eligible = true
 	case model.AgentPi:
 		// The relay's declared contract is a required conjunct: it can only
 		// narrow the compiled boundary, never expand it. Without the exact
@@ -86,8 +79,6 @@ func reviewImmutableRuntimeCapability(agent model.AgentID) reviewImmutableRuntim
 	switch agent {
 	case model.AgentClaudeCode:
 		policy.Transport = reviewImmutableTransportClaudePromptCarried
-	case model.AgentOpenCode:
-		policy.Transport = reviewImmutableTransportOpenCodeProviderInjected
 	case model.AgentCodex:
 		policy.Transport = reviewImmutableTransportCodexAdvisoryScratchProcess
 	case model.AgentPi:
@@ -98,7 +89,6 @@ func reviewImmutableRuntimeCapability(agent model.AgentID) reviewImmutableRuntim
 
 func (capability reviewImmutableRuntimePolicy) supportsImmutableReceiptReview() bool {
 	return capability.Transport == reviewImmutableTransportClaudePromptCarried ||
-		capability.Transport == reviewImmutableTransportOpenCodeProviderInjected ||
 		capability.Transport == reviewImmutableTransportCodexAdvisoryScratchProcess ||
 		capability.Transport == reviewImmutableTransportPiHostRelay
 }
@@ -106,10 +96,6 @@ func (capability reviewImmutableRuntimePolicy) supportsImmutableReceiptReview() 
 // reviewTransportSupportedRuntimeIDs derives the actionable runtime list from
 // the compiled boundary. A refused runtime cannot appear as a substitute.
 func reviewTransportSupportedRuntimeIDs() []string {
-	// The review provider boundary remains compatible with OpenCode until the
-	// Phase 3 retirement cohort lands. It is intentionally not sourced from
-	// catalog.AllAgents(), whose selection surface is already the retained
-	// five-client registry.
 	supported := make([]string, 0, len(reviewerprovider.RegisteredRuntimeIdentities()))
 	for _, runtime := range reviewerprovider.RegisteredRuntimeIdentities() {
 		if reviewImmutableRuntimeCapability(model.AgentID(runtime)).supportsImmutableReceiptReview() {

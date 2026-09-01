@@ -15,7 +15,6 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/antigravity"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/claude"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/codex"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/versions"
 )
 
@@ -30,8 +29,6 @@ func cursorAdapter(t *testing.T) agents.Adapter {
 
 func antigravityAdapter() agents.Adapter { return antigravity.NewAdapter() }
 func claudeAdapter() agents.Adapter      { return claude.NewAdapter() }
-
-func opencodeAdapter() agents.Adapter { return opencode.NewAdapter() }
 
 func assertOnlyKeys(t *testing.T, path string, object map[string]any, keys ...string) {
 	t.Helper()
@@ -150,112 +147,6 @@ func assertAntigravityContext7Schema(t *testing.T, path string) {
 
 // assertKimiContext7Schema asserts the mcpServers.context7 entry in a Kimi
 // mcp.json is the documented remote HTTP config with no legacy local keys.
-
-func TestInjectOpenCodeMergesContext7AndIsIdempotent(t *testing.T) {
-	home := t.TempDir()
-
-	first, err := Inject(home, home, opencodeAdapter())
-	if err != nil {
-		t.Fatalf("Inject() first error = %v", err)
-	}
-	if !first.Changed {
-		t.Fatalf("Inject() first changed = false")
-	}
-
-	second, err := Inject(home, home, opencodeAdapter())
-	if err != nil {
-		t.Fatalf("Inject() second error = %v", err)
-	}
-	if second.Changed {
-		t.Fatalf("Inject() second changed = true")
-	}
-
-	configPath := filepath.Join(home, ".config", "opencode", "opencode.json")
-	config, err := os.ReadFile(configPath)
-	if err != nil {
-		t.Fatalf("ReadFile(opencode.json) error = %v", err)
-	}
-
-	if len(config) == 0 {
-		t.Fatalf("opencode.json is empty")
-	}
-
-	assertOpenCodeRemoteContext7Schema(t, configPath)
-
-	text := string(config)
-	if !strings.Contains(text, `"mcp"`) {
-		t.Fatal("opencode.json missing mcp key")
-	}
-	if !strings.Contains(text, `"type": "remote"`) {
-		t.Fatal("opencode.json context7 missing type: remote")
-	}
-	if strings.Contains(text, `"mcpServers"`) {
-		t.Fatal("opencode.json should use 'mcp' key, not 'mcpServers'")
-	}
-}
-
-func TestInjectOpenCodePreservesOtherMCPEntriesWhenReplacingContext7(t *testing.T) {
-	home := t.TempDir()
-	adapter := opencodeAdapter()
-	configPath := adapter.SettingsPath(home)
-	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll error = %v", err)
-	}
-
-	legacy := `{
-	  "mcp": {
-	    "context7": {
-	      "type": "local",
-	      "command": ["npx", "-y", "@upstash/context7-mcp"],
-	      "args": ["legacy"],
-	      "env": {"TOKEN": "x"},
-	      "enabled": false
-	    },
-	    "engram": {
-	      "type": "local",
-	      "command": ["engram-server"],
-	      "args": ["--port", "9000"]
-	    }
-	  }
-	}`
-	if err := os.WriteFile(configPath, []byte(legacy), 0o644); err != nil {
-		t.Fatalf("WriteFile(opencode.json) error = %v", err)
-	}
-
-	_, err := Inject(home, home, adapter)
-	if err != nil {
-		t.Fatalf("Inject() error = %v", err)
-	}
-
-	assertOpenCodeRemoteContext7Schema(t, configPath)
-
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		t.Fatalf("ReadFile(opencode.json) error = %v", err)
-	}
-
-	var parsed map[string]any
-	if err := json.Unmarshal(content, &parsed); err != nil {
-		t.Fatalf("Unmarshal(opencode.json) error = %v", err)
-	}
-
-	mcp, ok := parsed["mcp"].(map[string]any)
-	if !ok {
-		t.Fatalf("opencode.json missing object key mcp; got %#v", parsed["mcp"])
-	}
-
-	engram, ok := mcp["engram"].(map[string]any)
-	if !ok {
-		t.Fatalf("opencode.json mcp.engram missing after inject; got %#v", mcp["engram"])
-	}
-	if engram["type"] != "local" {
-		t.Fatalf("mcp.engram.type = %#v; want %q", engram["type"], "local")
-	}
-	cmd, _ := engram["command"].([]any)
-	if len(cmd) == 0 || cmd[0] != "engram-server" {
-		t.Fatalf("mcp.engram.command = %#v; want [engram-server ...]", engram["command"])
-	}
-}
 
 func TestInjectClaudeWritesUserConfigAndIsIdempotent(t *testing.T) {
 	home := t.TempDir()

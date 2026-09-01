@@ -3,10 +3,11 @@
 package reviewtransaction
 
 import (
-	"golang.org/x/sys/windows"
 	"os/exec"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 var ntResumeProcess = windows.NewLazySystemDLL("ntdll.dll").NewProc("NtResumeProcess")

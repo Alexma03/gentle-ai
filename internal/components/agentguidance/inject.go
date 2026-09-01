@@ -1,7 +1,6 @@
 package agentguidance
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -9,7 +8,6 @@ import (
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/filemerge"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/opencodedefault"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
 
@@ -63,12 +61,7 @@ func InjectRouting(targetDir string, agent model.AgentID) (Result, error) {
 		return Result{}, err
 	}
 
-	switch delivery.kind {
-	case deliveryOrchestratorPrompt:
-		return injectOrchestratorPrompt(delivery, agent, rendered)
-	default:
-		return injectPromptSection(delivery, rendered)
-	}
+	return injectPromptSection(delivery, rendered)
 }
 
 // RoutingPaths reports the exact filesystem paths InjectRouting would write for
@@ -96,7 +89,6 @@ type routingDeliveryKind int
 
 const (
 	deliveryPromptSection routingDeliveryKind = iota
-	deliveryOrchestratorPrompt
 )
 
 // routingDelivery is the single resolution of how and where guidance reaches
@@ -124,32 +116,11 @@ func resolveRoutingDelivery(targetDir string, agent model.AgentID) (routingDeliv
 		return routingDelivery{}, fmt.Errorf("resolve routing guidance adapter for %q: %w", agent, err)
 	}
 
-	switch {
-	case DeliversThroughOrchestratorPrompt(agent):
-		settingsPath := adapter.SettingsPath(targetDir)
-		if strings.TrimSpace(settingsPath) == "" {
-			return routingDelivery{}, fmt.Errorf("%w: adapter %q exposes no settings path", ErrInvalidTarget, agent)
-		}
-		return routingDelivery{kind: deliveryOrchestratorPrompt, adapter: adapter, paths: []string{settingsPath}}, nil
-
-	default:
-		promptPath := adapter.SystemPromptFile(targetDir)
-		if strings.TrimSpace(promptPath) == "" {
-			return routingDelivery{}, fmt.Errorf("%w: adapter %q exposes no system prompt file", ErrInvalidTarget, agent)
-		}
-		return routingDelivery{kind: deliveryPromptSection, adapter: adapter, paths: []string{promptPath}}, nil
+	promptPath := adapter.SystemPromptFile(targetDir)
+	if strings.TrimSpace(promptPath) == "" {
+		return routingDelivery{}, fmt.Errorf("%w: adapter %q exposes no system prompt file", ErrInvalidTarget, agent)
 	}
-}
-
-// DeliversThroughOrchestratorPrompt reports whether an agent reads its
-// always-on instructions from the managed orchestrator agent definition inside
-// its settings document rather than from a global prompt file. For these
-// adapters the global prompt file is a separate, non-always-loaded scope, so
-// guidance placed there would simply never reach the model. It is exported so
-// installers can resolve the delivery root for these agents without keeping a
-// second copy of the agent list that could drift from this dispatch.
-func DeliversThroughOrchestratorPrompt(agent model.AgentID) bool {
-	return agent == model.AgentOpenCode
+	return routingDelivery{kind: deliveryPromptSection, adapter: adapter, paths: []string{promptPath}}, nil
 }
 
 // injectPromptSection is the default delivery: a managed marker section inside
@@ -170,88 +141,6 @@ func injectPromptSection(delivery routingDelivery, rendered string) (Result, err
 	}
 
 	return Result{Changed: writeResult.Changed, Files: []string{promptPath}}, nil
-}
-
-// injectOrchestratorPrompt delivers guidance inside the managed orchestrator
-// agent definition of the adapter's settings document — the always-loaded scope
-// for the OpenCode family. Every other key in that document is preserved.
-func injectOrchestratorPrompt(delivery routingDelivery, agent model.AgentID, rendered string) (Result, error) {
-	settingsPath := delivery.paths[0]
-
-	raw, err := readBytesOrEmpty(settingsPath)
-	if err != nil {
-		return Result{}, err
-	}
-
-	// Decode before merging: a document we cannot parse must abort the install
-	// instead of being silently rebuilt from an empty base, which would discard
-	// the user's entire agent configuration.
-	settings, err := filemerge.UnmarshalJSONObject(raw)
-	if err != nil {
-		return Result{}, fmt.Errorf("%w %q: %w", ErrUnreadableSettings, settingsPath, err)
-	}
-
-	existingPrompt, err := managedOrchestratorPrompt(settings, settingsPath)
-	if err != nil {
-		return Result{}, err
-	}
-
-	updatedPrompt := filemerge.InjectMarkdownSection(existingPrompt, RoutingSectionID, rendered)
-
-	overlay, err := json.Marshal(map[string]any{
-		"agent": map[string]any{
-			opencodedefault.ManagedAgent: map[string]any{"prompt": updatedPrompt},
-		},
-	})
-	if err != nil {
-		return Result{}, fmt.Errorf("encode routing guidance overlay for %q: %w", agent, err)
-	}
-
-	merged, err := filemerge.MergeJSONObjects(raw, overlay)
-	if err != nil {
-		return Result{}, fmt.Errorf("merge routing guidance into %q: %w", settingsPath, err)
-	}
-
-	writeResult, err := filemerge.WriteFileAtomic(settingsPath, merged, 0o644)
-	if err != nil {
-		return Result{}, err
-	}
-
-	return Result{Changed: writeResult.Changed, Files: []string{settingsPath}}, nil
-}
-
-// managedOrchestratorPrompt reads the current prompt of the managed
-// orchestrator agent. A missing agent map, agent, or prompt is a legitimate
-// first install and yields empty content; a value of an unexpected type is not
-// something this component may overwrite, so it fails closed.
-func managedOrchestratorPrompt(settings map[string]any, settingsPath string) (string, error) {
-	agentsRaw, ok := settings["agent"]
-	if !ok || agentsRaw == nil {
-		return "", nil
-	}
-	agentsMap, ok := agentsRaw.(map[string]any)
-	if !ok {
-		return "", fmt.Errorf("%w %q: %q is not an object", ErrUnreadableSettings, settingsPath, "agent")
-	}
-
-	orchestratorRaw, ok := agentsMap[opencodedefault.ManagedAgent]
-	if !ok || orchestratorRaw == nil {
-		return "", nil
-	}
-	orchestratorMap, ok := orchestratorRaw.(map[string]any)
-	if !ok {
-		return "", fmt.Errorf("%w %q: agent %q is not an object", ErrUnreadableSettings, settingsPath, opencodedefault.ManagedAgent)
-	}
-
-	promptRaw, ok := orchestratorMap["prompt"]
-	if !ok || promptRaw == nil {
-		return "", nil
-	}
-	prompt, ok := promptRaw.(string)
-	if !ok {
-		return "", fmt.Errorf("%w %q: agent %q has a non-string prompt", ErrUnreadableSettings, settingsPath, opencodedefault.ManagedAgent)
-	}
-	return prompt, nil
 }
 
 // readFileOrEmpty treats a missing prompt file as empty content: the first

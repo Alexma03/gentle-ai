@@ -51,22 +51,6 @@ func TestRenderABPreview_MetadataPresent(t *testing.T) {
 	}
 }
 
-func TestRenderABPreview_InstallTargetsShown(t *testing.T) {
-	agent := &agentbuilder.GeneratedAgent{
-		Name:    "my-agent",
-		Title:   "My Agent",
-		Content: "# My Agent\n",
-	}
-	targets := []string{"/home/user/.config/Claude/skills", "/home/user/.config/opencode/skills"}
-	out := RenderABPreview(agent, targets, 0, 40, 0, nil, "")
-	if !strings.Contains(out, "Will be installed to") {
-		t.Errorf("install targets section not found; output:\n%s", out)
-	}
-	if !strings.Contains(out, "Claude/skills") {
-		t.Errorf("claude skills path not found; output:\n%s", out)
-	}
-}
-
 func TestRenderABPreview_ActionBarPresent(t *testing.T) {
 	agent := &agentbuilder.GeneratedAgent{
 		Name:    "my-agent",

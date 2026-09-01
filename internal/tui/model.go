@@ -21,13 +21,12 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/catalog"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/cli"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/sdd"
 	componentuninstall "github.com/gentleman-programming/gentle-ai/v2/internal/components/uninstall"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/opencode"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/pipeline"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/planner"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/reviewtransaction"
+	runtimecatalog "github.com/gentleman-programming/gentle-ai/v2/internal/runtimecatalog"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/state"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/tui/screens"
@@ -92,9 +91,9 @@ func sanitizeAdvisoryURL(raw string) string {
 	return parsed.String()
 }
 
-var modelPickerSettingsPath = opencode.DefaultSettingsPath
+var modelPickerSettingsPath = runtimecatalog.DefaultSettingsPath
 var modelPickerWorkingDir = os.Getwd
-var modelPickerCatalogDiscoverer = screens.RuntimeCatalogDiscoverer(opencode.DiscoverCatalog)
+var modelPickerCatalogDiscoverer = screens.RuntimeCatalogDiscoverer(runtimecatalog.DiscoverCatalog)
 var osStatPathFn = os.Stat
 var osGetwdFn = os.Getwd
 var osExecutableFn = os.Executable
@@ -119,22 +118,18 @@ var communityToolStatusFn = func(id model.CommunityToolID, home string, detector
 }
 
 // readCurrentAssignmentsFn is a package-level variable so tests can override
-// how current model assignments are read from opencode.json. It wraps
+// how current model assignments are read from runtimecatalog.json. It wraps
 // sdd.ReadCurrentModelAssignments and is only called during ModelConfigMode.
-var readCurrentAssignmentsFn = func(settingsPath string) (map[string]model.ModelAssignment, error) {
-	return sdd.ReadCurrentModelAssignments(settingsPath)
-}
+var readCurrentAssignmentsFn = func(string) (map[string]model.ModelAssignment, error) { return nil, nil }
 
 // readProfilesFn is a package-level variable so tests can override how profiles
-// are detected from opencode.json. It wraps sdd.DetectProfiles and is called
+// are detected from runtimecatalog.json. It wraps sdd.DetectProfiles and is called
 // on ScreenProfiles entry and after SyncDoneMsg to refresh the profile list.
-var readProfilesFn = func(settingsPath string) ([]model.Profile, error) {
-	return sdd.DetectProfiles(settingsPath)
-}
-var removeProfileAgentsFn = sdd.RemoveProfileAgents
+var readProfilesFn = func(string) ([]model.Profile, error) { return nil, nil }
+var removeProfileAgentsFn = func(string, string) error { return nil }
 var discoverCodexModels = model.DiscoverCodexModels
 
-func sanitizeKnownModelEfforts(assignments map[string]model.ModelAssignment, sddModels map[string][]opencode.Model) map[string]model.ModelAssignment {
+func sanitizeKnownModelEfforts(assignments map[string]model.ModelAssignment, sddModels map[string][]runtimecatalog.Model) map[string]model.ModelAssignment {
 	if assignments == nil {
 		return nil
 	}
@@ -145,7 +140,7 @@ func sanitizeKnownModelEfforts(assignments map[string]model.ModelAssignment, sdd
 	return sanitized
 }
 
-func sanitizeKnownModelEffort(assignment model.ModelAssignment, sddModels map[string][]opencode.Model) model.ModelAssignment {
+func sanitizeKnownModelEffort(assignment model.ModelAssignment, sddModels map[string][]runtimecatalog.Model) model.ModelAssignment {
 	if assignment.Effort == "" {
 		return assignment
 	}
@@ -427,19 +422,14 @@ type SyncFunc func(overrides *model.SyncOverrides) ([]string, error)
 // UninstallFunc is the signature of the function injected to perform managed uninstall.
 type UninstallFunc func(agentIDs []model.AgentID, componentIDs []model.ComponentID) (componentuninstall.Result, error)
 
-// UninstallWithProfilesFunc is an uninstall function variant that accepts an
-// explicit profile selection for OpenCode SDD profile cleanup.
+// UninstallWithProfilesFunc accepts an explicit profile selection retained for migration-state cleanup.
 type UninstallWithProfilesFunc func(agentIDs []model.AgentID, componentIDs []model.ComponentID, profileNames []string, engramScope model.EngramUninstallScope) (componentuninstall.Result, error)
 
-// ExecuteFunc builds and runs the installation pipeline. It receives the
-// effective and publishable OpenCode and Pi background choices plus a
-// ProgressFunc.
+// ExecuteFunc builds and runs the installation pipeline with Pi background policy.
 type ExecuteFunc func(
 	selection model.Selection,
 	resolved planner.ResolvedPlan,
 	detection system.DetectionResult,
-	background model.OpenCodeBackgroundIntent,
-	backgroundPersist model.OpenCodeBackgroundIntent,
 	piBackground model.PiBackgroundIntent,
 	piBackgroundPersist model.PiBackgroundIntent,
 	onProgress pipeline.ProgressFunc,
@@ -482,7 +472,6 @@ const (
 	ScreenDependencyTree
 	ScreenSkillPicker
 	ScreenReview
-	ScreenOpenCodeBackground
 	ScreenPiBackground
 	ScreenInstalling
 	ScreenModelPicker
@@ -551,12 +540,6 @@ type Model struct {
 	CodexModelPicker               screens.CodexModelPickerState
 	SkillPicker                    []model.SkillID
 	Err                            error
-
-	// BackgroundIntent is the effective OpenCode background choice for the
-	// current install. BackgroundPersist is published only after success.
-	BackgroundIntent         model.OpenCodeBackgroundIntent
-	BackgroundPersist        model.OpenCodeBackgroundIntent
-	backgroundPromptOriginal model.OpenCodeBackgroundIntent
 
 	// PiBackgroundIntent is the effective Pi background choice for the current
 	// install. PiBackgroundPersist is published only after success.
@@ -678,7 +661,7 @@ type Model struct {
 	UpgradeErr error
 
 	// Profile management state
-	ProfileList          []model.Profile // profiles detected from opencode.json
+	ProfileList          []model.Profile // profiles detected from runtimecatalog.json
 	ProfileCreateStep    int             // 0=name, 1=assign-models, 2=confirm
 	ProfileDraft         model.Profile   // profile being created/edited
 	ProfileEditMode      bool            // true when editing, false when creating
@@ -787,7 +770,6 @@ func NewModel(detection system.DetectionResult, version string, installState ...
 		Version:               version,
 		Selection:             selection,
 		Detection:             detection,
-		BackgroundIntent:      s.BackgroundIntent,
 		PiBackgroundIntent:    s.PiBackgroundIntent,
 		UninstallAgents:       agents,
 		UninstallComponents:   defaultUninstallComponents(),
@@ -1095,7 +1077,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Refresh profile list after sync (profile create/delete/edit flows use sync).
 		// On failure, keep the existing list — this is a non-critical background refresh.
 		// Do NOT set m.Err: ScreenSync never renders it and it would leak to other screens.
-		if profiles, err := readProfilesFn(opencode.DefaultSettingsPath()); err == nil {
+		if profiles, err := readProfilesFn(runtimecatalog.DefaultSettingsPath()); err == nil {
 			m.ProfileList = profiles
 			// Clamp cursor to avoid out-of-bounds access when list shrinks after a delete.
 			if m.Cursor >= len(m.ProfileList) {
@@ -1293,7 +1275,7 @@ func (m Model) View() string {
 		}
 		return screens.RenderWelcomeWithAdvisory(
 			m.Cursor, m.Version, banner, m.UpdateResults, m.UpdateCheckDone,
-			m.hasDetectedOpenCode(), len(m.ProfileList), m.hasAgentBuilderEngines(),
+			false, len(m.ProfileList), m.hasAgentBuilderEngines(),
 			m.Width, m.Height,
 			screens.WelcomeAdvisory{Message: m.AdvisoryMessage, URL: m.AdvisoryURL, Scroll: m.AdvisoryScroll},
 		)
@@ -1363,8 +1345,6 @@ func (m Model) View() string {
 		return screens.RenderSkillPicker(m.SkillPicker, m.Cursor, m.Height)
 	case ScreenReview:
 		return screens.RenderReview(m.Review, m.Cursor)
-	case ScreenOpenCodeBackground:
-		return screens.RenderOpenCodeBackground(m.Cursor)
 	case ScreenPiBackground:
 		return screens.RenderPiBackground(m.Cursor)
 	case ScreenInstalling:
@@ -1857,14 +1837,6 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 		default:
 			next := 6
 
-			if m.hasDetectedOpenCode() {
-				if m.Cursor == next {
-					m.setScreen(ScreenProfiles)
-					return m, nil
-				}
-				next++
-			}
-
 			if m.Cursor == next {
 				m.setScreen(ScreenBackups)
 				return m, nil
@@ -2130,7 +2102,7 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 	case ScreenProfileDelete:
 		switch m.Cursor {
 		case 0: // "Delete & Sync"
-			if err := removeProfileAgentsFn(opencode.DefaultSettingsPath(), m.ProfileDeleteTarget); err != nil {
+			if err := removeProfileAgentsFn(runtimecatalog.DefaultSettingsPath(), m.ProfileDeleteTarget); err != nil {
 				// Store the error so it can be displayed on ScreenProfiles.
 				m.ProfileDeleteErr = err
 				m.setScreen(ScreenProfiles)
@@ -2153,30 +2125,11 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 			m.ModelConfigMode = true
 			m.ClaudeModelPicker = screens.NewClaudeModelPickerStateFromPhaseAssignments(claudePickerAssignments(m.Selection.ClaudeModelAssignments, m.Selection.ClaudePhaseAssignments))
 			m.setScreen(ScreenClaudeModelPicker)
-		case 1: // Configure OpenCode models
-			m.ModelConfigMode = true
-			discoveryCmd := m.initializeModelPicker()
-			// Pre-populate with existing assignments from opencode.json.
-			// Only when there are no in-session assignments yet — the nil guard
-			// ensures we don't overwrite changes the user already made this session.
-			if m.Selection.ModelAssignments == nil {
-				settingsPath := opencode.DefaultSettingsPath()
-				if current, err := readCurrentAssignmentsFn(settingsPath); err == nil && len(current) > 0 {
-					// Sanitize loaded assignments: clear any stale effort values for
-					// models that no longer report variants (e.g. provider refreshed
-					// their catalog since the user last synced). Without this, a stale
-					// effort would be preserved in the picker and re-injected on the
-					// next sync even if the model no longer supports that effort level.
-					m.Selection.ModelAssignments = sanitizeKnownModelEfforts(current, m.ModelPicker.SDDModels)
-				}
-			}
-			m.setScreen(ScreenModelPicker)
-			return m, discoveryCmd
-		case 2: // Configure Codex models
+		case 1: // Configure Codex models
 			m.ModelConfigMode = true
 			m.CodexModelPicker = screens.NewCodexModelPickerStateFromAssignments(m.Selection.CodexModelAssignments)
 			m.setScreen(ScreenCodexModelPicker)
-		case 3: // Back
+		case 2: // Back
 			m.setScreen(ScreenWelcome)
 		}
 		return m, nil
@@ -2221,7 +2174,7 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 			m.Selection.Components = componentsForPreset(options[m.Cursor], m.Selection.Persona)
 			// Enter the conditional picker chain through the single source of
 			// truth. pickerNextScreen(ScreenPreset) returns the first chain member
-			// for the current selection (Claude → Kiro → Codex → SDDMode →
+			// for the current selection (Claude → retired client → Codex → SDDMode →
 			// ModelPicker → StrictTDD); applyPickerEntry initializes its state.
 			// DependencyTree is the initial component picker for Custom and the
 			// terminal anchor for every other preset.
@@ -2302,7 +2255,7 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 				m.applyPickerEntry(ScreenSDDMode)
 				return m, nil
 			}
-			// Continue with OpenCode defaults when no providers are available yet.
+			// Continue when no runtime catalog is available when no providers are available yet.
 			// Fall back to explicit predicate checks to find the correct next screen.
 			if m.shouldShowStrictTDDScreen() {
 				m.setScreen(ScreenStrictTDD)
@@ -2345,7 +2298,7 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 			if m.ModelConfigMode {
 				m.ModelConfigMode = false
 				m.PendingSyncOverrides = &model.SyncOverrides{
-					TargetAgents:     []model.AgentID{model.AgentOpenCode},
+					TargetAgents:     nil,
 					ModelAssignments: sanitizeKnownModelEfforts(m.Selection.ModelAssignments, m.ModelPicker.SDDModels),
 					SDDMode:          model.SDDModeMulti,
 				}
@@ -2421,7 +2374,7 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 			case m.Cursor == len(allComps):
 				m.buildDependencyPlan()
 				// Advance to the next screen in the picker slice.
-				// applyPickerEntry handles Claude/Kiro/Codex-first paths correctly,
+				// applyPickerEntry handles Claude/Codex-first paths correctly,
 				// initializing each picker's state regardless of which agent is first.
 				if next, ok := m.pickerNextScreen(); ok {
 					m.applyPickerEntry(next)
@@ -2463,7 +2416,7 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 			// Enter-on-Back matches Esc behavior (INV-2).
 			m.setScreen(ScreenCommunityTools)
 		} else if prev, ok := m.pickerPreviousScreen(); ok {
-			// No OpenCode; step back through the picker slice.
+			// Step back through the picker slice.
 			m.applyPickerEntry(prev)
 		}
 	case ScreenSkillPicker:
@@ -2499,24 +2452,6 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 		}
 	case ScreenReview:
 		if m.Cursor == 0 {
-			if m.shouldShowOpenCodeBackgroundScreen() {
-				resolution, err := cli.ResolveOpenCodeBackgroundInteractive(m.BackgroundIntent)
-				if err != nil {
-					m.Err = err
-					return m, nil
-				}
-				if resolution.NeedsPrompt {
-					m.backgroundPromptOriginal = m.BackgroundIntent
-					m.BackgroundPersist = ""
-					m.setScreen(ScreenOpenCodeBackground)
-					return m, nil
-				}
-				m.BackgroundIntent = resolution.Effective
-				if m.BackgroundIntent == model.OpenCodeBackgroundAuto {
-					m.BackgroundIntent = model.OpenCodeBackgroundOff
-				}
-				m.BackgroundPersist = resolution.Persist
-			}
 			return m.continueToPiBackgroundOrInstall()
 		}
 		// Back — in custom preset, walk back through the screens that were shown.
@@ -2542,21 +2477,6 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 		} else {
 			m.setScreen(ScreenDependencyTree)
 		}
-	case ScreenOpenCodeBackground:
-		options := screens.OpenCodeBackgroundOptions()
-		if m.Cursor < len(options) {
-			if m.Cursor == 0 {
-				m.BackgroundIntent = model.OpenCodeBackgroundOn
-			} else {
-				m.BackgroundIntent = model.OpenCodeBackgroundOff
-			}
-			m.BackgroundPersist = m.BackgroundIntent
-			return m.continueToPiBackgroundOrInstall()
-		}
-		m.BackgroundIntent = m.backgroundPromptOriginal
-		m.BackgroundPersist = ""
-		m.Err = nil
-		m.setScreen(ScreenReview)
 	case ScreenPiBackground:
 		options := screens.PiBackgroundOptions()
 		if m.Cursor < len(options) {
@@ -2737,8 +2657,7 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 
 // continueToPiBackgroundOrInstall resolves the Pi background preference right
 // before the install transaction starts, prompting only when it is otherwise
-// unresolved. It mirrors the OpenCode gate and chains after it so both
-// prompts can appear in one review confirmation.
+// unresolved. It resolves the retained Pi preference before installation.
 func (m Model) continueToPiBackgroundOrInstall() (tea.Model, tea.Cmd) {
 	if m.shouldShowPiBackgroundScreen() {
 		resolution, err := cli.ResolvePiBackgroundInteractive(m.PiBackgroundIntent)
@@ -2796,8 +2715,6 @@ func (m Model) startInstalling() (tea.Model, tea.Cmd) {
 	selection := m.Selection
 	resolved := m.DependencyPlan
 	detection := m.Detection
-	background := m.BackgroundIntent
-	backgroundPersist := m.BackgroundPersist
 	piBackground := m.PiBackgroundIntent
 	piBackgroundPersist := m.PiBackgroundPersist
 
@@ -2806,7 +2723,7 @@ func (m Model) startInstalling() (tea.Model, tea.Cmd) {
 			progressRun.publish(event)
 		}
 
-		result := executeFn(selection, resolved, detection, background, backgroundPersist, piBackground, piBackgroundPersist, onProgress)
+		result := executeFn(selection, resolved, detection, piBackground, piBackgroundPersist, onProgress)
 		progressRun.complete(result)
 		return nil
 	}
@@ -3182,22 +3099,9 @@ func (m Model) startUninstall() tea.Cmd {
 func (m *Model) refreshUninstallProfiles() {
 	m.UninstallEngramProjectScopeAvailable = m.detectProjectEngramData()
 	m.UninstallEngramScope = model.EngramUninstallScopeGlobal
-
-	if !m.hasDetectedOpenCode() {
-		m.UninstallProfilesAvailable = nil
-		m.UninstallProfilesToRemove = nil
-		m.UninstallProfileSelection = false
-		return
-	}
-
-	profiles, err := readProfilesFn(opencode.DefaultSettingsPath())
-	if err != nil {
-		m.UninstallProfilesAvailable = nil
-		m.UninstallProfilesToRemove = nil
-		m.UninstallProfileSelection = false
-		return
-	}
-	m.UninstallProfilesAvailable = profileNames(profiles)
+	m.UninstallProfilesAvailable = nil
+	m.UninstallProfilesToRemove = nil
+	m.UninstallProfileSelection = false
 }
 
 func (m Model) detectProjectEngramData() bool {
@@ -3365,13 +3269,6 @@ func (m Model) goBack(cmd *tea.Cmd) Model {
 		m.setScreen(ScreenWelcome)
 		return m
 	}
-	if m.Screen == ScreenOpenCodeBackground {
-		m.BackgroundIntent = m.backgroundPromptOriginal
-		m.BackgroundPersist = ""
-		m.Err = nil
-		m.setScreen(ScreenReview)
-		return m
-	}
 	if m.Screen == ScreenPiBackground {
 		m.PiBackgroundIntent = m.piBackgroundPromptOriginal
 		m.PiBackgroundPersist = ""
@@ -3495,7 +3392,7 @@ func (m Model) goBack(cmd *tea.Cmd) Model {
 			return m
 		}
 		if prev, ok := m.pickerPreviousScreen(); ok {
-			// No OpenCode; step back through the picker slice.
+			// Step back through the picker slice.
 			m.applyPickerEntry(prev)
 			return m
 		}
@@ -3596,7 +3493,7 @@ func (m *Model) setScreen(next Screen) {
 	}
 	if next == ScreenProfiles {
 		// Refresh on entry without replacing valid data with an empty error state.
-		profiles, err := readProfilesFn(opencode.DefaultSettingsPath())
+		profiles, err := readProfilesFn(runtimecatalog.DefaultSettingsPath())
 		if err != nil {
 			m.Err = err
 			m.ProfileDeleteErr = err
@@ -3671,7 +3568,7 @@ func (m Model) optionCount() int {
 	}
 	switch m.Screen {
 	case ScreenWelcome:
-		return len(screens.WelcomeOptions(m.UpdateResults, m.UpdateCheckDone, m.hasDetectedOpenCode(), len(m.ProfileList), m.hasAgentBuilderEngines()))
+		return len(screens.WelcomeOptions(m.UpdateResults, m.UpdateCheckDone, false, len(m.ProfileList), m.hasAgentBuilderEngines()))
 	case ScreenUpgrade:
 		if m.UpgradeReport != nil || m.UpgradeErr != nil {
 			return 0
@@ -3744,8 +3641,6 @@ func (m Model) optionCount() int {
 		return screens.SkillPickerOptionCount()
 	case ScreenReview:
 		return len(screens.ReviewOptions())
-	case ScreenOpenCodeBackground:
-		return len(screens.OpenCodeBackgroundOptions()) + 1
 	case ScreenPiBackground:
 		return len(screens.PiBackgroundOptions()) + 1
 	case ScreenInstalling:
@@ -4141,8 +4036,6 @@ func detectedAgentIDs(detection system.DetectionResult) []model.AgentID {
 		switch strings.TrimSpace(cfg.Agent) {
 		case string(model.AgentClaudeCode):
 			selected = append(selected, model.AgentClaudeCode)
-		case string(model.AgentOpenCode):
-			selected = append(selected, model.AgentOpenCode)
 		case string(model.AgentCursor):
 			selected = append(selected, model.AgentCursor)
 		case string(model.AgentCodex):
@@ -4229,25 +4122,7 @@ func extractAvailableUpdates(results []update.UpdateResult) []screens.UpdateInfo
 	return updates
 }
 
-// hasDetectedOpenCode returns true if OpenCode config directory was detected.
-func (m Model) hasDetectedOpenCode() bool {
-	for _, cfg := range m.Detection.Configs {
-		if cfg.Agent == string(model.AgentOpenCode) && cfg.Exists {
-			return true
-		}
-	}
-	return false
-}
-
-func (m Model) shouldShowSDDModeScreen() bool {
-	return m.Selection.HasAgent(model.AgentOpenCode) &&
-		hasSelectedComponent(m.Selection.Components, model.ComponentSDD)
-}
-
-func (m Model) shouldShowOpenCodeBackgroundScreen() bool {
-	return m.Selection.HasAgent(model.AgentOpenCode) &&
-		hasSelectedComponent(m.Selection.Components, model.ComponentSDD)
-}
+func (m Model) shouldShowSDDModeScreen() bool { return false }
 
 // shouldShowPiBackgroundScreen gates only on the Pi agent: Pi's SDD stack is
 // provided by gentle-pi itself, so the pi-only flow (which skips the SDD
@@ -4350,7 +4225,7 @@ func (m *Model) advanceToNextPickerScreen(next Screen) tea.Cmd {
 // applyPickerEntry initializes the target picker's state and transitions to it.
 // This is the single place that sets up picker-specific state (model selections,
 // presets) before calling setScreen. It handles every target a caller may
-// navigate to, including Kiro-first and Codex-first custom paths where Claude is
+// navigate to, including Codex-first custom paths where Claude is
 // absent and navigation comes directly from ScreenDependencyTree.
 func (m *Model) applyPickerEntry(next Screen) tea.Cmd {
 	var discoveryCmd tea.Cmd
@@ -4399,38 +4274,7 @@ func hasSelectedComponent(components []model.ComponentID, target model.Component
 	return false
 }
 
-func hasSelectedAgent(agents []model.AgentID, target model.AgentID) bool {
-	for _, agent := range agents {
-		if agent == target {
-			return true
-		}
-	}
-	return false
-}
-
-func profileNames(profiles []model.Profile) []string {
-	names := make([]string, 0, len(profiles))
-	for _, profile := range profiles {
-		if strings.TrimSpace(profile.Name) == "" {
-			continue
-		}
-		names = append(names, profile.Name)
-	}
-	return names
-}
-
-func (m Model) shouldShowUninstallProfilesSelection() bool {
-	if len(m.UninstallProfilesAvailable) == 0 {
-		return false
-	}
-	if !hasSelectedAgent(m.UninstallAgents, model.AgentOpenCode) {
-		return false
-	}
-	if !hasSelectedComponent(m.UninstallComponents, model.ComponentSDD) {
-		return false
-	}
-	return true
-}
+func (m Model) shouldShowUninstallProfilesSelection() bool { return false }
 
 func (m Model) shouldShowUninstallEngramScopeSelection() bool {
 	if !hasSelectedComponent(m.UninstallComponents, model.ComponentEngram) {
@@ -4462,8 +4306,8 @@ func (m Model) handleProfileNameInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyEnter:
 		// Validate and advance to step 1.
 		name := strings.ToLower(m.ProfileNameInput)
-		if err := sdd.ValidateProfileName(name); err != nil {
-			m.ProfileNameErr = err.Error()
+		if name == "" {
+			m.ProfileNameErr = "profile name must not be empty"
 			m.ProfileNameCollision = false
 			return m, nil
 		}
@@ -4613,7 +4457,7 @@ func (m Model) confirmProfileCreate() (tea.Model, tea.Cmd) {
 		case 0: // "Create & Sync" / "Save & Sync"
 			draft := m.ProfileDraft
 			m.PendingSyncOverrides = &model.SyncOverrides{
-				TargetAgents: []model.AgentID{model.AgentOpenCode},
+				TargetAgents: nil,
 				Profiles:     []model.Profile{draft},
 			}
 			m = m.withResetSyncState()
@@ -4633,7 +4477,6 @@ func (m Model) confirmProfileCreate() (tea.Model, tea.Cmd) {
 func (m Model) detectAgentBuilderEngines() []model.AgentID {
 	candidateIDs := []model.AgentID{
 		model.AgentClaudeCode,
-		model.AgentOpenCode,
 		model.AgentCodex,
 	}
 	var available []model.AgentID
@@ -4726,8 +4569,6 @@ func agentBuilderSkillsDir(agentID model.AgentID) (string, bool) {
 	switch agentID {
 	case model.AgentClaudeCode:
 		return filepath.Join(home, ".claude", "skills"), true
-	case model.AgentOpenCode:
-		return filepath.Join(home, ".config", "opencode", "skills"), true
 	case model.AgentCodex:
 		return filepath.Join(home, ".codex", "skills"), true
 	default:
@@ -4897,8 +4738,6 @@ func agentBuilderSystemPromptPath(agentID model.AgentID) (string, bool) {
 	switch agentID {
 	case model.AgentClaudeCode:
 		return filepath.Join(home, ".claude", "CLAUDE.md"), true
-	case model.AgentOpenCode:
-		return filepath.Join(home, ".config", "opencode", "AGENTS.md"), true
 	case model.AgentCodex:
 		return filepath.Join(home, ".codex", "AGENTS.md"), true
 	default:

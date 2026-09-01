@@ -114,63 +114,8 @@ func TestPiRelayHandshakeGuidanceSurvivesTheFailureCausePrivacyGate(t *testing.T
 // TestPiHandshakeGuidanceStaysScopedToPi proves the new cause does not leak.
 // Two directions: a runtime the handshake cannot help keeps the generic exit
 // guidance, and `pi` never advertises itself as supported while it is refused.
-func TestPiHandshakeGuidanceStaysScopedToPi(t *testing.T) {
-	t.Setenv(reviewPiHostRelayContractEnvironment, "")
-
-	for _, runtime := range []string{string(model.AgentKilocode), "unknown-runtime"} {
-		t.Run(runtime, func(t *testing.T) {
-			_, err := reviewRuntimeWithImmutableTransport(runtime)
-			if err == nil {
-				t.Fatal("want a refusal")
-			}
-			if strings.Contains(err.Error(), reviewPiHostRelayContractEnvironment) {
-				t.Fatalf("refusal for %q leaks the pi relay handshake: %v", runtime, err)
-			}
-			if !strings.Contains(err.Error(), "gentle-ai review mode disable --scope clone --cwd <repo>") {
-				t.Fatalf("refusal for %q lost the generic exit guidance: %v", runtime, err)
-			}
-		})
-	}
-
-	t.Run("pi is never offered as its own substitute", func(t *testing.T) {
-		_, err := reviewRuntimeWithImmutableTransport(string(model.AgentPi))
-		if err == nil {
-			t.Fatal("want a refusal")
-		}
-		if strings.Contains(err.Error(), "supported immutable review runtimes") {
-			t.Fatalf("pi refusal reintroduced the substitute list: %v", err)
-		}
-	})
-}
 
 // TestPiRelayHandshakeIsSoleMissingConditionStaysDiagnostic pins the predicate
 // that selects the cause. It must never be read as an admission decision:
 // reviewImmutableRuntimeCapability stays the only authority, and the predicate
 // is false the moment the handshake is declared, whatever the capability says.
-func TestPiRelayHandshakeIsSoleMissingConditionStaysDiagnostic(t *testing.T) {
-	for _, test := range []struct {
-		name     string
-		declared string
-		agent    model.AgentID
-		want     bool
-	}{
-		{name: "pi without the handshake", declared: "", agent: model.AgentPi, want: true},
-		{name: "pi with a stale contract", declared: "gentle-pi.review-relay/v0", agent: model.AgentPi, want: true},
-		{name: "pi with the exact handshake", declared: reviewPiHostRelayContract, agent: model.AgentPi, want: false},
-		{name: "kilocode without the handshake", declared: "", agent: model.AgentKilocode, want: false},
-		{name: "opencode without the handshake", declared: "", agent: model.AgentOpenCode, want: false},
-		{name: "unknown runtime", declared: "", agent: model.AgentID("unknown-runtime"), want: false},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			t.Setenv(reviewPiHostRelayContractEnvironment, test.declared)
-			if got := reviewPiRelayHandshakeIsSoleMissingCondition(test.agent); got != test.want {
-				t.Fatalf("reviewPiRelayHandshakeIsSoleMissingCondition(%q) = %t, want %t", test.agent, got, test.want)
-			}
-			// Eligibility is unchanged by the diagnostic in every case.
-			capability := reviewImmutableRuntimeCapability(test.agent)
-			if test.agent == model.AgentPi && test.declared != reviewPiHostRelayContract && capability.supportsImmutableReceiptReview() {
-				t.Fatalf("the diagnostic widened pi eligibility: %#v", capability)
-			}
-		})
-	}
-}

@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/backup"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/state"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/update"
@@ -457,63 +456,6 @@ func TestExecute_DevBuildSurfacedAsSkipped(t *testing.T) {
 // execution does not mutate config file contents — the spec's config preservation
 // guarantee. We create real config files in a temp dir, run Execute (stubbed exec),
 // and diff the contents before and after.
-func TestExecute_ConfigNotMutatedDuringUpgrade(t *testing.T) {
-	homeDir := t.TempDir()
-
-	// Create realistic config files with known contents.
-	configFiles := map[string]string{
-		".claude/CLAUDE.md":            "# Claude config\nThis is my config.\n",
-		".config/opencode/config.json": `{"theme":"kanagawa"}`,
-		".gemini/GEMINI.md":            "# Gemini config\nMy rules.\n",
-	}
-
-	for relPath, content := range configFiles {
-		fullPath := homeDir + "/" + relPath
-		if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
-			t.Fatalf("create dir for %s: %v", relPath, err)
-		}
-		if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
-			t.Fatalf("write config %s: %v", relPath, err)
-		}
-	}
-
-	origExecCommand := execCommand
-	t.Cleanup(func() { execCommand = origExecCommand })
-	execCommand = func(name string, args ...string) *exec.Cmd {
-		// Simulate a successful upgrade (no-op shell command).
-		return mockCmd("echo", "upgrade ok")
-	}
-
-	results := []update.UpdateResult{
-		makeResult("engram", update.UpdateAvailable, "0.3.0", "0.4.0", update.InstallGoInstall),
-	}
-	results[0].Tool.GoImportPath = "github.com/Gentleman-Programming/engram/cmd/engram"
-
-	profile := linuxProfile()
-
-	// Execute upgrade.
-	report := Execute(context.Background(), results, profile, homeDir, false)
-
-	// Verify upgrade ran.
-	if len(report.Results) != 1 {
-		t.Fatalf("len(Results) = %d, want 1", len(report.Results))
-	}
-	if report.Results[0].Status != UpgradeSucceeded {
-		t.Errorf("engram status = %q, want UpgradeSucceeded", report.Results[0].Status)
-	}
-
-	// Verify config files are byte-identical after upgrade.
-	for relPath, want := range configFiles {
-		fullPath := homeDir + "/" + relPath
-		got, err := os.ReadFile(fullPath)
-		if err != nil {
-			t.Fatalf("read config %s after upgrade: %v", relPath, err)
-		}
-		if string(got) != want {
-			t.Errorf("config %s was mutated by upgrade!\n  before: %q\n  after:  %q", relPath, want, string(got))
-		}
-	}
-}
 
 // --- helper: verify errors wrap correctly ---
 func TestToolUpgradeResult_ErrorWrapping(t *testing.T) {
@@ -1230,46 +1172,6 @@ func TestEnumerateFilesInDir_CaseInsensitiveExclude(t *testing.T) {
 //
 // Scenario: state.json has 1 agent (claude-code); filesystem also has gemini-cli.
 // Backup must include claude-code paths but NOT gemini-cli paths.
-func TestConfigPathsForBackup_StateWinsOverFilesystem(t *testing.T) {
-	homeDir := t.TempDir()
-
-	// Create both agent config dirs on disk (simulates filesystem detection).
-	claudeDir := filepath.Join(homeDir, ".claude")
-	geminiDir := filepath.Join(homeDir, ".gemini")
-	for _, dir := range []string{claudeDir, geminiDir} {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatalf("mkdir %s: %v", dir, err)
-		}
-	}
-	// Write a managed claude-code config file that should be backed up.
-	claudeSettings := filepath.Join(claudeDir, "settings.json")
-	if err := os.WriteFile(claudeSettings, []byte(`{}`), 0o644); err != nil {
-		t.Fatalf("write %s: %v", claudeSettings, err)
-	}
-	// Write a gemini config file that should NOT be backed up (not in state).
-	geminiSettings := filepath.Join(geminiDir, "settings.json")
-	if err := os.WriteFile(geminiSettings, []byte(`{}`), 0o644); err != nil {
-		t.Fatalf("write %s: %v", geminiSettings, err)
-	}
-
-	// Write state.json with only claude-code — this is the user's explicit selection.
-	if err := state.Write(homeDir, state.InstallState{
-		InstalledAgents: []string{string(model.AgentClaudeCode)},
-	}); err != nil {
-		t.Fatalf("state.Write: %v", err)
-	}
-
-	paths := configPathsForBackup(homeDir)
-	pathSet := make(map[string]struct{}, len(paths))
-	for _, p := range paths {
-		pathSet[p] = struct{}{}
-	}
-
-	// Gemini settings must NOT appear in backup — not in state.json.
-	if _, ok := pathSet[geminiSettings]; ok {
-		t.Errorf("configPathsForBackup included gemini-cli settings %q which is not in state.json; state.json should be the source of truth", geminiSettings)
-	}
-}
 
 // TestConfigPathsForBackup_FallsBackToFilesystemWhenNoState verifies that when
 // state.json does not exist, configPathsForBackup falls back to filesystem

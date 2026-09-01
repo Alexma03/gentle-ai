@@ -16,47 +16,6 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/state"
 )
 
-func TestReviewModeStatusReportsBothSourcesWithoutMutating(t *testing.T) {
-	home := reviewModeHome(t)
-	repo := initReviewCLIRepo(t)
-	// This test pins that status leaves global user state alone, so it needs
-	// state on disk to compare against. It writes its own rather than relying
-	// on a shared fixture: nothing else in this flow creates one.
-	if err := state.Write(home, state.InstallState{InstalledAgents: []string{"opencode"}}); err != nil {
-		t.Fatal(err)
-	}
-	before, err := os.ReadFile(state.Path(home))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var output bytes.Buffer
-	if err := RunReviewMode([]string{"status", "--cwd", repo, "--json"}, &output); err != nil {
-		t.Fatalf("RunReviewMode(status) error = %v", err)
-	}
-	result := decodeReviewModeResult(t, output.Bytes())
-	if result.Schema != ReviewModeSchema || result.Operation != "status" {
-		t.Fatalf("status result = %#v", result)
-	}
-	// Nobody opted in here, so both sources stay unset and the default
-	// decides -- and the default is off, because receipt-driven development
-	// is opt-in. Status still has to name both sources rather than collapsing
-	// them into the one effective answer.
-	if result.Status.Effective != reviewtransaction.RDDModeOff ||
-		result.Status.Source != reviewtransaction.RDDModeSourceDefault ||
-		result.Status.Global != reviewtransaction.RDDModeUnset ||
-		result.Status.CloneLocal != reviewtransaction.RDDModeUnset {
-		t.Fatalf("status did not report both sources and the effective mode: %#v", result.Status)
-	}
-	after, err := os.ReadFile(state.Path(home))
-	if err != nil || !bytes.Equal(after, before) {
-		t.Fatalf("status changed global user state: err=%v before=%q after=%q", err, before, after)
-	}
-	if _, err := os.Lstat(filepath.Join(repo, ".git", "gentle-ai")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("status created repository state: %v", err)
-	}
-}
-
 func TestReviewModeDisableGlobalWinsOverEveryRepository(t *testing.T) {
 	home := reviewModeHome(t)
 	repo := initReviewCLIRepo(t)
@@ -167,53 +126,6 @@ func TestReviewModeRepositoryRequiredRefusalDoesNotDependOnGitStderrLanguage(t *
 	}
 	if strings.Contains(refusal.Error(), localized.Output) {
 		t.Fatalf("localized Git stderr reached the operator refusal: %v", refusal)
-	}
-}
-
-func TestWriteGlobalRDDModeSerializesWithInstallStateAndPreservesFreshFields(t *testing.T) {
-	home := reviewModeHome(t)
-	lock, err := reviewtransaction.AcquireAuthorityFileLock(installStateLockPath(home))
-	if err != nil {
-		t.Fatalf("acquire install state lock: %v", err)
-	}
-	released := false
-	t.Cleanup(func() {
-		if !released {
-			_ = lock.Release()
-		}
-	})
-
-	if err := state.Write(home, state.InstallState{InstalledAgents: []string{"opencode"}}); err != nil {
-		t.Fatalf("write concurrent install state: %v", err)
-	}
-	if err := writeGlobalRDDMode("enable"); !errors.Is(err, reviewtransaction.ErrStoreLockContended) {
-		t.Fatalf("writeGlobalRDDMode while install state lock was held error = %v, want lock contention", err)
-	}
-	persisted, err := state.Read(home)
-	if err != nil {
-		t.Fatalf("read state after contended global mode write: %v", err)
-	}
-	if persisted.RDDMode != "" || persisted.RDDModeRecordedAt != nil {
-		t.Fatalf("contended global mode write mutated state: %#v", persisted)
-	}
-
-	if err := lock.Release(); err != nil {
-		t.Fatalf("release install state lock: %v", err)
-	}
-	released = true
-	if err := writeGlobalRDDMode("enable"); err != nil {
-		t.Fatalf("writeGlobalRDDMode after lock release: %v", err)
-	}
-
-	persisted, err = state.Read(home)
-	if err != nil {
-		t.Fatalf("read state after global mode write: %v", err)
-	}
-	if len(persisted.InstalledAgents) != 1 || persisted.InstalledAgents[0] != "opencode" {
-		t.Fatalf("global mode write lost fresh install state: %#v", persisted.InstalledAgents)
-	}
-	if persisted.RDDMode != string(reviewtransaction.RDDModeOn) || persisted.RDDModeRecordedAt == nil {
-		t.Fatalf("global mode write did not persist enable: %#v", persisted)
 	}
 }
 

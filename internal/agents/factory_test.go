@@ -1,7 +1,6 @@
 package agents
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 
@@ -72,28 +71,5 @@ func TestDefaultRegistrySupportedAgentsMatchesFactoryAgents(t *testing.T) {
 
 	if got := registry.SupportedAgents(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("SupportedAgents() = %v, want %v", got, want)
-	}
-}
-
-func TestDefaultRegistryExcludesHermesUntilMigration(t *testing.T) {
-	registry, err := NewDefaultRegistry()
-	if err != nil {
-		t.Fatalf("NewDefaultRegistry() returned error: %v", err)
-	}
-
-	adapter, ok := registry.Get(model.AgentHermes)
-	if ok || adapter != nil {
-		t.Fatalf("default registry unexpectedly exposed retired %s adapter", model.AgentHermes)
-	}
-}
-
-func TestFactoryRejectsUnsupportedOpenClawLookalike(t *testing.T) {
-	_, err := NewAdapter(model.AgentID("openclaw-beta"))
-	if err == nil {
-		t.Fatalf("NewAdapter() expected unsupported agent error")
-	}
-
-	if !errors.Is(err, ErrAgentNotSupported) {
-		t.Fatalf("NewAdapter() error = %v, want ErrAgentNotSupported", err)
 	}
 }

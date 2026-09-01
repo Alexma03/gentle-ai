@@ -10,7 +10,6 @@ import (
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/catalog"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/opencodedefault"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
 
@@ -228,151 +227,6 @@ func TestInjectRoutingRejectsBlankTargetDir(t *testing.T) {
 	}
 }
 
-func TestInjectRoutingUsesAlwaysLoadedOrchestratorScope(t *testing.T) {
-	t.Parallel()
-
-	for _, agent := range []model.AgentID{model.AgentOpenCode} {
-		t.Run(string(agent), func(t *testing.T) {
-			t.Parallel()
-
-			targetDir := t.TempDir()
-
-			adapter, err := agents.NewAdapter(agent)
-			if err != nil {
-				t.Fatalf("NewAdapter error = %v", err)
-			}
-
-			result, err := InjectRouting(targetDir, agent)
-			if err != nil {
-				t.Fatalf("InjectRouting(%q) error = %v", agent, err)
-			}
-			if !result.Changed {
-				t.Fatalf("InjectRouting(%q) reported no change on a fresh target", agent)
-			}
-
-			settingsPath := adapter.SettingsPath(targetDir)
-			if len(result.Files) != 1 || result.Files[0] != settingsPath {
-				t.Fatalf("InjectRouting(%q) touched %v, want exactly %q", agent, result.Files, settingsPath)
-			}
-
-			rendered, err := RenderRouting(agent)
-			if err != nil {
-				t.Fatalf("RenderRouting(%q) error = %v", agent, err)
-			}
-
-			prompt := orchestratorPrompt(t, settingsPath)
-			if !strings.Contains(prompt, rendered) {
-				t.Fatalf("orchestrator prompt for %q carries no routing guidance:\n%s", agent, prompt)
-			}
-			if !strings.Contains(prompt, "<!-- gentle-ai:"+RoutingSectionID+" -->") ||
-				!strings.Contains(prompt, "<!-- /gentle-ai:"+RoutingSectionID+" -->") {
-				t.Fatalf("orchestrator prompt for %q carries no managed section:\n%s", agent, prompt)
-			}
-
-			// The global prompt file is a different, non-always-loaded scope for
-			// these adapters, so routing must never be delivered there.
-			promptFile := adapter.SystemPromptFile(targetDir)
-			if _, statErr := os.Stat(promptFile); !os.IsNotExist(statErr) {
-				t.Fatalf("InjectRouting(%q) wrote the non-always-loaded scope %q (stat err = %v)", agent, promptFile, statErr)
-			}
-		})
-	}
-}
-
-func TestInjectRoutingPreservesUnmanagedOrchestratorSettings(t *testing.T) {
-	t.Parallel()
-
-	targetDir := t.TempDir()
-
-	adapter, err := agents.NewAdapter(model.AgentOpenCode)
-	if err != nil {
-		t.Fatalf("NewAdapter error = %v", err)
-	}
-	settingsPath := adapter.SettingsPath(targetDir)
-
-	const existingPrompt = "# Existing orchestrator policy\n\nHand-written rules that must survive.\n"
-	existing := map[string]any{
-		"$schema": "https://opencode.ai/config.json",
-		"model":   "anthropic/claude-opus-4",
-		"agent": map[string]any{
-			opencodedefault.ManagedAgent: map[string]any{
-				"prompt":      existingPrompt,
-				"description": "kept",
-			},
-			"some-other-agent": map[string]any{"prompt": "untouched"},
-		},
-	}
-	writeJSON(t, settingsPath, existing)
-
-	if _, err := InjectRouting(targetDir, model.AgentOpenCode); err != nil {
-		t.Fatalf("InjectRouting error = %v", err)
-	}
-
-	rendered, err := RenderRouting(model.AgentOpenCode)
-	if err != nil {
-		t.Fatalf("RenderRouting error = %v", err)
-	}
-
-	prompt := orchestratorPrompt(t, settingsPath)
-	if !strings.HasPrefix(prompt, existingPrompt) {
-		t.Fatalf("existing orchestrator prompt was altered:\n%s", prompt)
-	}
-	if !strings.Contains(prompt, rendered) {
-		t.Fatalf("routing guidance was not appended to the existing orchestrator prompt:\n%s", prompt)
-	}
-
-	settings := readJSON(t, settingsPath)
-	if settings["model"] != "anthropic/claude-opus-4" {
-		t.Fatalf("unmanaged settings key was dropped: %+v", settings)
-	}
-	if settings["$schema"] != "https://opencode.ai/config.json" {
-		t.Fatalf("unmanaged settings key was dropped: %+v", settings)
-	}
-	agentsMap, ok := settings["agent"].(map[string]any)
-	if !ok {
-		t.Fatalf("agent map was dropped: %+v", settings)
-	}
-	other, ok := agentsMap["some-other-agent"].(map[string]any)
-	if !ok || other["prompt"] != "untouched" {
-		t.Fatalf("sibling agent definition was altered: %+v", agentsMap)
-	}
-	managed, ok := agentsMap[opencodedefault.ManagedAgent].(map[string]any)
-	if !ok || managed["description"] != "kept" {
-		t.Fatalf("sibling orchestrator field was dropped: %+v", agentsMap)
-	}
-}
-
-func TestInjectRoutingRejectsMalformedOrchestratorSettings(t *testing.T) {
-	t.Parallel()
-
-	targetDir := t.TempDir()
-
-	adapter, err := agents.NewAdapter(model.AgentOpenCode)
-	if err != nil {
-		t.Fatalf("NewAdapter error = %v", err)
-	}
-	settingsPath := adapter.SettingsPath(targetDir)
-
-	const corrupt = "this is not json at all"
-	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll error = %v", err)
-	}
-	if err := os.WriteFile(settingsPath, []byte(corrupt), 0o644); err != nil {
-		t.Fatalf("WriteFile error = %v", err)
-	}
-
-	result, err := InjectRouting(targetDir, model.AgentOpenCode)
-	if err == nil {
-		t.Fatalf("InjectRouting accepted unreadable settings: %+v", result)
-	}
-	if result.Changed || len(result.Files) != 0 {
-		t.Fatalf("InjectRouting reported work for unreadable settings: %+v", result)
-	}
-	if got := readFile(t, settingsPath); got != corrupt {
-		t.Fatalf("InjectRouting clobbered unreadable settings:\n%s", got)
-	}
-}
-
 func TestInjectRoutingKeepsMarkdownSectionAgentsOnTheirPromptFile(t *testing.T) {
 	t.Parallel()
 
@@ -521,24 +375,7 @@ func markdownSectionAgents(t *testing.T) []model.AgentID {
 func deliveredGuidance(t *testing.T, path string) string {
 	t.Helper()
 
-	if strings.HasSuffix(path, ".json") {
-		return orchestratorPrompt(t, path)
-	}
 	return readFile(t, path)
-}
-
-func orchestratorPrompt(t *testing.T, path string) string {
-	t.Helper()
-
-	var settings struct {
-		Agent map[string]struct {
-			Prompt string `json:"prompt"`
-		} `json:"agent"`
-	}
-	if err := json.Unmarshal([]byte(readFile(t, path)), &settings); err != nil {
-		t.Fatalf("Unmarshal(%q) error = %v", path, err)
-	}
-	return settings.Agent[opencodedefault.ManagedAgent].Prompt
 }
 
 // managedRoutingBlock returns only the content Gentle AI owns, so assertions

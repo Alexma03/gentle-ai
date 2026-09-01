@@ -14,7 +14,7 @@ import (
 )
 
 // PiBackgroundSubagentsEnv is the environment source for the managed Pi
-// background-subagent preference. It mirrors the OpenCode contract; there is
+// background-subagent preference. It mirrors the legacy host contract; there is
 // no launcher or activation plumbing behind it because the primitive is the
 // already-installed pi-subagents extension reading a projected policy file.
 const PiBackgroundSubagentsEnv = "GENTLE_AI_PI_BACKGROUND_SUBAGENTS"
@@ -162,7 +162,7 @@ func piBackgroundPolicyPath(homeDir string) string {
 // piBackgroundProjectionPlan writes the RESOLVED effective on/off policy to
 // the gentle-pi-readable location. Auto never reaches projection: it resolves
 // to on/off (or stays foreground) before a plan is prepared. The plan is
-// file-only and snapshot/restore based, mirroring the shape of the OpenCode
+// file-only and snapshot/restore based, mirroring the shape of the legacy host
 // activation plan minus all launcher plumbing.
 type piBackgroundProjectionPlan struct {
 	path   string
@@ -260,7 +260,7 @@ func (p *piBackgroundProjectionPlan) ChangedPaths() []string {
 }
 
 // piBackgroundProjectionStep is the pipeline seam for the projection. It
-// mirrors openCodeBackgroundActivationStep: Run applies the prepared plan and
+// mirrors backgroundActivationStep: Run applies the prepared plan and
 // Rollback restores the snapshot.
 type piBackgroundProjectionStep struct {
 	id   string

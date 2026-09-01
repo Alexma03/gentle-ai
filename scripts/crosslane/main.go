@@ -3,11 +3,6 @@
 // It drives one real gentle-ai binary (--binary) end to end across the
 // integration boundaries where host runtimes meet the Go facade:
 //
-//   - opencode lane: the REAL OpenCode transport plugin bytes
-//     (internal/assets/opencode/plugins/opencode-review-transport.ts) driven
-//     through a fresh Node Task-hook process with HOST-assembled binding frames,
-//     against an immutable base tree and committed candidate. Covers the lens
-//     frame, correction closure re-entry, and validator role frame.
 //   - claude lane: one low-risk lifecycle ending in exact acknowledgement then authority burn and five
 //     ordinary-policy gates, plus a committed medium candidate exercised by a
 //     local provider-shaped fixture through the real Claude process transport.
@@ -21,7 +16,7 @@
 //     Any emitter/schema divergence fails the battery.
 //
 // The battery is intentionally honest: known-red checks (host binding frames
-// pending fix/opencode-host-binding, schema gaps) FAIL and are annotated,
+// pending provider-host binding fixes and schema gaps) FAIL and are annotated,
 // because red at the exact seam where field defects escaped is the battery
 // proving its worth.
 package main
@@ -42,7 +37,7 @@ func main() {
 func run() int {
 	binary := flag.String("binary", "", "path to the gentle-ai binary under test (required)")
 	withModel := flag.Bool("with-model", false, "reserved; live Claude model proof remains intentionally disabled")
-	withHost := flag.Bool("with-host", false, "spawn REAL host applications (codex exec, pi print mode, an opencode session) end to end (uses the dev subscription)")
+	withHost := flag.Bool("with-host", false, "spawn retained REAL host applications end to end (uses the dev subscription)")
 	keepWork := flag.Bool("keep-work", false, "keep the scratch working directory for inspection")
 	flag.Parse()
 
@@ -98,7 +93,6 @@ func run() int {
 	}
 
 	b.captureCapabilities()
-	b.runOpenCodeLane()
 	b.runClaudeLane()
 	b.runAdvisoryLane()
 	b.runCodexLane()

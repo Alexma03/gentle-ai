@@ -24,51 +24,6 @@ func TestRenderUninstallResultIncludesManualCleanup(t *testing.T) {
 	}
 }
 
-func TestRenderUninstallConfirmIncludesSelectedProfiles(t *testing.T) {
-	out := RenderUninstallConfirm(
-		model.UninstallModePartial,
-		[]model.AgentID{model.AgentOpenCode},
-		[]model.ComponentID{model.ComponentSDD},
-		[]string{"cheap"},
-		model.EngramUninstallScopeGlobal,
-		false,
-		0,
-		false,
-		0,
-	)
-
-	if !strings.Contains(out, "Profiles to remove") {
-		t.Fatalf("RenderUninstallConfirm() should include profile section; got:\n%s", out)
-	}
-	if !strings.Contains(out, "cheap") {
-		t.Fatalf("RenderUninstallConfirm() should include selected profile name; got:\n%s", out)
-	}
-}
-
-func TestRenderUninstallConfirmIncludesEngramProjectScopeDetails(t *testing.T) {
-	out := RenderUninstallConfirm(
-		model.UninstallModePartial,
-		[]model.AgentID{model.AgentOpenCode},
-		[]model.ComponentID{model.ComponentEngram},
-		nil,
-		model.EngramUninstallScopeProject,
-		true,
-		0,
-		false,
-		0,
-	)
-
-	if !strings.Contains(out, "Engram cleanup scope") {
-		t.Fatalf("RenderUninstallConfirm() should include Engram cleanup scope heading; got:\n%s", out)
-	}
-	if !strings.Contains(out, "Project-only") {
-		t.Fatalf("RenderUninstallConfirm() should include project-only scope label; got:\n%s", out)
-	}
-	if !strings.Contains(out, ".engram/") {
-		t.Fatalf("RenderUninstallConfirm() should mention .engram project data removal; got:\n%s", out)
-	}
-}
-
 func TestRenderUninstallResultIncludesSelectedProfiles(t *testing.T) {
 	out := RenderUninstallResult(componentuninstall.Result{}, nil, model.UninstallModePartial, []string{"cheap", "fast"}, model.EngramUninstallScopeGlobal, false, nil, nil)
 

@@ -912,12 +912,12 @@ func isOperationalMarkdownPath(logicalPath string) bool {
 	segments := strings.Split(lower, "/")
 	base := path.Base(lower)
 	switch base {
-	case "agents.md", "claude.md", "gemini.md", "kimi.md", "skill.md", "copilot-instructions.md":
+	case "agents.md", "claude.md", "gemini.md", "skill.md":
 		return true
 	}
 	for index, segment := range segments {
 		switch segment {
-		case ".agent", ".agents", ".claude", ".codex", ".cursor", ".opencode", "openspec", "runtime":
+		case ".agent", ".agents", ".claude", ".codex", ".cursor", ".gemini", ".pi", "openspec", "runtime":
 			return true
 		}
 		if index == 1 && segments[0] == "internal" {
@@ -951,7 +951,7 @@ func isPassiveContentCandidatePath(logicalPath string) bool {
 	}
 	base := strings.ToLower(path.Base(logicalPath))
 	switch base {
-	case "agents.md", "claude.md", "gemini.md", "kimi.md", "soul.md", "tools.md", "skill.md", "copilot-instructions.md":
+	case "agents.md", "claude.md", "gemini.md", "soul.md", "tools.md", "skill.md":
 		return false
 	}
 	stem := strings.TrimSuffix(base, strings.ToLower(path.Ext(base)))
@@ -965,7 +965,7 @@ func isPassiveContentCandidatePath(logicalPath string) bool {
 	}
 	for _, segment := range strings.Split(strings.ToLower(logicalPath), "/") {
 		switch segment {
-		case ".github", ".claude", ".codex", ".cursor", ".gemini", ".kiro", ".kilo", ".opencode", ".windsurf",
+		case ".github", ".agent", ".agents", ".claude", ".codex", ".cursor", ".gemini", ".pi",
 			"agent", "agents", "command", "commands", "prompt", "prompts", "rule", "rules", "runtime", "runtimes", "skill", "skills", "workflow", "workflows":
 			return false
 		}

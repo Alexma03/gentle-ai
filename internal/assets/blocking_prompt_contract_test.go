@@ -51,7 +51,6 @@ var blockingPromptRoutes = map[string]blockingPromptRoute{
 	"codex/sdd-orchestrator.md":       {},
 	"cursor/sdd-orchestrator.md":      {},
 	"generic/sdd-orchestrator.md":     {},
-	"opencode/sdd-orchestrator.md":    {nativeTool: "`question`"},
 }
 
 func TestCoordinatorOrchestratorsCarryLosslessBlockingPromptRule(t *testing.T) {
@@ -152,36 +151,6 @@ func TestCoordinatorOrchestratorsCarryClosedSingleSelectDomainContract(t *testin
 				}
 				if strings.Contains(contract[idx:end], "for example") {
 					t.Errorf("%s uses 'for example' for ordinal aliases (Matere413: must be explicit list)", path)
-				}
-			}
-		})
-	}
-}
-
-func TestNativeBlockingPromptRulesRetainInteractiveUIWithFailClosedFallback(t *testing.T) {
-	tests := []struct {
-		name string
-		path string
-		tool string
-	}{
-		{name: "Claude", path: "claude/sdd-orchestrator.md", tool: "`AskUserQuestion`"},
-		{name: "OpenCode", path: "opencode/sdd-orchestrator.md", tool: "`question`"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			contract := blockingPromptContractSection(t, tt.path)
-			if !strings.Contains(contract, "The classified native question UI is "+tt.tool+".") {
-				t.Fatalf("%s does not retain its native interactive question UI", tt.path)
-			}
-			for _, scenario := range []string{
-				"unavailable",
-				"denied",
-				"the runtime is noninteractive",
-				"question-count, option-count, or text-length limits",
-			} {
-				if !strings.Contains(contract, scenario) {
-					t.Errorf("%s has no complete fallback for %s", tt.path, scenario)
 				}
 			}
 		})

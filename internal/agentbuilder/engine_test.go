@@ -73,16 +73,6 @@ func TestNewEngine_ClaudeCode_ReturnsClaudeEngine(t *testing.T) {
 	}
 }
 
-func TestNewEngine_OpenCode_ReturnsOpenCodeEngine(t *testing.T) {
-	engine := NewEngine(model.AgentOpenCode)
-	if engine == nil {
-		t.Fatal("expected non-nil engine for opencode")
-	}
-	if engine.Agent() != model.AgentOpenCode {
-		t.Errorf("Agent() = %q, want %q", engine.Agent(), model.AgentOpenCode)
-	}
-}
-
 func TestNewEngine_Codex_ReturnsCodexEngine(t *testing.T) {
 	engine := NewEngine(model.AgentCodex)
 	if engine == nil {
@@ -100,14 +90,6 @@ func TestNewEngine_Unknown_ReturnsNil(t *testing.T) {
 	}
 }
 
-func TestNewEngine_Cursor_ReturnsNil(t *testing.T) {
-	// cursor, vscode-copilot, etc. are not supported generation engines.
-	engine := NewEngine(model.AgentCursor)
-	if engine != nil {
-		t.Errorf("expected nil engine for cursor (not a generation engine), got %v", engine)
-	}
-}
-
 // ─── Engine command construction tests ───────────────────────────────────────
 // These test the Agent() method (which identifies the CLI binary used)
 // without actually executing anything.
@@ -119,13 +101,6 @@ func TestClaudeEngine_AgentID(t *testing.T) {
 	}
 }
 
-func TestOpenCodeEngine_AgentID(t *testing.T) {
-	e := &OpenCodeEngine{}
-	if e.Agent() != model.AgentOpenCode {
-		t.Errorf("OpenCodeEngine.Agent() = %q, want %q", e.Agent(), model.AgentOpenCode)
-	}
-}
-
 func TestCodexEngine_AgentID(t *testing.T) {
 	e := &CodexEngine{}
 	if e.Agent() != model.AgentCodex {
@@ -134,18 +109,3 @@ func TestCodexEngine_AgentID(t *testing.T) {
 }
 
 // TestAllSupportedEngines verifies that all supported engine IDs produce non-nil engines.
-func TestAllSupportedEngines(t *testing.T) {
-	supported := []model.AgentID{
-		model.AgentClaudeCode,
-		model.AgentOpenCode,
-		model.AgentCodex,
-	}
-	for _, id := range supported {
-		t.Run(string(id), func(t *testing.T) {
-			engine := NewEngine(id)
-			if engine == nil {
-				t.Errorf("NewEngine(%q) returned nil", id)
-			}
-		})
-	}
-}

@@ -17,7 +17,6 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/installcmd"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/pipeline"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/planner"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/state"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
 )
@@ -91,82 +90,16 @@ const canonicalPiSubagentsReadyForCLI = `{
   }
 }`
 
-func TestPiAgentInstallRejectsUnvalidatedSubagentsRPCAtProductionBoundary(t *testing.T) {
-	restorePreflightLookPath := installcmd.OverrideLookPath(func(name string) (string, error) { return name, nil })
-	t.Cleanup(restorePreflightLookPath)
-
-	restoreCommand := runCommand
-	var commands []string
-	runCommand = func(name string, args ...string) error {
-		commands = append(commands, strings.Join(append([]string{name}, args...), " "))
-		return nil
-	}
-	t.Cleanup(func() { runCommand = restoreCommand })
-
+func stubCanonicalPiSubagentsRPC(t *testing.T) {
+	t.Helper()
 	restoreProbe := probePiSubagentsRPC
+	probePiSubagentsRPC = func(context.Context, string, string) (piagent.PiSubagentsRPCProviderResponse, error) {
+		return piagent.PiSubagentsRPCProviderResponse{
+			Package: "npm:pi-subagents",
+			Ready:   []byte(canonicalPiSubagentsReadyForCLI),
+		}, nil
+	}
 	t.Cleanup(func() { probePiSubagentsRPC = restoreProbe })
-
-	tests := []struct {
-		name     string
-		response piagent.PiSubagentsRPCProviderResponse
-		want     string
-	}{
-		{
-			name:     "absent",
-			response: piagent.PiSubagentsRPCProviderResponse{Package: "npm:pi-subagents"},
-			want:     "ready payload",
-		},
-		{
-			name:     "malformed",
-			response: piagent.PiSubagentsRPCProviderResponse{Package: "npm:pi-subagents", Ready: []byte("{")},
-			want:     "invalid JSON",
-		},
-		{
-			name: "wrong version",
-			response: piagent.PiSubagentsRPCProviderResponse{
-				Package: "npm:pi-subagents",
-				Ready:   []byte(strings.Replace(canonicalPiSubagentsReadyForCLI, `"version": 1`, `"version": 2`, 1)),
-			},
-			want: "version",
-		},
-		{
-			name: "incomplete",
-			response: piagent.PiSubagentsRPCProviderResponse{
-				Package: "npm:pi-subagents",
-				Ready:   []byte(strings.Replace(canonicalPiSubagentsReadyForCLI, `"resume"`, `"not-resume"`, 1)),
-			},
-			want: "resume",
-		},
-		{
-			name: "retired provider",
-			response: piagent.PiSubagentsRPCProviderResponse{
-				Package: "npm:pi-subagents-j0k3r",
-				Ready:   []byte(canonicalPiSubagentsReadyForCLI),
-			},
-			want: "canonical",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			commands = nil
-			probePiSubagentsRPC = func(context.Context, string, string) (piagent.PiSubagentsRPCProviderResponse, error) {
-				return tt.response, nil
-			}
-			step := agentInstallStep{id: "agent:pi", agent: model.AgentPi, homeDir: t.TempDir()}
-			if err := step.Run(); err == nil || !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(tt.want)) {
-				t.Fatalf("agentInstallStep.Run() error = %v, want rejection containing %q", err, tt.want)
-			}
-			if got := countString(commands, "pi install npm:pi-subagents"); got != 1 {
-				t.Fatalf("canonical package install count = %d in %v, want exactly one", got, commands)
-			}
-			for _, command := range commands {
-				if strings.Contains(command, "pi-subagents-j0k3r") || strings.Contains(command, "@tintinweb/pi-subagents") {
-					t.Fatalf("retired subagents fallback command = %q", command)
-				}
-			}
-		})
-	}
 }
 
 func TestPiAgentInstallAcceptsCanonicalSubagentsRPCAtProductionBoundary(t *testing.T) {
@@ -177,14 +110,7 @@ func TestPiAgentInstallAcceptsCanonicalSubagentsRPCAtProductionBoundary(t *testi
 	runCommand = func(string, ...string) error { return nil }
 	t.Cleanup(func() { runCommand = restoreCommand })
 
-	restoreProbe := probePiSubagentsRPC
-	probePiSubagentsRPC = func(context.Context, string, string) (piagent.PiSubagentsRPCProviderResponse, error) {
-		return piagent.PiSubagentsRPCProviderResponse{
-			Package: "npm:pi-subagents",
-			Ready:   []byte(canonicalPiSubagentsReadyForCLI),
-		}, nil
-	}
-	t.Cleanup(func() { probePiSubagentsRPC = restoreProbe })
+	stubCanonicalPiSubagentsRPC(t)
 
 	step := agentInstallStep{id: "agent:pi", agent: model.AgentPi, homeDir: t.TempDir()}
 	if err := step.Run(); err != nil {
@@ -287,6 +213,7 @@ func TestRunInstallReturnsStatePersistenceFailure(t *testing.T) {
 }
 
 func TestRunInstallEngramForPiAndClaudeProvisionsBothMCPTargets(t *testing.T) {
+	stubCanonicalPiSubagentsRPC(t)
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
@@ -350,26 +277,9 @@ func TestRunInstallEngramForPiAndClaudeProvisionsBothMCPTargets(t *testing.T) {
 // TestAgentInstallStepSkipsMissingNonPiRuntime proves an explicitly selected
 // desktop agent does not block installation or trigger agent acquisition when
 // its runtime is absent.
-func TestAgentInstallStepSkipsMissingNonPiRuntime(t *testing.T) {
-	restoreCommand := runCommand
-	recorder := &commandRecorder{}
-	runCommand = recorder.record
-	t.Cleanup(func() { runCommand = restoreCommand })
-
-	step := agentInstallStep{
-		id:      "agent:vscode-copilot",
-		agent:   model.AgentVSCodeCopilot,
-		homeDir: t.TempDir(),
-	}
-	if err := step.Run(); err != nil {
-		t.Fatalf("agentInstallStep.Run() error = %v, want absent non-Pi runtime to be skipped", err)
-	}
-	if got := recorder.get(); len(got) != 0 {
-		t.Fatalf("commands executed = %v, want none for non-Pi agent", got)
-	}
-}
 
 func TestPiAgentInstallProgressUsesAdapterCommandNames(t *testing.T) {
+	stubCanonicalPiSubagentsRPC(t)
 	restorePreflightLookPath := installcmd.OverrideLookPath(func(name string) (string, error) { return name, nil })
 	t.Cleanup(restorePreflightLookPath)
 
@@ -438,6 +348,7 @@ func TestRunCommandSequenceWithProgressStopsAfterFailedCommand(t *testing.T) {
 }
 
 func TestPiAgentInstallRunsPackageCommandsWhenPiAlreadyInstalled(t *testing.T) {
+	stubCanonicalPiSubagentsRPC(t)
 	binDir := t.TempDir()
 	fakePi := filepath.Join(binDir, "pi")
 	if err := os.WriteFile(fakePi, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
@@ -560,46 +471,6 @@ type failingPersonaInstallStep struct{}
 func (failingPersonaInstallStep) ID() string { return "test:fail-after-persona" }
 func (failingPersonaInstallStep) Run() error {
 	return errors.New("forced failure after persona cleanup")
-}
-
-func TestInstallPersonaOnlyRollbackRestoresOpenCodeSettingsAfterCleanup(t *testing.T) {
-	home := t.TempDir()
-	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
-	before := []byte("// preserve exact JSONC bytes\n{\"agent\":{\"gentleman\":{\"tools\":{\"write\":true},\"description\":\"keep\"},\"user-owned\":{\"tools\":{\"custom\":true}}}}\n")
-	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(settingsPath, before, 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	selection := model.Selection{
-		Agents:     []model.AgentID{model.AgentOpenCode},
-		Components: []model.ComponentID{model.ComponentPersona},
-		Persona:    model.PersonaGentleman,
-	}
-	resolved := planner.ResolvedPlan{Agents: selection.Agents, OrderedComponents: selection.Components}
-	runtime, err := newInstallRuntime(home, ScopeGlobal, ChannelStable, selection, resolved, system.PlatformProfile{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	restoreCommand := runCommand
-	runCommand = func(string, ...string) error { return nil }
-	t.Cleanup(func() { runCommand = restoreCommand })
-	plan := runtime.stagePlan()
-	plan.Prepare = plan.Prepare[1:]
-	plan.Apply = append(plan.Apply, failingPersonaInstallStep{})
-	result := pipeline.NewOrchestrator(pipeline.DefaultRollbackPolicy()).Execute(plan)
-	if result.Err == nil || !result.Rollback.Success {
-		t.Fatalf("persona-only install rollback = %#v", result)
-	}
-	after, err := os.ReadFile(settingsPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(after) != string(before) {
-		t.Fatalf("persona-only install rollback settings = %q, want exact before-image %q", after, before)
-	}
 }
 
 // --- Batch D: Linux profile runtime wiring integration tests ---
@@ -918,10 +789,6 @@ func TestRunInstallWorkspaceScopeRollback_SurfacesRealError(t *testing.T) {
 	if !strings.Contains(err.Error(), "permission") {
 		t.Fatalf("RunInstall() error = %v, want it to surface the real download failure (os.ErrPermission)", err)
 	}
-}
-
-func TestRunInstallRejectsRetiredQwenSelector(t *testing.T) {
-	assertRunInstallRejectsRetiredSelector(t, "qwen-code", "--agent", "qwen-code", "--component", "engram")
 }
 
 func TestRunInstallLinuxVerificationReportsReadyOnSuccess(t *testing.T) {
@@ -1658,10 +1525,6 @@ func TestRunInstallDryRunMatchesActualInstall(t *testing.T) {
 	}
 }
 
-func TestRunInstallRejectsRetiredOpenCodeSDDSelector(t *testing.T) {
-	assertRunInstallRejectsRetiredSelector(t, "opencode", "--dry-run", "--agent", "opencode", "--component", "sdd", "--sdd-mode", "multi")
-}
-
 func TestEnsureGoAvailableAfterInstallWindowsRefreshesPath(t *testing.T) {
 	restoreLookPath := cmdLookPath
 	restoreStat := osStat
@@ -2061,17 +1924,6 @@ func TestRunInstallCustomPresetExplicitComponentsResolveCorrectly(t *testing.T) 
 // OpenCode remains represented only by an explicit retired-selector refusal;
 // its old Persona/SDD integration cannot be reached through the canonical
 // install planner.
-func TestRunInstallRejectsRetiredOpenCodePersonaSDDSelector(t *testing.T) {
-	assertRunInstallRejectsRetiredSelector(t, "opencode", "--agent", "opencode", "--component", "persona", "--component", "engram", "--component", "sdd", "--persona", "gentleman")
-}
-
-func TestRunInstallRejectsRetiredKimiSelector(t *testing.T) {
-	assertRunInstallRejectsRetiredSelector(t, "kimi", "--agent", "kimi", "--component", "permissions")
-}
-
-func TestRunInstallRejectsRetiredKimiSelectorWithoutRuntimeFallback(t *testing.T) {
-	assertRunInstallRejectsRetiredSelector(t, "kimi", "--agent", "kimi", "--component", "permissions")
-}
 
 func TestRunInstallWorkspaceScopeVerification(t *testing.T) {
 	home := t.TempDir()

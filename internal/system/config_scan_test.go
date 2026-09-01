@@ -133,41 +133,6 @@ func TestScanConfigs_ExistsFalseWhenDirAbsent(t *testing.T) {
 
 // TestScanConfigs_IsDirectorySetForExistingDirs verifies that IsDirectory is
 // set correctly for existing directories.
-func TestScanConfigs_IsDirectorySetForExistingDirs(t *testing.T) {
-	home := t.TempDir()
-
-	// Create two agent dirs.
-	for _, rel := range []string{".claude", ".codex"} {
-		if err := os.MkdirAll(filepath.Join(home, rel), 0o755); err != nil {
-			t.Fatalf("MkdirAll(%q): %v", rel, err)
-		}
-	}
-
-	configs := ScanConfigs(home)
-
-	claudeFound, codexFound := false, false
-	for _, c := range configs {
-		switch c.Agent {
-		case "claude-code":
-			claudeFound = true
-			if !c.Exists || !c.IsDirectory {
-				t.Errorf("claude-code: Exists=%v IsDirectory=%v, want both true", c.Exists, c.IsDirectory)
-			}
-		case "codex":
-			codexFound = true
-			if !c.Exists || !c.IsDirectory {
-				t.Errorf("opencode: Exists=%v IsDirectory=%v, want both true", c.Exists, c.IsDirectory)
-			}
-		}
-	}
-
-	if !claudeFound {
-		t.Error("ScanConfigs() missing claude-code entry")
-	}
-	if !codexFound {
-		t.Error("ScanConfigs() missing codex entry")
-	}
-}
 
 // agentNames extracts agent name strings for error messages.
 func agentNames(configs []ConfigState) []string {

@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/assets"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
 
 // #3817: the SDD orchestrator contract is maintained as six hand-written
@@ -70,34 +69,6 @@ func TestSharedOrchestratorSectionsHaveOneSource(t *testing.T) {
 
 // TestEveryRuntimeRendersTheSharedSections pins that the substitution actually
 // reaches the rendered prompt: deleting duplication must not delete content.
-func TestEveryRuntimeRendersTheSharedSections(t *testing.T) {
-	for _, agent := range []model.AgentID{
-		model.AgentOpenCode, model.AgentCursor, model.AgentCodex,
-		model.AgentAntigravity, model.AgentClaudeCode, model.AgentPi,
-	} {
-		rendered := renderSDDOrchestratorAsset(agent)
-		for _, name := range sharedOrchestratorSectionNames {
-			if !strings.Contains(rendered, name) {
-				continue // a runtime that never carried this section keeps not carrying it
-			}
-			body := sharedOrchestratorSection(name)
-			first := strings.SplitN(strings.TrimSpace(body), "\n", 2)[0]
-			if !strings.Contains(rendered, first) {
-				t.Errorf("%s rendered %q without its shared body", agent, name)
-			}
-		}
-	}
-}
 
 // TestNoRawSharedSectionPlaceholderSurvivesRendering pins that no placeholder
 // reaches a rendered prompt.
-func TestNoRawSharedSectionPlaceholderSurvivesRendering(t *testing.T) {
-	for _, agent := range []model.AgentID{
-		model.AgentOpenCode, model.AgentCursor, model.AgentCodex,
-		model.AgentAntigravity, model.AgentClaudeCode, model.AgentPi,
-	} {
-		if rendered := renderSDDOrchestratorAsset(agent); strings.Contains(rendered, "{{GENTLE_AI_SDD_SECTION:") {
-			t.Errorf("%s kept a raw shared-section placeholder", agent)
-		}
-	}
-}

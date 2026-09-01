@@ -22,10 +22,10 @@ const sddTaskResultUsage = "`gentle-ai sdd-task-result --phase <phase> --cwd <re
 // RunSDDTaskResult classifies one delegated SDD phase result and renders the
 // typed terminal failure when it is not usable.
 //
-// #3818: this contract was enforced only by the OpenCode plugin; every other
+// #3818: this contract was enforced only by the retired plugin; every other
 // runtime carried it as prose with nothing evaluating it. This command is the
 // enforcement surface those runtimes were missing, and it renders bytes
-// identical to the OpenCode transport because both read one Go definition.
+// identical to the retired transport because both read one Go definition.
 func RunSDDTaskResult(args []string, stdout io.Writer) error {
 	return runSDDTaskResult(args, os.Stdin, stdout)
 }

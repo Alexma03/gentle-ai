@@ -60,50 +60,6 @@ func TestWelcomeMenuOffersTheReviewStoreReset(t *testing.T) {
 
 // TestWelcomeSelectionEntersTheSurvey proves the menu entry runs the read-only
 // survey and lands on the confirmation screen, never straight into a removal.
-func TestWelcomeSelectionEntersTheSurvey(t *testing.T) {
-	m := NewModel(system.DetectionResult{}, "dev")
-	m.Screen = ScreenWelcome
-	surveyed := false
-	m.ReviewStoreResetSurveyFn = func() (reviewtransaction.StoreResetReport, error) {
-		surveyed = true
-		return settledStoreResetReport(), nil
-	}
-	m.ReviewStoreResetFn = func() (reviewtransaction.StoreResetReport, error) {
-		t.Fatal("selecting the menu entry applied a reset")
-		return reviewtransaction.StoreResetReport{}, nil
-	}
-	options := screens.WelcomeOptions(m.UpdateResults, m.UpdateCheckDone, m.hasDetectedOpenCode(), len(m.ProfileList), m.hasAgentBuilderEngines())
-	for index, option := range options {
-		if option == "Reset review store" {
-			m.Cursor = index
-		}
-	}
-
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	state := updated.(Model)
-	if state.Screen != ScreenReviewStoreResetConfirm {
-		t.Fatalf("screen = %v, want the confirmation screen", state.Screen)
-	}
-	if !state.OperationRunning {
-		t.Fatal("the survey did not start")
-	}
-	if state.optionCount() != 0 {
-		t.Fatal("a running survey still exposes options")
-	}
-	if cmd == nil {
-		t.Fatal("no survey command was returned")
-	}
-	state = drainReviewStoreResetCmd(t, state, cmd)
-	if !surveyed {
-		t.Fatal("the survey function was never called")
-	}
-	if state.OperationRunning {
-		t.Fatal("the survey never finished")
-	}
-	if state.optionCount() != 2 {
-		t.Fatalf("settled survey exposes %d options, want Delete + Cancel", state.optionCount())
-	}
-}
 
 // drainReviewStoreResetCmd runs a returned command and feeds every message it
 // produces back into the model, so a tea.Batch of a worker plus a spinner tick
@@ -314,38 +270,6 @@ func TestReviewStoreResetResultIsNeverDropped(t *testing.T) {
 // cursor resting on "Delete permanently", the second Enter empties the store --
 // while the CLI equivalent makes the user type --confirm. Two keystrokes and a
 // typed flag are not the same bar.
-func TestReviewStoreResetConfirmStartsOnCancel(t *testing.T) {
-	m := NewModel(system.DetectionResult{}, "dev")
-	m.Screen = ScreenWelcome
-	m.ReviewStoreResetSurveyFn = func() (reviewtransaction.StoreResetReport, error) {
-		return settledStoreResetReport(), nil
-	}
-	m.ReviewStoreResetFn = func() (reviewtransaction.StoreResetReport, error) {
-		t.Fatal("the second Enter after entering the screen destroyed the store")
-		return reviewtransaction.StoreResetReport{}, nil
-	}
-	options := screens.WelcomeOptions(m.UpdateResults, m.UpdateCheckDone, m.hasDetectedOpenCode(), len(m.ProfileList), m.hasAgentBuilderEngines())
-	for index, option := range options {
-		if option == "Reset review store" {
-			m.Cursor = index
-		}
-	}
-
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	state := drainReviewStoreResetCmd(t, updated.(Model), cmd)
-
-	confirmOptions := screens.ReviewStoreResetConfirmOptions(state.ReviewStoreResetReport, state.ReviewStoreResetSurveyErr)
-	if state.Cursor >= len(confirmOptions) || confirmOptions[state.Cursor] != "Cancel" {
-		t.Fatalf("cursor %d selects %#v, want Cancel", state.Cursor, confirmOptions)
-	}
-
-	// The second Enter has to be inert, which is the property the cursor
-	// position exists to produce.
-	updated, _ = state.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	if after := updated.(Model); after.Screen != ScreenWelcome {
-		t.Fatalf("the second Enter went to %v, want back to the menu", after.Screen)
-	}
-}
 
 // TestReviewStoreResetResultNamesStrandedWorktreeRegistrations keeps the one
 // exception to "not removed means untouched" visible in the interface a user

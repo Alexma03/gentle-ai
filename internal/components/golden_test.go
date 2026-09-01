@@ -1,11 +1,9 @@
 package components_test
 
 import (
-	"encoding/json"
 	"flag"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
@@ -13,10 +11,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/claude"
 	codexagent "github.com/gentleman-programming/gentle-ai/v2/internal/agents/codex"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/cursor"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/assets"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/engram"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/mcp"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/persona"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/sdd"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/skills"
@@ -25,9 +20,9 @@ import (
 
 var update = flag.Bool("update", false, "update golden files")
 
-func claudeAdapter() agents.Adapter   { return claude.NewAdapter() }
-func opencodeAdapter() agents.Adapter { return opencode.NewAdapter() }
-func cursorAdapter() agents.Adapter   { return cursor.NewAdapter() }
+func claudeAdapter() agents.Adapter { return claude.NewAdapter() }
+
+func cursorAdapter() agents.Adapter { return cursor.NewAdapter() }
 
 func codexAdapter() agents.Adapter       { return codexagent.NewAdapter() }
 func antigravityAdapter() agents.Adapter { return antigravity.NewAdapter() }
@@ -35,47 +30,6 @@ func antigravityAdapter() agents.Adapter { return antigravity.NewAdapter() }
 // ---------------------------------------------------------------------------
 // Existing golden tests (context7, presets, SDD command)
 // ---------------------------------------------------------------------------
-
-func TestGoldenConfigs(t *testing.T) {
-	type presetMapping struct {
-		Preset string   `json:"preset"`
-		Skills []string `json:"skills"`
-	}
-
-	presets := []presetMapping{
-		{Preset: "full-gentleman", Skills: toStringSlice(skills.SkillsForPreset("full-gentleman"))},
-		{Preset: "ecosystem-only", Skills: toStringSlice(skills.SkillsForPreset("ecosystem-only"))},
-		{Preset: "minimal", Skills: toStringSlice(skills.SkillsForPreset("minimal"))},
-	}
-	presetsJSON, err := json.MarshalIndent(presets, "", "  ")
-	if err != nil {
-		t.Fatalf("MarshalIndent() error = %v", err)
-	}
-	presetsJSON = append(presetsJSON, '\n')
-
-	commands := sdd.OpenCodeCommands()
-	if len(commands) == 0 {
-		t.Fatalf("OpenCodeCommands() returned no commands")
-	}
-	commandMarkdown := []byte("# " + commands[0].Name + "\n\n" + commands[0].Description + "\n\n" + commands[0].Body + "\n")
-
-	tests := []struct {
-		name    string
-		path    string
-		content []byte
-	}{
-		{name: "context7 server", path: "context7-server.json", content: mcp.DefaultContext7ServerJSON()},
-		{name: "context7 overlay", path: "context7-overlay.json", content: mcp.DefaultContext7OverlayJSON()},
-		{name: "skills presets", path: "skills-presets.json", content: presetsJSON},
-		{name: "sdd command markdown", path: "sdd-command-sdd-init.md", content: commandMarkdown},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			assertGolden(t, tc.path, tc.content)
-		})
-	}
-}
 
 // ---------------------------------------------------------------------------
 // SDD Injector golden tests
@@ -112,83 +66,6 @@ func TestGoldenSDD_Claude(t *testing.T) {
 	} {
 		agentContent := readTestFile(t, filepath.Join(agentsDir, name+".md"))
 		assertGolden(t, "sdd-claude-agent-"+name+".golden", agentContent)
-	}
-}
-
-func TestGoldenSDD_OpenCode(t *testing.T) {
-	home := t.TempDir()
-
-	result, err := sdd.Inject(home, opencodeAdapter(), "")
-	if err != nil {
-		t.Fatalf("sdd.Inject(opencode) error = %v", err)
-	}
-	if !result.Changed {
-		t.Fatalf("sdd.Inject(opencode) changed = false")
-	}
-
-	// Golden-check a representative command file.
-	sddInit := readTestFile(t, filepath.Join(home, ".config", "opencode", "commands", "sdd-init.md"))
-	assertGolden(t, "sdd-opencode-cmd-sdd-init.golden", sddInit)
-	sddApply := readTestFile(t, filepath.Join(home, ".config", "opencode", "commands", "sdd-apply.md"))
-	assertGolden(t, "sdd-opencode-cmd-sdd-apply.golden", sddApply)
-	sddResearch := readTestFile(t, filepath.Join(home, ".config", "opencode", "commands", "sdd-research.md"))
-	assertGolden(t, "sdd-opencode-cmd-sdd-research.golden", sddResearch)
-
-	// Golden-check a representative SDD skill file.
-	skillInit := readTestFile(t, filepath.Join(home, ".config", "opencode", "skills", "sdd-init", "SKILL.md"))
-	assertGolden(t, "sdd-opencode-skill-sdd-init.golden", skillInit)
-	skillResearch := readTestFile(t, filepath.Join(home, ".config", "opencode", "skills", "sdd-research", "SKILL.md"))
-	assertGolden(t, "sdd-opencode-skill-sdd-research.golden", skillResearch)
-
-	// Verify ALL expected command files exist.
-	expectedCommands := []string{
-		"sdd-init.md", "sdd-apply.md", "sdd-archive.md", "sdd-continue.md",
-		"sdd-explore.md", "sdd-ff.md", "sdd-new.md", "sdd-onboard.md", "sdd-research.md", "sdd-status.md", "sdd-verify.md",
-	}
-	commandsDir := filepath.Join(home, ".config", "opencode", "commands")
-	for _, name := range expectedCommands {
-		path := filepath.Join(commandsDir, name)
-		if _, err := os.Stat(path); err != nil {
-			t.Errorf("expected command file %q not found: %v", name, err)
-		}
-	}
-}
-
-func TestGoldenSDD_OpenCode_Multi(t *testing.T) {
-	home := t.TempDir()
-
-	result, err := sdd.Inject(home, opencodeAdapter(), "multi")
-	if err != nil {
-		t.Fatalf("sdd.Inject(opencode, multi) error = %v", err)
-	}
-	if !result.Changed {
-		t.Fatalf("sdd.Inject(opencode, multi) changed = false")
-	}
-
-	// Golden-check the settings file with multi overlay merged.
-	settingsJSON := readTestFile(t, filepath.Join(home, ".config", "opencode", "opencode.json"))
-	var settings map[string]any
-	if err := json.Unmarshal(settingsJSON, &settings); err != nil {
-		t.Fatalf("unmarshal generated OpenCode settings: %v", err)
-	}
-	for name, raw := range settings["agent"].(map[string]any) {
-		if _, exists := raw.(map[string]any)["tools"]; exists {
-			t.Fatalf("generated managed agent %q emits deprecated tools", name)
-		}
-	}
-	assertGolden(t, "sdd-opencode-multi-settings.golden", settingsJSON)
-	if strings.Contains(string(settingsJSON), "<!-- gentle-ai:opencode-background-subagents -->") {
-		t.Fatal("default OpenCode golden output unexpectedly contains background policy")
-	}
-
-	legacyPluginPath := filepath.Join(home, ".config", "opencode", "plugins", "background-agents.ts")
-	if _, err := os.Stat(legacyPluginPath); !os.IsNotExist(err) {
-		t.Fatalf("legacy background-agents plugin should not be installed by default; stat err = %v", err)
-	}
-	modelVariantsPath := filepath.Join(home, ".config", "opencode", "plugins", "model-variants.ts")
-	pluginContent := readTestFile(t, modelVariantsPath)
-	if string(pluginContent) != assets.MustRead("opencode/plugins/model-variants.ts") {
-		t.Fatalf("plugin content mismatch for %q", modelVariantsPath)
 	}
 }
 
@@ -344,36 +221,6 @@ func TestGoldenPersona_Claude_Neutral(t *testing.T) {
 	assertGolden(t, "persona-claude-neutral-outputstyle.golden", outputStyle)
 }
 
-func TestGoldenPersona_OpenCode_Gentleman(t *testing.T) {
-	home := t.TempDir()
-
-	result, err := persona.Inject(home, opencodeAdapter(), model.PersonaGentleman)
-	if err != nil {
-		t.Fatalf("persona.Inject(opencode, gentleman) error = %v", err)
-	}
-	if !result.Changed {
-		t.Fatalf("persona.Inject(opencode, gentleman) changed = false")
-	}
-
-	agentsMD := readTestFile(t, filepath.Join(home, ".config", "opencode", "AGENTS.md"))
-	assertGolden(t, "persona-opencode-gentleman.golden", agentsMD)
-}
-
-func TestGoldenPersona_OpenCode_Neutral(t *testing.T) {
-	home := t.TempDir()
-
-	result, err := persona.Inject(home, opencodeAdapter(), model.PersonaNeutral)
-	if err != nil {
-		t.Fatalf("persona.Inject(opencode, neutral) error = %v", err)
-	}
-	if !result.Changed {
-		t.Fatalf("persona.Inject(opencode, neutral) changed = false")
-	}
-
-	agentsMD := readTestFile(t, filepath.Join(home, ".config", "opencode", "AGENTS.md"))
-	assertGolden(t, "persona-opencode-neutral.golden", agentsMD)
-}
-
 func TestGoldenPersona_Claude_Custom(t *testing.T) {
 	home := t.TempDir()
 
@@ -387,22 +234,6 @@ func TestGoldenPersona_Claude_Custom(t *testing.T) {
 	}
 	if len(result.Files) != 0 {
 		t.Fatalf("persona.Inject(claude, custom) returned files %v, want none", result.Files)
-	}
-}
-
-func TestGoldenPersona_OpenCode_Custom(t *testing.T) {
-	home := t.TempDir()
-
-	result, err := persona.Inject(home, opencodeAdapter(), model.PersonaCustom)
-	if err != nil {
-		t.Fatalf("persona.Inject(opencode, custom) error = %v", err)
-	}
-	// Custom persona does nothing — no files written.
-	if result.Changed {
-		t.Fatalf("persona.Inject(opencode, custom) changed = true, want false")
-	}
-	if len(result.Files) != 0 {
-		t.Fatalf("persona.Inject(opencode, custom) returned files %v, want none", result.Files)
 	}
 }
 
@@ -435,25 +266,6 @@ func TestGoldenEngram_Claude(t *testing.T) {
 	// CLAUDE.md with engram-protocol section (slim, per Decision 1).
 	claudeMD := readTestFile(t, filepath.Join(home, ".claude", "CLAUDE.md"))
 	assertGolden(t, "engram-claude-claudemd.golden", claudeMD)
-}
-
-func TestGoldenEngram_OpenCode(t *testing.T) {
-	home := t.TempDir()
-
-	// Mock engramLookPath so the resolved command matches the golden file regardless
-	// of whether engram is installed at /opt/homebrew/bin/engram on the current machine.
-	engram.SetLookPathForTest(t, "/opt/homebrew/bin/engram", "")
-
-	result, err := engram.Inject(home, opencodeAdapter())
-	if err != nil {
-		t.Fatalf("engram.Inject(opencode) error = %v", err)
-	}
-	if !result.Changed {
-		t.Fatalf("engram.Inject(opencode) changed = false")
-	}
-
-	configJSON := readTestFile(t, filepath.Join(home, ".config", "opencode", "opencode.json"))
-	assertGolden(t, "engram-opencode-settings.golden", configJSON)
 }
 
 // TestGoldenEngram_Codex captures the rendered Codex model_instructions_file
@@ -507,25 +319,6 @@ func TestGoldenSkills_Claude(t *testing.T) {
 
 	skillCreator := readTestFile(t, filepath.Join(home, ".claude", "skills", "skill-creator", "SKILL.md"))
 	assertGolden(t, "skills-claude-skill-creator.golden", skillCreator)
-}
-
-func TestGoldenSkills_OpenCode(t *testing.T) {
-	home := t.TempDir()
-
-	skillIDs := []model.SkillID{model.SkillGoTesting, model.SkillCreator}
-	result, err := skills.Inject(home, opencodeAdapter(), skillIDs)
-	if err != nil {
-		t.Fatalf("skills.Inject(opencode) error = %v", err)
-	}
-	if !result.Changed {
-		t.Fatalf("skills.Inject(opencode) changed = false")
-	}
-
-	goTestingSkill := readTestFile(t, filepath.Join(home, ".config", "opencode", "skills", "go-testing", "SKILL.md"))
-	assertGolden(t, "skills-opencode-go-testing.golden", goTestingSkill)
-
-	skillCreator := readTestFile(t, filepath.Join(home, ".config", "opencode", "skills", "skill-creator", "SKILL.md"))
-	assertGolden(t, "skills-opencode-skill-creator.golden", skillCreator)
 }
 
 // ---------------------------------------------------------------------------

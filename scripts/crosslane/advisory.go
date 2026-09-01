@@ -11,7 +11,7 @@ const advisoryLane = "advisory"
 
 // runAdvisoryLane drives the MIDDLE path the other lanes never reach.
 //
-// The opencode lane covers the blocker path (candidate-causal severe finding
+// The retained provider lane covers the blocker path (candidate-causal severe finding
 // -> correction -> approved) and the claude lane covers the clean path (no
 // findings at all -> approved). Neither covers a review that reaches an
 // approved terminal result while carrying findings that do not block. That gap is not
