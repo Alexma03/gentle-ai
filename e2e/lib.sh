@@ -76,9 +76,6 @@ resolve_binary() {
 # cleanup_test_env — reset filesystem state between tests.
 # Removes config dirs and files that the installer writes.
 cleanup_test_env() {
-    rm -rf "$HOME/.config/opencode" 2>/dev/null || true
-    rm -rf "$HOME/.config/gga" 2>/dev/null || true
-    rm -rf "$HOME/.config/Windsurf" 2>/dev/null || true
     rm -rf "$HOME/.claude" 2>/dev/null || true
     rm -f "$HOME/.claude.json" 2>/dev/null || true
     rm -rf "$HOME/.codex" 2>/dev/null || true
@@ -86,9 +83,6 @@ cleanup_test_env() {
     rm -rf "$HOME/.gentle-ai" 2>/dev/null || true
     rm -rf "$HOME/.codeium" 2>/dev/null || true
     rm -rf "$HOME/.cursor" 2>/dev/null || true
-    rm -rf "$HOME/.qwen" 2>/dev/null || true
-    rm -rf "$HOME/.kiro" 2>/dev/null || true
-    rm -rf "$HOME/.kimi" 2>/dev/null || true
     mkdir -p "$HOME/.config"
 }
 
@@ -145,8 +139,6 @@ EOF
 # setup_fake_configs — seed fake config files so backup tests have something
 # to snapshot and restore.
 setup_fake_configs() {
-    mkdir -p "$HOME/.config/opencode"
-    echo '{"fake-settings": true}' > "$HOME/.config/opencode/opencode.json"
 
     mkdir -p "$HOME/.claude"
     echo '# Fake CLAUDE.md' > "$HOME/.claude/CLAUDE.md"

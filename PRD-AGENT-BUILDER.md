@@ -17,7 +17,6 @@ The Gentleman AI ecosystem ships with a powerful set of pre-built skills and SDD
 **Today, creating a custom sub-agent requires:**
 
 1. Understanding the skill file format (`SKILL.md`) for each AI agent
-2. Knowing where each agent stores its configuration (Claude Code: `~/.claude/skills/`, OpenCode: `~/.config/opencode/skills/`, etc.)
 3. Writing the system prompt, triggers, and patterns manually
 4. Duplicating the skill across every AI agent you use
 5. If it's SDD-related, understanding the orchestrator config and how to register a new phase
@@ -31,7 +30,6 @@ The Gentleman AI ecosystem ships with a powerful set of pre-built skills and SDD
 **A guided TUI experience where you describe what you want, and the ecosystem uses one of your installed AI agents to generate a production-ready sub-agent skill — installed across all your tools instantly.**
 
 Think of it as the "Create Agent" flow from Claude's `/agents` command, but:
-- **Cross-agent**: generates once, installs everywhere (Claude Code, OpenCode, Gemini CLI, Cursor, etc.)
 - **SDD-aware**: can optionally integrate as a new SDD phase or as support for an existing phase
 - **Ecosystem-native**: the generated agent has access to Engram (persistent memory), MCP servers, and follows the Gentleman skill format
 - **Preview before install**: you see exactly what will be generated before it touches your filesystem
@@ -98,8 +96,6 @@ The Agent Builder is a **top-level menu option** on the Welcome screen, alongsid
 │  help you build your sub-agent?  │
 │                                  │
 │  ★ Claude Code (installed)       │  ← Uses claude --print to generate
-│  ○ OpenCode (installed)          │  ← Uses opencode run to generate
-│  ○ Gemini CLI (installed)        │  ← Uses gemini -p to generate
 │  ○ Codex (installed)             │  ← Uses codex exec to generate
 │                                  │
 │  Only installed agents shown.    │
@@ -223,7 +219,6 @@ The Agent Builder is a **top-level menu option** on the Welcome screen, alongsid
 │                                                              │
 │  Will be installed to:                                       │
 │    • ~/.claude/skills/a11y-reviewer/SKILL.md                 │
-│    • ~/.config/opencode/skills/a11y-reviewer/SKILL.md        │
 │                                                              │
 │  [Install]  [Edit]  [Regenerate]  [Back]                     │
 └──────────┬──────────────────────────────────────────────────┘
@@ -242,7 +237,6 @@ The Agent Builder is a **top-level menu option** on the Welcome screen, alongsid
 │  Installing "a11y-reviewer"...   │
 │                                  │
 │  ✓ Claude Code — skill installed │
-│  ✓ OpenCode — skill installed    │
 │  ✓ Skill registered in catalog   │
 │  ✓ SDD integration configured   │
 │                                  │
@@ -263,7 +257,6 @@ After creating agents, users need to manage them. A future iteration will add a 
 - List all custom agents
 - Edit an existing agent (re-open in preview)
 - Delete a custom agent (removes from all configured AI agents)
-- Export an agent (for sharing — future marketplace feature)
 
 For V1, custom agents can be managed manually by editing/deleting the SKILL.md files.
 
@@ -282,8 +275,6 @@ Each supported AI agent exposes a different CLI interface for non-interactive us
 | Agent | Command | Mode |
 |-------|---------|------|
 | Claude Code | `claude --print -p "{prompt}"` | Pipe prompt, get text output |
-| OpenCode | `opencode run "{prompt}"` | Run mode, text output |
-| Gemini CLI | `gemini -p "{prompt}"` | Pipe mode |
 | Codex | `codex exec "{prompt}"` | Exec mode |
 
 The system needs a `GenerationEngine` interface:
@@ -411,12 +402,8 @@ Custom agent skills follow the SAME installation pattern as built-in skills. The
 | Agent | Skill Directory | File Path |
 |-------|----------------|-----------|
 | Claude Code | `~/.claude/skills/` | `~/.claude/skills/{name}/SKILL.md` |
-| OpenCode | `~/.config/opencode/skills/` | `~/.config/opencode/skills/{name}/SKILL.md` |
-| Gemini CLI | `~/.gemini/skills/` | `~/.gemini/skills/{name}/SKILL.md` |
 | Cursor | `~/.cursor/skills/` | `~/.cursor/skills/{name}/SKILL.md` |
-| VSCode | `~/.vscode/skills/` | `~/.vscode/skills/{name}/SKILL.md` |
 | Codex | `~/.codex/skills/` | `~/.codex/skills/{name}/SKILL.md` |
-| Windsurf | `~/.windsurf/skills/` | `~/.windsurf/skills/{name}/SKILL.md` |
 | Antigravity | `~/.antigravity/skills/` | `~/.antigravity/skills/{name}/SKILL.md` |
 
 The installer writes the SAME `SKILL.md` to ALL agents that were configured during the initial setup (detected via the ecosystem's state file or by scanning which agent skill directories exist).
@@ -443,7 +430,6 @@ To track which custom agents the user has created (for future management), a loc
         "mode": "phase-support",
         "target_phase": "design"
       },
-      "installed_agents": ["claude-code", "opencode"]
     }
   ]
 }
@@ -590,16 +576,12 @@ func (e *ClaudeEngine) Generate(ctx context.Context, prompt string) (string, err
     return string(output), nil
 }
 
-// OpenCodeEngine generates skills using OpenCode's run mode.
-type OpenCodeEngine struct {
     binaryPath string
 }
 
-func (e *OpenCodeEngine) Generate(ctx context.Context, prompt string) (string, error) {
     cmd := exec.CommandContext(ctx, e.binaryPath, "run", prompt)
     output, err := cmd.Output()
     if err != nil {
-        return "", fmt.Errorf("opencode generation failed: %w", err)
     }
     return string(output), nil
 }
@@ -612,7 +594,6 @@ sequenceDiagram
     participant User
     participant TUI as Gentle AI TUI
     participant Builder as Agent Builder
-    participant Engine as Generation Engine<br/>(Claude/OpenCode/etc.)
     participant Parser as Output Parser
     participant Installer as Skill Installer
     participant FS as Filesystem
@@ -690,7 +671,6 @@ graph TB
     subgraph ENGINE_LAYER["Generation Engines"]
         ENGINE_IF{GenerationEngine<br/>Interface}
         CLAUDE_ENG[Claude Engine<br/>claude --print]
-        OC_ENG[OpenCode Engine<br/>opencode run]
         GEM_ENG[Gemini Engine<br/>gemini -p]
         CDX_ENG[Codex Engine<br/>codex exec]
 
@@ -870,7 +850,6 @@ The user selects where in the pipeline to insert the new phase:
 
 | Feature | Description | Why Later |
 |---------|-------------|-----------|
-| **Marketplace** | Share and discover community-created agents | Needs backend infrastructure, auth, trust model |
 | **Templates** | Pre-built starting points (Code Reviewer, Doc Writer, Test Generator) | Can be added once the core builder is solid |
 | **Agent Management Screen** | List, edit, delete, export custom agents from TUI | Registry is there; UI can come later |
 | **Team Sync** | Share custom agents across team members via git | Needs a convention for team-shared skills |

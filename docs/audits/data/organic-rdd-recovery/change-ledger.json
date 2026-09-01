@@ -11,11 +11,6 @@
       "path": "docs/trigger-rules.md"
     },
     {
-      "context": "RAR",
-      "disposition": "REWRITE",
-      "path": "e2e/organicruntime/organic_runtime_test.go"
-    },
-    {
       "context": "ACI",
       "disposition": "KEEP",
       "path": "internal/agents/capabilitymanifest/manifest.go"
@@ -88,37 +83,12 @@
     {
       "context": "ACI",
       "disposition": "REGENERATE",
-      "path": "internal/assets/hermes/sdd-orchestrator.md"
-    },
-    {
-      "context": "ACI",
-      "disposition": "REGENERATE",
-      "path": "internal/assets/kimi/sdd-orchestrator.md"
-    },
-    {
-      "context": "ACI",
-      "disposition": "REGENERATE",
-      "path": "internal/assets/kiro/sdd-orchestrator.md"
-    },
-    {
-      "context": "ACI",
-      "disposition": "REGENERATE",
-      "path": "internal/assets/opencode/sdd-orchestrator.md"
-    },
-    {
-      "context": "ACI",
-      "disposition": "REGENERATE",
-      "path": "internal/assets/qwen/sdd-orchestrator.md"
+      "path": "internal/assets/pi/sdd-orchestrator.md"
     },
     {
       "context": "ACI",
       "disposition": "KEEP",
       "path": "internal/assets/skills/_shared/review-ledger-contract.md"
-    },
-    {
-      "context": "ACI",
-      "disposition": "REGENERATE",
-      "path": "internal/assets/windsurf/sdd-orchestrator.md"
     },
     {
       "context": "ACI",

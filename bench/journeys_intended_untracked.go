@@ -90,7 +90,7 @@ func unbornUntrackedExecutableCandidate(sandbox *Sandbox) error {
 func unbornUntrackedStatusCollectsSelection(r *journeyRun) error {
 	observation := r.run(productArgsFor(r,
 		"review", "status", "--cwd", r.sandbox.Repo, "--contract", reviewContractV2,
-		"--agent", "opencode", "--next-transition"), false)
+		"--agent", "codex", "--next-transition"), false)
 	if observation.ExitCode != 0 {
 		return fmt.Errorf("unborn STATUS exited %d: %s", observation.ExitCode, firstLine(observation.Stderr))
 	}
@@ -139,7 +139,7 @@ func unbornIntendedDeliveryCandidate(sandbox *Sandbox) error {
 }
 
 func selectAndStartUnbornIntendedDelivery(r *journeyRun) error {
-	status, err := readStatusForContract(r, reviewContractV2, "--agent", "opencode")
+	status, err := readStatusForContract(r, reviewContractV2, "--agent", "codex")
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func selectAndStartUnbornIntendedDelivery(r *journeyRun) error {
 	}
 	digest := status.argument("expected_untracked_inventory")
 	selected, err := readStatusForContract(r, reviewContractV2,
-		"--agent", "opencode", "--untracked-scope=select", "--expected-untracked-inventory="+digest,
+		"--agent", "codex", "--untracked-scope=select", "--expected-untracked-inventory="+digest,
 		"--intended-untracked="+unbornIntendedDeliveryPath)
 	if err != nil {
 		return err
@@ -179,7 +179,7 @@ func requireUnbornIntendedStagedDeliveryStop(r *journeyRun) error {
 		return fmt.Errorf("unborn delivery real index = %q, %v", cached, err)
 	}
 	selectors := []string{
-		"--agent", "opencode", "--lineage", r.sandbox.Lineage, "--gate", "pre-commit",
+		"--agent", "codex", "--lineage", r.sandbox.Lineage, "--gate", "pre-commit",
 		"--untracked-scope=select", "--expected-untracked-inventory=" + r.sandbox.Scratch["unborn-intended-inventory"],
 		"--intended-untracked=" + unbornIntendedDeliveryPath,
 	}
@@ -205,7 +205,7 @@ func stageUnbornIntendedDeliveryCandidate(sandbox *Sandbox) error {
 
 func validateUnbornIntendedStagedDelivery(r *journeyRun) error {
 	status, err := readStatusForContract(r, reviewContractV2,
-		"--agent", "opencode", "--lineage", r.sandbox.Lineage, "--gate", "pre-commit", "--projection", "staged")
+		"--agent", "codex", "--lineage", r.sandbox.Lineage, "--gate", "pre-commit", "--projection", "staged")
 	if err != nil {
 		return err
 	}
@@ -241,7 +241,7 @@ func intendedUntrackedJourneys() []Journey {
 			Steps: []Step{
 				{Name: "fixture: unborn repository with one untracked executable candidate", Fixture: unbornUntrackedExecutableCandidate},
 				{Name: "mode enable", Requires: modeCapability, Args: productArgs("review", "mode", "enable", "--json")},
-				{Name: "v2 OpenCode STATUS collects the inventory-bound untracked selection", Requires: unbornIntendedUntrackedStatusCapability, Composite: unbornUntrackedStatusCollectsSelection},
+				{Name: "v2 Codex STATUS collects the inventory-bound untracked selection", Requires: unbornIntendedUntrackedStatusCapability, Composite: unbornUntrackedStatusCollectsSelection},
 			},
 		},
 		{
@@ -254,7 +254,7 @@ func intendedUntrackedJourneys() []Journey {
 				{Name: "select every untracked path and execute printed zero-lens START", Requires: unbornIntendedUntrackedStatusCapability, Composite: selectAndStartUnbornIntendedDelivery},
 				{Name: "the zero-lens terminal event emits acknowledgement before burning the unborn transaction", Requires: statusCapability, Composite: func(r *journeyRun) error {
 					return requireAtomicLineageAcknowledged(r, r.sandbox.Lineage,
-						"--agent", "opencode", "--untracked-scope=select",
+						"--agent", "codex", "--untracked-scope=select",
 						"--expected-untracked-inventory="+r.sandbox.Scratch["unborn-intended-inventory"],
 						"--intended-untracked="+unbornIntendedDeliveryPath,
 					)

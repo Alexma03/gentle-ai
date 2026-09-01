@@ -1372,24 +1372,6 @@
     },
     {
       "earlyDeviation": false,
-      "path": "e2e/organicruntime/organic_runtime_test.go",
-      "publication": [
-        {
-          "present": false,
-          "ref": "origin/main"
-        },
-        {
-          "present": false,
-          "ref": "main"
-        },
-        {
-          "present": false,
-          "ref": "v2.1.11"
-        }
-      ]
-    },
-    {
-      "earlyDeviation": false,
       "path": "internal/agents/capabilitymanifest/manifest.go",
       "publication": [
         {
@@ -1642,79 +1624,7 @@
     },
     {
       "earlyDeviation": false,
-      "path": "internal/assets/hermes/sdd-orchestrator.md",
-      "publication": [
-        {
-          "present": true,
-          "ref": "origin/main"
-        },
-        {
-          "present": true,
-          "ref": "main"
-        },
-        {
-          "present": true,
-          "ref": "v2.1.11"
-        }
-      ]
-    },
-    {
-      "earlyDeviation": false,
-      "path": "internal/assets/kimi/sdd-orchestrator.md",
-      "publication": [
-        {
-          "present": true,
-          "ref": "origin/main"
-        },
-        {
-          "present": true,
-          "ref": "main"
-        },
-        {
-          "present": true,
-          "ref": "v2.1.11"
-        }
-      ]
-    },
-    {
-      "earlyDeviation": false,
-      "path": "internal/assets/kiro/sdd-orchestrator.md",
-      "publication": [
-        {
-          "present": true,
-          "ref": "origin/main"
-        },
-        {
-          "present": true,
-          "ref": "main"
-        },
-        {
-          "present": true,
-          "ref": "v2.1.11"
-        }
-      ]
-    },
-    {
-      "earlyDeviation": false,
-      "path": "internal/assets/opencode/sdd-orchestrator.md",
-      "publication": [
-        {
-          "present": true,
-          "ref": "origin/main"
-        },
-        {
-          "present": true,
-          "ref": "main"
-        },
-        {
-          "present": true,
-          "ref": "v2.1.11"
-        }
-      ]
-    },
-    {
-      "earlyDeviation": false,
-      "path": "internal/assets/qwen/sdd-orchestrator.md",
+      "path": "internal/assets/pi/sdd-orchestrator.md",
       "publication": [
         {
           "present": true,
@@ -1733,24 +1643,6 @@
     {
       "earlyDeviation": false,
       "path": "internal/assets/skills/_shared/review-ledger-contract.md",
-      "publication": [
-        {
-          "present": true,
-          "ref": "origin/main"
-        },
-        {
-          "present": true,
-          "ref": "main"
-        },
-        {
-          "present": true,
-          "ref": "v2.1.11"
-        }
-      ]
-    },
-    {
-      "earlyDeviation": false,
-      "path": "internal/assets/windsurf/sdd-orchestrator.md",
       "publication": [
         {
           "present": true,

@@ -60,7 +60,7 @@ body:
       description: Describe the solution you'd like. Be as specific as possible.
       placeholder: |
         Example usage:
-          gga <command> <flags>
+          gentle-ai <command> <flags>
 
         Expected output:
           ...

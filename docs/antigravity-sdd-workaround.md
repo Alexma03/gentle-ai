@@ -5,7 +5,6 @@ Antigravity (CLI y Desktop) actualmente no soporta la invocación nativa de suba
 Esto genera un alto riesgo de **degradación de contexto y alucinaciones**, ya que el LLM empieza a mezclar instrucciones de skills anteriores y pierde el hilo de la arquitectura.
 
 ## La Solución: Artifact-Driven State Machine
-Para implementar una integración temprana sin depender de APIs externas y **sin afectar la arquitectura multi-agente original de proyectos como Cursor u OpenCode**, aplicamos un patrón de Máquina de Estados apoyada estrictamente en el File System local.
 
 ### Reglas a Inyectar (Específicas para Antigravity)
 

@@ -415,7 +415,6 @@ invents a metric is worse than one that admits a gap.
     nothing stronger.
 
 13. **A boundary-specific fix is omitted when this harness cannot cross its real
-    boundary.** Issue #2028 is an OpenCode plugin session-local retry and remains
     plugin-covered; a CLI journey would never exercise that session boundary.
     Issue #2074 is a Claude install/registry migration and remains E2E-covered;
     this isolated review-lifecycle harness does not install or migrate Claude.

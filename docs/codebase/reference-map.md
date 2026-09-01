@@ -15,7 +15,6 @@ This appendix maps main docs and source files to responsibilities. Use it to mak
 | `docs/engram.md` | Engram command and MCP tool reference. |
 | `docs/agents.md` | Supported agents, delegation model, and per-agent notes. |
 | `docs/components.md` | Components, skills, and presets. |
-| `docs/opencode-profiles.md` | OpenCode SDD profile behavior. |
 | `docs/rollback.md` | Backup, restore, and managed uninstall recovery behavior. |
 | `docs/platforms.md` | Platform support and path notes. |
 | `docs/skill-registry.md` | Skill registry refresh/list behavior and generated index expectations. |
@@ -40,7 +39,6 @@ This appendix maps main docs and source files to responsibilities. Use it to mak
 | `internal/components/engram/` | Engram install, setup, MCP injection, and verification wiring. |
 | `internal/components/sdd/` | SDD prompt/profile generation and injection. |
 | `internal/components/communitytool/` | Community tool installation orchestration plus managed guidance/config/MCP reconciliation, including CodeGraph. |
-| `internal/components/opencodeplugin/` | Optional OpenCode TUI plugin registration, including external package names and the managed Gentle Logo local plugin. |
 | `internal/components/uninstall/` | Managed component cleanup services for uninstall flows. |
 | `internal/skillregistry/` | Skill registry scanning, cache behavior, and markdown generation. |
 | `internal/agents/` | Per-agent adapter strategies and paths. |

@@ -1,14 +1,6 @@
 {
   "invariants": [
     {
-      "context": "RAR",
-      "invariant": "real configured-agent journeys cover direct, delegated, optional-SDD, every review tier, one bounded correction, and flexible delivery",
-      "path": "e2e/organicruntime/organic_runtime_test.go",
-      "proof": [
-        "e2e/organicruntime/organic_runtime_test.go"
-      ]
-    },
-    {
       "context": "ACI",
       "invariant": "per-adapter facts stay truthful and unknown agents are rejected instead of assumed",
       "path": "internal/agents/capabilitymanifest/manifest.go",
@@ -115,39 +107,7 @@
     {
       "context": "ACI",
       "invariant": "the orchestrator prompt carries organic routing under systemic order and no remote work vocabulary",
-      "path": "internal/assets/hermes/sdd-orchestrator.md",
-      "proof": [
-        "internal/assets/assets_test.go"
-      ]
-    },
-    {
-      "context": "ACI",
-      "invariant": "the orchestrator prompt carries organic routing under systemic order and no remote work vocabulary",
-      "path": "internal/assets/kimi/sdd-orchestrator.md",
-      "proof": [
-        "internal/assets/assets_test.go"
-      ]
-    },
-    {
-      "context": "ACI",
-      "invariant": "the orchestrator prompt carries organic routing under systemic order and no remote work vocabulary",
-      "path": "internal/assets/kiro/sdd-orchestrator.md",
-      "proof": [
-        "internal/assets/assets_test.go"
-      ]
-    },
-    {
-      "context": "ACI",
-      "invariant": "the orchestrator prompt carries organic routing under systemic order and no remote work vocabulary",
-      "path": "internal/assets/opencode/sdd-orchestrator.md",
-      "proof": [
-        "internal/assets/assets_test.go"
-      ]
-    },
-    {
-      "context": "ACI",
-      "invariant": "the orchestrator prompt carries organic routing under systemic order and no remote work vocabulary",
-      "path": "internal/assets/qwen/sdd-orchestrator.md",
+      "path": "internal/assets/pi/sdd-orchestrator.md",
       "proof": [
         "internal/assets/assets_test.go"
       ]
@@ -158,14 +118,6 @@
       "path": "internal/assets/skills/_shared/review-ledger-contract.md",
       "proof": [
         "internal/components/sdd/review_ledger_contract_test.go"
-      ]
-    },
-    {
-      "context": "ACI",
-      "invariant": "the orchestrator prompt carries organic routing under systemic order and no remote work vocabulary",
-      "path": "internal/assets/windsurf/sdd-orchestrator.md",
-      "proof": [
-        "internal/assets/assets_test.go"
       ]
     },
     {
@@ -197,7 +149,7 @@
       "invariant": "the compact facade appends and reads back native authority before materializing artifacts",
       "path": "internal/cli/review_facade.go",
       "proof": [
-        "internal/cli/review_facade_test.go"
+        "internal/cli/review_facade_invalidated_test.go"
       ]
     },
     {

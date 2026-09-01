@@ -53,18 +53,12 @@ First-time setup — detects your tools, configures agents, injects all componen
 ```bash
 # Full ecosystem for multiple agents
 gentle-ai install \
-  --agent claude-code,opencode,gemini-cli \
   --preset full-gentleman
 
 # Minimal setup for Cursor
 gentle-ai install \
   --agent cursor \
   --preset minimal
-
-# OpenClaw setup after installing OpenClaw manually
-gentle-ai install \
-  --agent openclaw \
-  --preset full-gentleman
 
 # Pick specific components and skills
 gentle-ai install \
@@ -75,7 +69,6 @@ gentle-ai install \
 
 # Dry-run first (preview plan without applying changes)
 gentle-ai install --dry-run \
-  --agent claude-code,opencode \
   --preset full-gentleman
 ```
 
@@ -89,17 +82,11 @@ gentle-ai skill-registry refresh --force
 gentle-ai skill-registry refresh --cwd /path/to/project --quiet
 ```
 
-The command scans project skills first (`skills/`, `.opencode/skills/`, `.claude/skills/`, `.github/skills/`, and other supported workspace skill roots), then global agent skill directories. Project-local skills win over same-name global skills.
-
 The command writes `.atl/skill-registry.md` and `.atl/.skill-registry.cache.json`. The cache fingerprint includes schema version plus each discovered `SKILL.md` file path, mtime, and size, so normal startup is a cheap cache-hit when skills have not changed.
-
-Codex, Claude Code, and OpenCode installs wire this command into startup/plugin hooks. Pi gets the equivalent behavior from `gentle-pi`; keep those hook/plugin scan roots in sync when changing these discovery rules.
 
 See [Skill Registry](skill-registry.md) for the full index-first flow and diagrams.
 
 ### sync
-
-Refresh managed assets to the current version. Run it after replacing or upgrading the `gentle-ai` binary, including with `brew upgrade`, `gentle-ai upgrade`, or `go install`. It does NOT reinstall binaries (engram, GGA) — only updates prompt content, skills, MCP configs, and SDD orchestrators.
 
 Managed reviewer and runtime assets are version-bound to the binary. Until sync succeeds, review lifecycle operations fail closed when managed writer provenance is missing or mismatched.
 
@@ -117,31 +104,10 @@ gentle-ai sync --dry-run
 gentle-ai sync
 
 # Sync specific agents only
-gentle-ai sync --agent claude-code --agent opencode
 
-# Refresh OpenClaw workspace instructions and MCP config
-gentle-ai sync --agent openclaw
-```
-
-Sync is safe and idempotent — running it twice produces no changes the second time. When files change, the summary reports the changed file count and lists the changed file paths.
-
-`sync` refreshes the managed component set for the selected agents. It does not support `--component`; use `--include-permissions` or `--include-theme` for the opt-in components that are excluded from the default sync scope.
-
-For OpenClaw, sync reads the active workspace from `~/.openclaw/openclaw.json` (`agents.defaults.workspace`). It writes `AGENTS.md` / `SOUL.md` into that workspace, while MCP servers stay in the global OpenClaw config under `mcp.servers`.
-
-For Hermes, gentle-ai is detect-only: it cannot install Hermes. Install Hermes manually first. Detection is driven by the `~/.hermes` config directory (the binary being on `PATH` is reported separately). Once Hermes is detected, `gentle-ai install --agent hermes` injects context7 and Engram MCP blocks into `~/.hermes/config.yaml`, writes the SDD orchestrator and persona into `~/.hermes/SOUL.md`, and copies skills to `~/.hermes/skills/`. Use `gentle-ai sync --agent hermes` to update the managed configuration after upgrades.
-
-### uninstall
-
-Remove only the `gentle-ai` managed configuration from one or more agents. This does not uninstall external packages or binaries — it removes managed prompt sections, MCP entries, skills/config fragments, and other managed files, then updates `state.json` accordingly.
-
-Before any change is applied, `gentle-ai` creates a backup snapshot of the affected files.
-
-```bash
 # Partial uninstall for specific agents
 gentle-ai uninstall \
   --agent claude-code \
-  --agent opencode
 
 # Partial uninstall for specific components only
 gentle-ai uninstall \
@@ -254,32 +220,8 @@ gentle-ai -v
 | `--skill`, `--skills`    | Skills to sync (comma-separated; defaults to selected preset skills)                                  |
 | `--sdd-mode`             | SDD orchestrator mode: `single` or `multi`                                                           |
 | `--strict-tdd`           | Enable Strict TDD Mode for SDD agents                                                                |
-| `--profile`              | Create or update an SDD profile: `name:provider/model` (sets the default model for all phases)       |
-| `--profile-phase`        | Override a specific phase in a profile: `name:phase:provider/model`                                  |
-| `--sdd-profile-strategy` | OpenCode profile sync strategy: `generated-multi` or `external-single-active`                        |
 | `--include-permissions`  | Include permissions sync (opt-in)                                                                    |
-| `--include-theme`        | Include theme sync (opt-in)                                                                          |
 | `--dry-run`              | Preview the sync plan without applying changes                                                       |
-
-**Profile examples:**
-
-```bash
-# Create a "cheap" profile using a free model for all phases
-gentle-ai sync --profile cheap:openrouter/qwen/qwen3-30b-a3b:free
-
-# Override the design phase to use a stronger model
-gentle-ai sync --profile-phase cheap:sdd-design:anthropic/claude-sonnet-4-20250514
-
-# Create multiple profiles in one command
-gentle-ai sync \
-  --profile cheap:openrouter/qwen/qwen3-30b-a3b:free \
-  --profile premium:anthropic/claude-sonnet-4-20250514
-
-# Use compatibility mode with an external OpenCode profile manager
-gentle-ai sync --agent opencode --sdd-profile-strategy external-single-active
-```
-
-See [OpenCode SDD Profiles](opencode-profiles.md) for the full guide.
 
 ## CLI Flags (uninstall)
 
@@ -307,7 +249,6 @@ gentle-ai sync
 gentle-ai uninstall --agent claude-code --component sdd,persona
 
 # Adding a new agent later
-gentle-ai install --agent windsurf --preset full-gentleman
 ```
 
 ### Homebrew upgrade troubleshooting
@@ -338,7 +279,6 @@ sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
 Use `HOMEBREW_NO_SANDBOX_LINUX=1 brew upgrade gentle-ai` only as a final
 workaround when your distro policy forbids the namespace settings; it disables
 Homebrew's Linux sandbox for that command.
-
 
 ---
 

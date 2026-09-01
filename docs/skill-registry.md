@@ -6,8 +6,6 @@ The skill registry is a project-local index that lets every supported agent find
 
 ## When To Use It
 
-Use `gentle-ai skill-registry refresh` after you add, remove, rename, or move skills. Normal installs wire this refresh into startup hooks where the agent supports them, including Codex, Claude Code, OpenCode, and Pi through `gentle-pi`.
-
 ## Runtime Flow
 
 ```text
@@ -35,10 +33,8 @@ Subagent executes with original skill intent preserved
 gentle-ai skill-registry refresh
    │
    ├─ Scan project skill roots first
-   │     skills/, .opencode/skills/, .claude/skills/, ...
    │
    ├─ Scan global agent skill roots second
-   │     ~/.config/opencode/skills/, ~/.claude/skills/, ...
    │
    ├─ Deduplicate by skill name
    │     project skill wins over global skill

@@ -1,12 +1,6 @@
 {
   "tests": [
     {
-      "path": "e2e/organicruntime/organic_runtime_test.go",
-      "proof": [
-        "e2e/organicruntime/organic_runtime_test.go"
-      ]
-    },
-    {
       "path": "internal/agents/capabilitymanifest/manifest.go",
       "proof": [
         "internal/agents/capabilitymanifest/manifest_test.go"
@@ -85,31 +79,7 @@
       ]
     },
     {
-      "path": "internal/assets/hermes/sdd-orchestrator.md",
-      "proof": [
-        "internal/assets/assets_test.go"
-      ]
-    },
-    {
-      "path": "internal/assets/kimi/sdd-orchestrator.md",
-      "proof": [
-        "internal/assets/assets_test.go"
-      ]
-    },
-    {
-      "path": "internal/assets/kiro/sdd-orchestrator.md",
-      "proof": [
-        "internal/assets/assets_test.go"
-      ]
-    },
-    {
-      "path": "internal/assets/opencode/sdd-orchestrator.md",
-      "proof": [
-        "internal/assets/assets_test.go"
-      ]
-    },
-    {
-      "path": "internal/assets/qwen/sdd-orchestrator.md",
+      "path": "internal/assets/pi/sdd-orchestrator.md",
       "proof": [
         "internal/assets/assets_test.go"
       ]
@@ -118,12 +88,6 @@
       "path": "internal/assets/skills/_shared/review-ledger-contract.md",
       "proof": [
         "internal/components/sdd/review_ledger_contract_test.go"
-      ]
-    },
-    {
-      "path": "internal/assets/windsurf/sdd-orchestrator.md",
-      "proof": [
-        "internal/assets/assets_test.go"
       ]
     },
     {
@@ -147,7 +111,7 @@
     {
       "path": "internal/cli/review_facade.go",
       "proof": [
-        "internal/cli/review_facade_test.go"
+        "internal/cli/review_facade_invalidated_test.go"
       ]
     },
     {
@@ -386,8 +350,8 @@
     },
     {
       "destinationProof": [
-        "internal/reviewtransaction/gate_test.go",
-        "internal/reviewtransaction/receipt_test.go"
+        "internal/reviewtransaction/gate_write_guard_test.go",
+        "internal/reviewtransaction/compact_receipt_gate_removal_guard_test.go"
       ],
       "path": "internal/workprovider/"
     },

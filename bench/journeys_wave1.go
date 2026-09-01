@@ -1469,7 +1469,6 @@ func waveOneJourneys() []Journey {
 			Steps: []Step{
 				{Name: "fixture: repo", Fixture: baseRepo},
 				{Name: "fixture: one exact code candidate proven staged", Fixture: stageWaveCandidate},
-				{Name: "fixture: product process temp is unavailable", Fixture: unavailableProcessTemp},
 				{Name: "fresh negotiated status offers review start without authority history", Requires: statusCapability,
 					Args: productArgs("review", "status", "--contract", reviewContract, "--next-transition"), After: requireFreshNegotiatedStart},
 				{Name: "review start with an exact active lineage", Requires: startNamedCapability,

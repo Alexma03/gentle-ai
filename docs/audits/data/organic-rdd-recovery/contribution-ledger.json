@@ -10,10 +10,6 @@
     },
     {
       "contributor": "@Alan-TheGentleman",
-      "path": "e2e/organicruntime/organic_runtime_test.go"
-    },
-    {
-      "contributor": "@Alan-TheGentleman",
       "path": "internal/agents/capabilitymanifest/manifest.go"
     },
     {
@@ -70,31 +66,11 @@
     },
     {
       "contributor": "@Alan-TheGentleman",
-      "path": "internal/assets/hermes/sdd-orchestrator.md"
-    },
-    {
-      "contributor": "@Alan-TheGentleman",
-      "path": "internal/assets/kimi/sdd-orchestrator.md"
-    },
-    {
-      "contributor": "@Alan-TheGentleman",
-      "path": "internal/assets/kiro/sdd-orchestrator.md"
-    },
-    {
-      "contributor": "@Alan-TheGentleman",
-      "path": "internal/assets/opencode/sdd-orchestrator.md"
-    },
-    {
-      "contributor": "@Alan-TheGentleman",
-      "path": "internal/assets/qwen/sdd-orchestrator.md"
+      "path": "internal/assets/pi/sdd-orchestrator.md"
     },
     {
       "contributor": "@Alan-TheGentleman",
       "path": "internal/assets/skills/_shared/review-ledger-contract.md"
-    },
-    {
-      "contributor": "@Alan-TheGentleman",
-      "path": "internal/assets/windsurf/sdd-orchestrator.md"
     },
     {
       "contributor": "@Alan-TheGentleman",

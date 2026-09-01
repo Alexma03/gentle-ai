@@ -164,9 +164,7 @@ go build -o /tmp/gentle-ai ./cmd/gentle-ai
 
 | Tier | Flags | Cost profile | What it covers |
 |------|-------|--------------|----------------|
-| Deterministic | none (always runs) | Free and fast | The real OpenCode transport plugin bytes through an emulated Task hook surface (host-frame emulation), one full Claude-lane lifecycle plus a medium-candidate consent round-trip, and schema conformance of every captured envelope against `contracts/review-integration/`. |
 | Model | `--with-model` | Real reviewer model runs (model spend) | Additionally runs the real compiled claude-code reviewer runtime. |
-| Host | `--with-host` | Real host sessions plus model spend | Spawns real host applications: `codex exec` through the compiled Codex adapter, the installed `gentle-pi` print-mode Pi relay, and a headless `opencode run` session in a sandboxed HOME with the real transport plugin. |
 
 Behavior to expect:
 

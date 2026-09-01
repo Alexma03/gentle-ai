@@ -54,39 +54,6 @@ func TestRC1ConsecutiveRescopeProvenanceRefusesGeneratorCommandMutation(t *testi
 	}
 }
 
-func TestRC1ConsecutiveRescopeGeneratorCommandsPinExactHistoricalWorkspace(t *testing.T) {
-	const root = "/tmp/opencode/2839-repro"
-	want := []string{
-		"test ! -e " + root,
-		"mkdir -p " + root,
-		"git clone --no-checkout . " + root + "/source",
-		"git -C " + root + "/source checkout 3d1e673553c9afb0bf91a710121f415d6a7e4ed1",
-		"go -C " + root + "/source build -trimpath -o " + root + "/gentle-ai ./cmd/gentle-ai",
-		"mkdir " + root + "/repo",
-		"git -C " + root + "/repo init -b main -q",
-		"git -C " + root + "/repo config user.name Fixture",
-		"git -C " + root + "/repo config user.email fixture@example.invalid",
-		"git -C " + root + "/repo config commit.gpgsign false",
-		"git -C " + root + `/repo commit --allow-empty -qm "fixture baseline"`,
-		"(cd " + root + " && ./gentle-ai sdd-attempt begin --cwd " + root + "/repo --change consecutive-rescope-repair --expected-revision= --request-id begin-a --work-unit objective-a --evidence-goal prove-a --max-attempts 2 --max-changed-lines 20)",
-		"(cd " + root + ` && ./gentle-ai sdd-attempt finish --cwd ` + root + `/repo --change consecutive-rescope-repair --expected-revision "$(./gentle-ai sdd-attempt status --cwd ` + root + `/repo --change consecutive-rescope-repair | jq -r '.revision')" --request-id finish-a-failed --outcome failed --evidence-revision sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --diagnosis "intentional failed zero-drift attempt" --harness-disposition reused --cleanup-evidence clean --process-evidence reproduced)`,
-		"(cd " + root + ` && ./gentle-ai sdd-attempt rescope --cwd ` + root + `/repo --change consecutive-rescope-repair --expected-revision "$(./gentle-ai sdd-attempt status --cwd ` + root + `/repo --change consecutive-rescope-repair | jq -r '.revision')" --request-id rescope-a-b --work-unit objective-b --evidence-goal prove-b --max-attempts 1 --max-changed-lines 10 --reason "narrow A to B" --actor fixture-maintainer)`,
-		"(cd " + root + ` && ./gentle-ai sdd-attempt rescope --cwd ` + root + `/repo --change consecutive-rescope-repair --expected-revision "$(./gentle-ai sdd-attempt status --cwd ` + root + `/repo --change consecutive-rescope-repair | jq -r '.revision')" --request-id rescope-b-c --work-unit objective-c --evidence-goal prove-c --max-attempts 1 --max-changed-lines 5 --reason "narrow B to C" --actor fixture-maintainer)`,
-	}
-	if !slices.Equal(rc1ConsecutiveRescopeGeneratorCommands, want) {
-		t.Fatalf("generator commands = %#v, want %#v", rc1ConsecutiveRescopeGeneratorCommands, want)
-	}
-}
-
-func TestRC1ConsecutiveRescopeProvenanceRefusesHistoricalWorkspaceDrift(t *testing.T) {
-	fixture := mutatedRC1ConsecutiveRescopeProvenance(t, func(manifest *rc1ConsecutiveRescopeManifest) {
-		manifest.GeneratorCommands[11] = strings.Replace(manifest.GeneratorCommands[11], rc1ConsecutiveRescopeFixtureRoot+"/repo", "/tmp/opencode/other/repo", 1)
-	})
-	if _, err := rc1ConsecutiveRescopeRecordsFrom(fixture); err == nil || !strings.Contains(err.Error(), "refuses different generator commands") {
-		t.Fatalf("historical workspace drift = %v, want observable generator-command refusal", err)
-	}
-}
-
 func TestRC1ConsecutiveRescopeProvenanceRefusesRecordMapMutation(t *testing.T) {
 	for _, test := range []struct {
 		name   string

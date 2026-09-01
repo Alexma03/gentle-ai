@@ -33,10 +33,6 @@ The installer detects the platform automatically at runtime — there is no flag
 
 | Platform | Package manager | Example install command |
 |---|---|---|
-| macOS | `brew` | `brew install anomalyco/tap/opencode` |
-| Ubuntu/Debian | `apt` | `sudo npm install -g opencode-ai` |
-| Arch | `pacman` | `sudo npm install -g opencode-ai` |
-| Fedora/RHEL family | `dnf` | `sudo npm install -g opencode-ai` |
 
 The `--dry-run` output includes a `Platform decision` line showing `os`, `distro`, `package-manager`, and `status`.
 
@@ -46,7 +42,6 @@ macOS (or any supported platform — same flags, platform is auto-detected):
 
 ```bash
 go run ./cmd/gentle-ai install \
-  --agent claude-code,opencode \
   --component engram,sdd,skills \
   --skill sdd-apply \
   --persona gentleman \

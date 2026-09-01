@@ -13,24 +13,6 @@
 | Skills | `skills` | Curated coding skill library |
 | Context7 | `context7` | MCP server for live framework/library documentation |
 | Persona | `persona` | Managed Gentleman/neutral persona injection, or unmanaged custom persona mode |
-| Permissions | `permissions` | Security-first defaults and guardrails. Applied to Claude Code and OpenCode (the two adapters with permissions overlay support). Default sensitive-paths deny list: `~/.ssh/*`, `~/.ssh/**/*`, `**/*.pem`, `**/*.key`, `**/.env*`, `~/.credentials/*`, `~/.aws/credentials`, `~/.config/gh/hosts.yml`, `~/Library/Keychains/*`, `**/secrets/*`, `**/*.p12`, `**/*.pfx` |
-| GGA | `gga` | Gentleman Guardian Angel — AI provider switcher |
-| Theme | `theme` | Gentleman Kanagawa theme overlay |
-
-## GGA Behavior
-
-`gentle-ai install --component gga` installs/provisions the `gga` binary globally on your machine.
-
-It does **not** run project-level hook setup automatically (`gga init` / `gga install`) because that should be an explicit decision per repository.
-
-After global install, enable GGA per project with:
-
-```bash
-gga init
-gga install
-```
-
----
 
 ## Skills
 
@@ -82,8 +64,6 @@ For framework-specific skills (React 19, Angular, TypeScript, Tailwind 4, Zod 4,
 
 | Preset | ID | What's Included |
 |--------|-----|-----------------|
-| Dev Stack + Polish | `full-gentleman` | All components (Engram + SDD + Skills + Context7 + GGA + Permissions + Theme) + all skills |
-| Dev Stack | `ecosystem-only` | Core components (Engram + SDD + Skills + Context7 + GGA) + all skills |
 | Memory Only | `minimal` | Engram + SDD skills only |
 | Custom | `custom` | You choose components and skills manually while keeping any existing persona/settings unmanaged |
 

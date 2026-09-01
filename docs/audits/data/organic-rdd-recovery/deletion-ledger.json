@@ -536,8 +536,8 @@
     {
       "destinationPath": "internal/reviewtransaction/",
       "destinationProof": [
-        "internal/reviewtransaction/gate_test.go",
-        "internal/reviewtransaction/receipt_test.go"
+        "internal/reviewtransaction/gate_write_guard_test.go",
+        "internal/reviewtransaction/compact_receipt_gate_removal_guard_test.go"
       ],
       "earlyDeviation": true,
       "noRetainedInvariant": false,

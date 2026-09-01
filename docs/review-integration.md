@@ -2,8 +2,6 @@
 
 ← [Back to README](../README.md)
 
-`gentle-ai.review-integration/v2` coordinates one immutable review transaction at a time. Go owns the candidate snapshot, review admission, correction boundary, terminal burn, and all provider-facing bindings. Claude Code, OpenCode, Codex, and Pi transport provider-issued work; no runtime adapter decides review or delivery.
-
 ## RDD starts off
 
 RDD is opt-in. Until a user enables it with `gentle-ai review mode enable --scope global`, review does not govern the candidate and delivery follows ordinary repository policy. Disabling returns to that state. Enabling revalidates the current candidate; it never resumes stale authority.
@@ -34,8 +32,6 @@ A session in repository A may review a nested target in unrelated repository B o
 | Opaque capture | `repository_context` can materialize or capture from another process cwd, but remains B-bound. |
 | Isolation | Equal lineage text in A and B names independent transactions. Approval burns B only; A remains untouched. |
 | Delivery | Ordinary repository policy and any explicit delivery authorization name B. Approval never authorizes delivery. |
-
-This lifecycle is available only to Claude Code, Codex, OpenCode, and Pi. Unsupported runtimes fail before repository or authority mutation.
 
 ## Atomic lifecycle
 
@@ -77,8 +73,6 @@ The acknowledgement transition is an execution detail of `gentle-ai.review-integ
 After a successful burn, no terminal receipt, tombstone, witness, mirror, or delivery authority survives. Other lineages and worktrees are unaffected.
 
 ## Reviewer transport
-
-The provider contract is shared by Claude Code, OpenCode, Codex, and Pi. Go derives frozen trees, manifest, subject hash, role, binding, schema, evidence limits, and admission. Adapters transport opaque provider output and never parse bindings, manufacture a verdict, or mutate review authority.
 
 Each provider-issued capture input is one slot. Its reviewer prompt starts with `GENTLE_AI_REVIEW_BINDING ` followed by one-line binding JSON. A result echoes the exact `subject_hash`, reports completed inspection of the full manifest, and supplies structured findings/evidence. On malformed, incomplete, or unavailable inspection, query bound STATUS again; relaunch only when it reoffers the exact same slot.
 

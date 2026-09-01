@@ -40,8 +40,6 @@
 
 Gentle-AI is NOT an AI agent installer. It adapts the agent runtime(s) already on your machine; it never installs one for you. If a selected agent isn't detected, Gentle-AI refuses and names the exact command you'd run yourself instead. It is an **ecosystem configurator** that equips the AI coding agent(s) you already use with persistent memory, Spec-Driven Development (SDD), curated skills, MCP servers, model routing, a teaching-oriented persona, and bounded native review.
 
-**Before**: "I installed Claude Code / OpenCode / Cursor, but it's just a chatbot that writes code."
-
 **After**: Your agent now has memory, skills, workflow, MCP tools, and a persona that actually teaches you.
 
 ### Supported Agent Integrations
@@ -49,21 +47,10 @@ Gentle-AI is NOT an AI agent installer. It adapts the agent runtime(s) already o
 | Agent               |         Delegation Model         | Key Feature                                                     |
 | ------------------- | :------------------------------: | --------------------------------------------------------------- |
 | **Claude Code**     |         Full (Task tool)         | Sub-agents, output styles                                       |
-| **OpenCode**        |    Full (multi-mode overlay)     | Per-phase model routing                                         |
-| **Kilo Code**       |    Full (multi-mode overlay)     | OpenCode-compatible config in `~/.config/kilo`                  |
-| **Gemini CLI**      |       Full (experimental)        | Custom agents in `~/.gemini/agents/`                            |
 | **Cursor**          |     Full (native subagents)      | 10 SDD agents in `~/.cursor/agents/`                            |
-| **VS Code Copilot** |        Full (runSubagent)        | Parallel execution                                              |
 | **Codex**           |            Solo-agent            | CLI-native, TOML config                                         |
-| **Windsurf**        |            Solo-agent            | Plan Mode, Code Mode, native workflows                          |
 | **Antigravity**     |   Solo-agent + Mission Control   | Built-in Browser/Terminal sub-agents                            |
-| **Kimi Code**       |   Full (native custom agents)    | Modular prompt templates in `~/.kimi`                           |
-| **Kiro IDE**        |     Full (native subagents)      | Native `~/.kiro/agents/` + steering orchestration               |
-| **Qwen Code**       |     Full (native sub-agents)     | Slash commands, `~/.qwen/commands/`, `auto_edit` mode           |
-| **OpenClaw**        |            Solo-agent            | Workspace-first `AGENTS.md` / `SOUL.md` with global MCP config  |
-| **Trae**            |            Solo-agent            | Desktop app by ByteDance; `~/.trae/skills/` + OS-specific rules |
 | **Pi**              | Full (package-managed subagents) | First-class `gentle-pi` harness with Pi-native persona/models, SDD, and Engram memory |
-| **Hermes**          |         Detect-only              | YAML MCP config, SOUL.md persona; install manually first        |
 
 > **Pi is package-managed, not just configured.** Selecting Pi installs the first-class [`gentle-pi`](docs/pi.md) harness, which owns Pi-native persona and model controls, SDD assets, chains, and memory wiring.
 
@@ -119,8 +106,6 @@ Once your agents are configured, open your AI agent in a project and run these t
 | ---------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `/sdd-init`                        | Detects stack, testing capabilities, activates Strict TDD Mode if available | When your project adds/removes test frameworks, or first time in a new project |
 | `gentle-ai skill-registry refresh` | Scans installed skills and project conventions, builds the registry         | After installing/removing skills, or first time in a new project               |
-
-These are **not required** for basic usage. The SDD orchestrator runs `/sdd-init` automatically if it detects no context. Startup hooks normally keep the skill registry fresh for agents that support hooks, including Codex, Claude Code, OpenCode, and Pi through `gentle-pi`. If you start Pi with `pi -ns`, startup skill loading/hooks are skipped, so run the registry refresh manually when you need updated project rules.
 
 Run `gentle-ai doctor` at any time for a read-only health check of your ecosystem (tool binaries, `state.json`, Engram reachability, disk space).
 
@@ -246,7 +231,6 @@ Once you enable it, both implementation routes can converge on RDD: a bounded na
 
 ```mermaid
 flowchart TD
-    A["User requests a change<br/>(Claude Code · OpenCode · Codex...)"] --> B{"Implementation<br/>route"}
     B -->|"decide/verify<br/>1–3 files"| C["Direct inline"]
     B -->|"4+ file exploration<br/>or 2+ non-trivial writes"| D["Delegated direct<br/>(one bounded worker)"]
     C --> E["Implementation + tests"]
@@ -371,95 +355,5 @@ See [Backup & Rollback Guide](docs/rollback.md) for details.
 
 ## Key Features You Should Know About
 
-### OpenCode SDD Profiles
-
-Assign different AI models to different SDD phases -- a powerful model for design, a fast one for implementation, a cheap one for exploration. OpenCode uses **`gentle-orchestrator`** as the base SDD conductor, and generated named profiles still appear as `sdd-orchestrator-{name}` entries.
-
-```bash
 # Via CLI
-gentle-ai sync --profile cheap:openrouter/qwen/qwen3-30b-a3b:free
 gentle-ai sync --profile-phase cheap:sdd-design:anthropic/claude-sonnet-4-20250514
-
-# Or via TUI: gentle-ai → "OpenCode SDD Profiles" → Create
-```
-
-After creating a profile, open OpenCode and press **Tab** to switch between `gentle-orchestrator` (default) and your custom profiles.
-
-| What you need         | Use this                                                        |
-| --------------------- | --------------------------------------------------------------- |
-| Default SDD conductor | `gentle-orchestrator`                                           |
-| Legacy configs        | `sdd-orchestrator` is migrated to `gentle-orchestrator` on sync |
-| Named model profiles  | `sdd-orchestrator-cheap`, `sdd-orchestrator-premium`, etc.      |
-
-**Full guide**: [OpenCode SDD Profiles](docs/opencode-profiles.md)
-
-### Engram (Persistent Memory)
-
-Your AI agent automatically remembers decisions, bugs, and context across sessions. You don't need to do anything -- but when you do:
-
-```bash
-engram projects list          # See all projects with memory counts
-engram projects consolidate   # Fix name drift ("my-app" vs "My-App")
-engram search "auth bug"      # Find a past decision from the terminal
-engram tui                    # Visual memory browser
-```
-
-**Full reference**: [Engram Commands](docs/engram.md)
-
----
-
-## Documentation
-
-| Your task | Start here |
-| --- | --- |
-| Understand the Gentle-AI mental model | [Intended Usage](docs/intended-usage.md) |
-| Choose direct, delegated, or optional SDD routing | [Organic Implementation Routing](docs/trigger-rules.md) |
-| Plan substantial work with SDD | [Intended Usage](docs/intended-usage.md) and [OpenSpec Config](docs/openspec-config.md) |
-| Configure a supported agent | [Agents](docs/agents.md) for the feature matrix and per-agent notes |
-| Use the Pi package harness | [Pi Agent](docs/pi.md) for packages, Pi-native commands, models, and troubleshooting |
-| Configure OpenCode phase models | [OpenCode SDD Profiles](docs/opencode-profiles.md) |
-| Review or deliver a change safely | [Review Integration Contract](docs/review-integration.md) for provider consumers; [Review Authority Threat Model](docs/review-authority-threat-model.md) for technical boundaries; [Chapter 21 — Verifiable Trust](https://the-amazing-gentleman-programming-book.vercel.app/en/book/Chapter21_Verifiable-Trust) for the mental model |
-| Find or share persistent context | [Engram Commands](docs/engram.md) |
-| Refresh or troubleshoot an installation | [Usage](docs/usage.md), [Backup & Rollback](docs/rollback.md), and [Platforms](docs/platforms.md) |
-| Extend or contribute to Gentle AI | [Codebase Guide](docs/CODEBASE-GUIDE.md), [Components, Skills & Presets](docs/components.md), [Skill Registry](docs/skill-registry.md), and [Architecture & Development](docs/architecture.md) |
-| Understand how agent behavior is tested | [Testing Agents Deterministically](docs/testing-agents-deterministically.md) for the real-agent E2E and its model fixture |
-
----
-
-## Community Highlights
-
-This project gets better when the community builds on top of it.
-
-### Community Integrations
-
-- [sub-agent-statusline](https://github.com/Joaquinvesapa/sub-agent-statusline) — optional OpenCode TUI plugin that shows sub-agent activity, status, elapsed time, and token/context usage when OpenCode exposes it.
-- [sdd-engram-plugin](https://github.com/j0k3r-dev-rgl/sdd-engram-plugin) — optional OpenCode TUI plugin to manage SDD profiles and browse Engram memories directly from OpenCode, with runtime profile activation and no restart required.
-
-When you select OpenCode in the installer, Gentle-AI asks whether to register each community plugin and offers a browser shortcut to review the repository first. Gentle-AI only ensures `~/.config/opencode/tui.json` exists and adds the plugin package names to its `plugin` array; OpenCode installs/loads those packages the next time it starts. Once OpenCode has materialized a plugin under `~/.config/opencode/node_modules/`, `gentle-ai update` can compare its local `package.json` version with the plugin's GitHub releases.
-
-### Contributors
-
-This project exists because of the community. See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the full list.
-
-<a href="https://github.com/Gentleman-Programming/gentle-ai/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=Gentleman-Programming/gentle-ai" />
-</a>
-
----
-
-## Next Steps
-
-- **Just installed?** Read [Intended Usage](docs/intended-usage.md) for the mental model, then run `gentle-ai doctor` if anything looks wrong.
-- **Starting work?** Read [Organic Implementation Routing](docs/trigger-rules.md) to understand direct, delegated, and optional SDD behavior.
-- **Reviewing a focused change?** Start with the [Organic RDD architecture](docs/architecture/organic-rdd.md) and [review authority threat model](docs/review-authority-threat-model.md).
-- **Maintaining Gentle AI?** Use the [Codebase Guide](docs/CODEBASE-GUIDE.md) to find package ownership and review boundaries.
-- **Using Pi?** Read [Pi Agent](docs/pi.md) for the `gentle-pi` harness, Pi commands, persona, and model assignments.
-- **Ready to contribute?** Start at the [Community Roadmap](docs/community-roadmap.md) — everything labelled [`up-for-grabs`](https://github.com/Gentleman-Programming/gentle-ai/issues?q=is%3Aissue+is%3Aopen+label%3Aup-for-grabs) is scoped, approved and unclaimed. Then read [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
-
-<div align="center">
-<a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
-</div>
-
-> **Trademark notice:** The Gentle AI names and logos are trademarks of Alan Buscaglia. The MIT License applies to the code; it does not permit implying endorsement or official affiliation. See [TRADEMARKS.md](TRADEMARKS.md).

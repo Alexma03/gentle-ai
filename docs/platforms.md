@@ -16,16 +16,6 @@ Derivatives are detected via `ID_LIKE` in `/etc/os-release` (Linux Mint, Pop!_OS
 
 Release archives are currently produced for macOS and Linux only. Windows source compatibility remains supported, but official Windows executable/archive assets and Scoop publication are temporarily unavailable pending the [Authenticode restoration gate](release-signing.md#windows-distribution-restoration-gate).
 
-## OpenCode Managed Launcher
-
-When OpenCode background subagents are enabled through `gentle-ai install` or `gentle-ai sync`, Gentle AI writes only its own launcher files under `~/.gentle-ai/bin/`. POSIX systems use `~/.gentle-ai/bin/opencode`; Windows uses `opencode.cmd` and `opencode.ps1`. The launcher sets `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true` only when the variable is not already defined, so an explicit `false` always selects foreground execution.
-
-Deactivation removes managed launcher files but may leave `~/.gentle-ai/bin/` in `PATH`; Gentle AI does not clean up shell profiles.
-
-Restart OpenCode after enabling managed activation. Restart the shell if the launcher directory has not entered PATH. OpenCode `serve`, `attach`, Desktop, or any session started outside the managed launcher uses foreground fallback rather than receiving an unsafe partial activation.
-
----
-
 ## Windows Notes
 
 - **Install from source** with Go 1.25.10+:
@@ -39,9 +29,7 @@ Restart OpenCode after enabling managed activation. Restart the shell if the lau
 - **npm global installs** do not require `sudo` on Windows (user-writable by default).
 - **curl** is pre-installed on Windows 10+ and does not require separate installation.
 - **PowerShell** is the default shell when `$SHELL` is not set.
-- **GGA on Windows** works from both Git Bash and PowerShell. gentle-ai installs a `gga.ps1` shim that automatically delegates to Git Bash, so no manual shell switching is required.
 - **PowerShell source-installer output** is forced to UTF-8 and installs through Go's configured `GOBIN`/`GOPATH`.
-- **Fresh install detection** falls back to known Engram/GGA install locations when the running process has a stale `PATH`.
 
 ---
 
@@ -50,16 +38,7 @@ Restart OpenCode after enabling managed activation. Restart the shell if the lau
 | Agent | Windows Config Path |
 |-------|-------------------|
 | Claude Code | `%USERPROFILE%\.claude\` |
-| OpenCode | `%USERPROFILE%\.config\opencode\` |
-| Gemini CLI | `%USERPROFILE%\.gemini\` |
 | Cursor | `%USERPROFILE%\.cursor\` |
-| VS Code Copilot | `%APPDATA%\Code\User\` (settings, MCP, prompts) + `%USERPROFILE%\.copilot\` (skills) |
 | Codex | `%USERPROFILE%\.codex\` |
-| Windsurf | `%USERPROFILE%\.codeium\windsurf\` (skills, MCP, rules) + `%APPDATA%\Windsurf\User\` (settings) |
-| Kimi | `%USERPROFILE%\.kimi\` (includes `config.toml`, system prompt, agents, MCP) |
 | Antigravity | `%USERPROFILE%\.gemini\antigravity\` |
-| Kiro IDE | `%USERPROFILE%\.kiro\steering\` (prompts) + `%USERPROFILE%\.kiro\skills\` (skills) + `%USERPROFILE%\.kiro\agents\` (SDD agents) + `%APPDATA%\kiro\User\settings.json` (settings) + `%USERPROFILE%\.kiro\settings\mcp.json` (MCP) |
-| OpenClaw | `%USERPROFILE%\.openclaw\openclaw.json` (global MCP/settings) + active workspace from `agents.defaults.workspace` for `AGENTS.md` / `SOUL.md` / workspace-scoped SDD skills |
-| Trae | `%USERPROFILE%\.trae\` (skills) + `%APPDATA%\Trae\User\user_rules.md` (rules) + `%APPDATA%\Trae\User\mcp.json` (MCP) |
 | Pi | `%USERPROFILE%\.pi\` (Pi config, project agents/chains, Gentle AI support assets) |
-| Hermes | `%USERPROFILE%\.hermes\` (config.yaml, SOUL.md, skills/) |

@@ -164,8 +164,6 @@ selected:
 
 - Standard adapters receive the managed `agent-routing` marker in their
   adapter-owned system-prompt file.
-- OpenCode and Kilocode receive it inside
-  `agent.gentle-orchestrator.prompt` in their adapter-owned `opencode.json`.
 - Jinja-backed adapters receive an `agent-routing.md` module included by their
   managed router template.
 

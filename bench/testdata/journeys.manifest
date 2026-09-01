@@ -13,8 +13,6 @@ j113-correction-removes-candidate-only-path
 j114-last-reviewer-capture-closes-and-burns
 j115-recovery-selector-is-collected-before-authorization
 j116-codex-committed-correction-runs-returned-status-continuation
-j117-doctor-dangling-managed-config
-j118-doctor-dangling-config-ancestor
 j119-global-review-mode-status-reports-persisted-source
 j12-rejected-capture-then-recapture
 j120-welcome-tui-runs-under-a-real-tty
@@ -25,8 +23,6 @@ j124-sdd-attempt-reset-after-selected-untracked-lands
 j13-next-transition-runs-verbatim
 j14-abandon-needs-a-hand-built-token
 j17-bare-repository
-j2138-opencode-native-fallback-boundary
-j3043-opencode-managed-background-activation
 j31-nonsense-mode-value
 j34-abandon-then-start-again
 j36-contract-right-name-wrong-version
@@ -55,7 +51,6 @@ j87-unmanaged-remediation-uses-chain-failed-evidence
 j88-unborn-status-collects-untracked-selection
 j89-staged-validation-is-informational-and-unmanaged
 j92-released-compact-history-quarantines-without-compatibility
-j93-stale-managed-assets-start-is-not-unknown
 j96-sdd-same-parent-repository-edit-authority
 j98-sdd-flat-root-spec-is-discovered
 j99-sdd-attempt-born-during-untracked-lifecycle

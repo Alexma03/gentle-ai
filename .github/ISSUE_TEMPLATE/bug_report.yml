@@ -71,7 +71,7 @@ body:
     id: version
     attributes:
       label: Gentle AI Version
-      description: Run `gga version` to get this
+      description: Run `gentle-ai version` to get this
       placeholder: "e.g. v0.1.0"
     validations:
       required: true

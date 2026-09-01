@@ -2,7 +2,6 @@
 
 ## Scope freeze
 
-- [ ] Confirm MVP scope remains macOS + Claude Code + OpenCode only.
 - [ ] Confirm no post-MVP features are merged.
 
 ## Quality gates
@@ -15,7 +14,6 @@
 
 - [ ] Dry-run install on macOS.
 - [ ] Real install on macOS test account.
-- [ ] Validate key output paths for Claude Code and OpenCode.
 - [ ] Validate Engram health endpoint is reachable when selected.
 
 ## Documentation

@@ -63,27 +63,15 @@ Support depends on the agent:
 
 | Agent | How multi-mode works |
 | ----- | -------------------- |
-| **OpenCode** | SDD Profiles generate `gentle-orchestrator` plus phase sub-agents in `opencode.json` |
-| **Kilo Code** | OpenCode-compatible SDD profile overlay in `~/.config/kilo` |
-| **Kiro IDE** | Native phase agents with per-agent `model:` frontmatter |
 | **Pi** | Owned by `gentle-pi` through Pi-managed agents, chains, and model overrides |
 | **Others** | Single-mode SDD; one active model handles all phases |
 
 Single-mode is not a downgrade. It is the simpler default and works well. Multi-mode is useful when you deliberately want cost, speed, or reasoning tradeoffs per phase.
 
-If you want OpenCode profiles:
-
-1. Connect your AI providers in OpenCode first
-2. Create a profile via gentle-ai TUI ("OpenCode SDD Profiles") or CLI (`--profile` flag)
 3. The base/default SDD conductor is `gentle-orchestrator`
 4. Named profiles generate `sdd-orchestrator-{name}` + suffixed sub-agents, each assigned to your chosen model
-5. In OpenCode, press **Tab** to switch between `gentle-orchestrator` and custom profiles
 
 You can create multiple profiles (e.g., "cheap" for experimentation, "premium" for production) and switch between them freely.
-
-If you prefer a **runtime profile manager** that keeps profiles outside `opencode.json`, gentle-ai supports that too. During sync, OpenCode can auto-detect external profile files under `~/.config/opencode/profiles/*.json` and switch to a safer compatibility path that preserves the active `gentle-orchestrator` prompt instead of overwriting it.
-
-**Full step-by-step guide**: [OpenCode SDD Profiles](opencode-profiles.md)
 
 For the complete support matrix, see [Supported Agents](agents.md).
 
@@ -105,9 +93,6 @@ This pattern works today in several delegation models:
 
 | Model | Agents | How it runs |
 | ----- | ------ | ----------- |
-| **Full sub-agents** | Claude Code, OpenCode, Kilo Code, Gemini CLI, Cursor, VS Code Copilot, Kimi Code, Kiro IDE, Qwen Code, Pi | Each SDD phase can run in a focused context through native delegation, package-managed subagents, or an OpenCode-compatible overlay |
-| **Hermes delegate_task** | Hermes | The orchestrator spawns ephemeral workers with self-contained missions and verifies their summaries before reporting success |
-| **Solo-agent** | Codex, Windsurf, Antigravity, OpenClaw, Trae | SDD phases run inline in one conversation; Engram still provides cross-phase persistence when available |
 
 You don't need to configure any of this. The installer sets up the right model for your agent, and the orchestrator manages delegation automatically.
 
@@ -143,14 +128,11 @@ Once installed, your agent detects what you're working on and loads the relevant
 
 How it works:
 
-1. **The registry refreshes at startup where the agent supports hooks.** Normal Pi startup runs the `gentle-pi` session hook. Codex, Claude Code, and OpenCode run `gentle-ai skill-registry refresh --quiet` from their installed startup/plugin hooks.
 2. **The refresh is cached.** Gentle-AI fingerprints discovered `SKILL.md` files using schema version, path, mtime, and size. If `.atl/.skill-registry.cache.json` matches and `.atl/skill-registry.md` exists, startup is a cheap cache-hit.
 3. **The orchestrator uses it automatically** -- once the registry exists, the orchestrator reads it at session start and passes exact matching `SKILL.md` paths to sub-agents. You don't interact with the registry after that.
 4. **Manual fallback stays available** -- run `gentle-ai skill-registry refresh --force` from a project if you want to regenerate immediately.
 
 There's also an automated side: `sdd-init` runs the same registry logic internally, so if you use SDD in a new project, the registry gets built as part of that flow.
-
-**Pro tip**: On Codex, Claude Code, OpenCode, and normal Pi startup you normally do not need to remember this. The startup hook refreshes the registry and the cache prevents unnecessary work. If you start Pi with `pi -ns`, Pi skips startup skill loading/hooks, so run the manual refresh when you need the registry updated in that session.
 
 ---
 
