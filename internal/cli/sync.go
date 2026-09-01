@@ -1559,8 +1559,8 @@ func validatePersistedSyncState(persisted state.InstallState, readErr error) err
 // and a fully-built Selection (agents + components + options).
 // This is the function the TUI calls directly to avoid CLI flag parsing.
 func RunSyncWithSelection(homeDir string, selection model.Selection) (SyncResult, error) {
-	if err := requireInstallStateMigrationResolved(homeDir); err != nil {
-		return SyncResult{Agents: selection.Agents, Selection: selection}, fmt.Errorf("state migration: %w", err)
+	if err := migrateInstallStateBeforePlanning(homeDir); err != nil {
+		return SyncResult{Agents: selection.Agents, Selection: selection}, err
 	}
 	persistedState, persistedStateErr := state.Read(homeDir)
 	if persistedStateErr != nil && !os.IsNotExist(persistedStateErr) {
@@ -1773,8 +1773,8 @@ func RunSync(args []string) (SyncResult, error) {
 	if err != nil {
 		return SyncResult{}, fmt.Errorf("resolve user home directory: %w", err)
 	}
-	if err := requireInstallStateMigrationResolved(homeDir); err != nil {
-		return SyncResult{}, fmt.Errorf("state migration: %w", err)
+	if err := migrateInstallStateBeforePlanning(homeDir); err != nil {
+		return SyncResult{}, err
 	}
 
 	// Resolve agents: explicit flag takes precedence over auto-discovery.

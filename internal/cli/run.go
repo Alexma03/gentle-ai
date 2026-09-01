@@ -141,8 +141,8 @@ func RunInstall(args []string, detection system.DetectionResult) (InstallResult,
 	if err != nil {
 		return InstallResult{}, fmt.Errorf("resolve user home directory: %w", err)
 	}
-	if err := requireInstallStateMigrationResolved(homeDir); err != nil {
-		return InstallResult{}, fmt.Errorf("state migration: %w", err)
+	if err := migrateInstallStateBeforePlanning(homeDir); err != nil {
+		return InstallResult{}, err
 	}
 
 	resolved, err := planner.NewResolver(planner.MVPGraph()).Resolve(input.Selection)
