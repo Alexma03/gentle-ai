@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -55,5 +57,57 @@ func TestCodeGraphEnabledRecognizesCanonicalAndLegacyState(t *testing.T) {
 	}
 	if codeGraphEnabled(state.InstallState{Components: []model.ComponentID{model.ComponentEngram}}) {
 		t.Fatal("unrelated component enabled CodeGraph")
+	}
+}
+
+func TestRunDoctorIncludesCodeGraphParityCheckWhenEnabled(t *testing.T) {
+	home := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, ".gentle-ai"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(home, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.Write(home, state.InstallState{
+		InstalledAgents: []string{"claude-code"},
+		Components:      []model.ComponentID{model.ComponentCodeGraph},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	stateBefore, err := os.ReadFile(state.Path(home))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	originalLookPath := lookPathFn
+	originalAvailable := availableBytesFn
+	originalPathDirs := pathDirsFn
+	originalHome := osUserHomeDirDoctor
+	lookPathFn = func(name string) (string, error) { return "/usr/local/bin/" + name, nil }
+	availableBytesFn = func(string) (int64, error) { return 1024 * 1024 * 1024, nil }
+	pathDirsFn = func() []string { return []string{"/usr/local/bin"} }
+	osUserHomeDirDoctor = func() (string, error) { return home, nil }
+	defer func() {
+		lookPathFn = originalLookPath
+		availableBytesFn = originalAvailable
+		pathDirsFn = originalPathDirs
+		osUserHomeDirDoctor = originalHome
+	}()
+
+	var output bytes.Buffer
+	if err := RunDoctor(context.Background(), &output); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"codegraph:parity", "CodeGraph parity degraded", "retained clients are unchanged"} {
+		if !strings.Contains(output.String(), want) {
+			t.Fatalf("RunDoctor output missing %q:\n%s", want, output.String())
+		}
+	}
+	stateAfter, err := os.ReadFile(state.Path(home))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(stateAfter, stateBefore) {
+		t.Fatal("RunDoctor changed install state while checking CodeGraph")
 	}
 }
