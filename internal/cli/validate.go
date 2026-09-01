@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/catalog"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
@@ -209,32 +210,41 @@ func defaultAgentsFromDetection(detection system.DetectionResult) []model.AgentI
 
 // asAgentIDs converts raw --agent/--agents flag values into model.AgentID,
 // rejecting any value that is not a real, supported agent. The valid set is
-// derived from catalog.AllAgents() -- the same canonical agent registry used
-// by internal/app/app.go's default agent list -- so it can never drift from
-// a hand-written list (install/sync surface audit finding 3: an unknown
-// value like `cluade` previously converted silently and was later dropped
-// without any error, so `gentle-ai sync --agent cluade` reported success
-// having synced nothing).
+// derived from agents.NewDefaultRegistry() -- the same canonical registry
+// used by lifecycle discovery -- so it can never drift from a hand-written
+// list (install/sync surface audit finding 3: an unknown value like `cluade`
+// previously converted silently and was later dropped without any error, so
+// `gentle-ai sync --agent cluade` reported success having synced nothing).
 func asAgentIDs(values []string) ([]model.AgentID, error) {
-	supported := catalog.AllAgents()
-	allowed := make(map[model.AgentID]struct{}, len(supported))
-	names := make([]string, 0, len(supported))
-	for _, agent := range supported {
-		allowed[agent.ID] = struct{}{}
-		names = append(names, string(agent.ID))
+	registry, err := agents.NewDefaultRegistry()
+	if err != nil {
+		return nil, fmt.Errorf("create agent registry: %w", err)
 	}
-	sort.Strings(names)
-
-	agents := make([]model.AgentID, 0, len(values))
+	ids := make([]model.AgentID, 0, len(values))
 	for _, value := range values {
-		id := model.AgentID(value)
-		if _, ok := allowed[id]; !ok {
-			return nil, fmt.Errorf("unsupported agent %q (valid: %s)", value, strings.Join(names, ", "))
-		}
-		agents = append(agents, id)
+		ids = append(ids, model.AgentID(value))
 	}
+	if err := registry.Validate(ids); err != nil {
+		names := make([]string, 0, len(registry.SupportedAgents()))
+		for _, agent := range registry.SupportedAgents() {
+			names = append(names, string(agent))
+		}
+		sort.Strings(names)
+		return nil, fmt.Errorf("unsupported agent %q (valid: %s)", unsupportedAgentName(ids, values), strings.Join(names, ", "))
+	}
+	return ids, nil
+}
 
-	return agents, nil
+func unsupportedAgentName(ids []model.AgentID, raw []string) string {
+	for i, id := range ids {
+		if !model.IsPersonalClient(id) {
+			if i < len(raw) {
+				return raw[i]
+			}
+			return string(id)
+		}
+	}
+	return ""
 }
 
 func isPiOnlyAgents(agents []model.AgentID) bool {

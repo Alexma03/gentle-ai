@@ -335,8 +335,11 @@ func TestRunInstallDryRunSkipsExecution(t *testing.T) {
 // marked as Exists=true. All other agents are absent.
 func makeDetectionWithAgents(present ...string) system.DetectionResult {
 	var configs []system.ConfigState
-	// Full canonical agent set — mirrors knownAgentConfigDirs in config_scan.go.
-	known := []string{"claude-code", "opencode", "kilocode", "gemini-cli", "cursor", "vscode-copilot", "codex", "antigravity", "windsurf", "kimi", "qwen-code", "kiro-ide", "openclaw", "pi", "trae-ide", "hermes"}
+	// Canonical retained-client set — mirrors model.PersonalClientIDs().
+	known := make([]string, 0, len(model.PersonalClientIDs()))
+	for _, id := range model.PersonalClientIDs() {
+		known = append(known, string(id))
+	}
 	presentSet := make(map[string]bool, len(present))
 	for _, p := range present {
 		presentSet[p] = true
@@ -382,21 +385,10 @@ func TestDefaultAgentsFromDetection_AllAgentsMappedCorrectly(t *testing.T) {
 		wantID      model.AgentID
 	}{
 		{"claude-code", model.AgentClaudeCode},
-		{"opencode", model.AgentOpenCode},
-		{"kilocode", model.AgentKilocode},
-		{"gemini-cli", model.AgentGeminiCLI},
 		{"cursor", model.AgentCursor},
-		{"vscode-copilot", model.AgentVSCodeCopilot},
 		{"codex", model.AgentCodex},
 		{"antigravity", model.AgentAntigravity},
-		{"windsurf", model.AgentWindsurf},
-		{"kimi", model.AgentKimi},
-		{"qwen-code", model.AgentQwenCode},
-		{"kiro-ide", model.AgentKiroIDE},
-		{"openclaw", model.AgentOpenClaw},
 		{"pi", model.AgentPi},
-		{"trae-ide", model.AgentTrae},
-		{"hermes", model.AgentHermes},
 	}
 
 	for _, tt := range tests {
