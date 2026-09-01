@@ -35,7 +35,7 @@ go test ./internal/agents ./internal/state ./internal/components/codegraph -coun
 PASS — 3 packages: internal/agents, internal/state, internal/components/codegraph.
 
 go test ./internal/cli -run 'TestCanonicalCodeGraphProjectRoot|TestRunCodeGraphInit|TestReviewCandidatePreserves|TestReviewCommittedOnlySelector|TestReviewStagedProjectionPreservesEmptyIndex|TestMigrateInstallState|TestInstallPlanningBlocksUnresolvedStateMigration|TestRunInstallMigratesLegacyStateBeforePlanning|TestRunSyncMigratesLegacyStateBeforePlanning|TestCheckCodeGraph|TestCodeGraphEnabled|TestRunDoctorIncludesCodeGraphParityCheckWhenEnabled' -count=1
-PASS — 1 package; 16 passing test cases (including subtests).
+PASS — 1 package; 16 top-level tests and 26 tests including subtests.
 
 go test ./internal/state -run 'TestMigrate|TestRequireMigration|TestRestoreMigration|TestResolveSelection' -count=1
 PASS — 1 package; 11 passing tests.
@@ -67,6 +67,8 @@ The full root suite is therefore a known cross-slice blocker, not evidence that 
 
 ## Commits
 
+This ledger records every implementation and evidence commit through `567569b1`. A later commit that only corrects this ledger's snapshot wording is intentionally outside the recorded implementation boundary.
+
 - `3a14948e` — `test(codegraph): characterize canonical root equivalence`
 - `2eb8763e` — `feat(codegraph): promote lifecycle to a first-class component`
 - `023a70ac` — `test(review): characterize commit-state candidates`
@@ -87,6 +89,7 @@ The full root suite is therefore a known cross-slice blocker, not evidence that 
 - `0ff03225` — `docs(sdd): document migration correction evidence`
 - `c0805976` — `docs(sdd): complete PR1 correction commit ledger`
 - `441509ed` — `docs(sdd): record correction red evidence`
+- `567569b1` — `docs(sdd): include all correction commits`
 
 ## Rollback Boundary
 
