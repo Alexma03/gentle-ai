@@ -22,7 +22,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/backup"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/catalog"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/cli"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/communitytool"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/opencodeplugin"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/sdd"
 	componentuninstall "github.com/gentleman-programming/gentle-ai/v2/internal/components/uninstall"
@@ -103,8 +103,8 @@ var osGetwdFn = os.Getwd
 var osExecutableFn = os.Executable
 var osRemoveFn = os.Remove
 var execCommandFn = exec.Command
-var communityToolInstallFn = communitytool.Install
-var communityToolStatusFn = communitytool.DetectStatus
+var communityToolInstallFn = codegraph.InstallByID
+var communityToolStatusFn = codegraph.DetectStatusByID
 
 // readCurrentAssignmentsFn is a package-level variable so tests can override
 // how current model assignments are read from opencode.json. It wraps
@@ -390,12 +390,12 @@ type ReviewModeUpdatedMsg struct {
 }
 
 type CommunityToolInstallationDoneMsg struct {
-	Results []communitytool.Result
+	Results []codegraph.Result
 	Err     error
 }
 
 type CommunityToolStatusLoadedMsg struct {
-	Statuses []communitytool.Status
+	Statuses []codegraph.Status
 	Err      error
 }
 
@@ -802,9 +802,9 @@ type Model struct {
 
 	CommunityToolsStandalone   bool
 	CommunityToolStatusLoading bool
-	CommunityToolStatuses      []communitytool.Status
+	CommunityToolStatuses      []codegraph.Status
 	CommunityToolStatusErr     error
-	CommunityToolResults       []communitytool.Result
+	CommunityToolResults       []codegraph.Result
 	CommunityToolErr           error
 }
 
@@ -3352,9 +3352,9 @@ func (m Model) spinnerTickOpenCodePluginUninstall() Model {
 func (m Model) startCommunityToolInstallation() tea.Cmd {
 	tools := append([]model.CommunityToolID(nil), m.Selection.CommunityTools...)
 	workspaceDir, _ := osGetwdFn()
-	runner := communitytool.RunnerFunc(runCommunityToolCommand)
+	runner := codegraph.RunnerFunc(runCommunityToolCommand)
 	return func() tea.Msg {
-		results := make([]communitytool.Result, 0, len(tools))
+		results := make([]codegraph.Result, 0, len(tools))
 		for _, tool := range tools {
 			result, err := communityToolInstallFn(tool, workspaceDir, runner)
 			if err != nil {
@@ -3372,12 +3372,12 @@ func (m Model) startCommunityToolInstallation() tea.Cmd {
 func (m Model) startCommunityToolStatusDetection() tea.Cmd {
 	tools := []model.CommunityToolID{model.CommunityToolCodeGraph}
 	home := homeDir()
-	detector := communitytool.DetectorFunc(func(name string) (string, error) {
+	detector := codegraph.DetectorFunc(func(name string) (string, error) {
 		path, err := exec.LookPath(name)
 		return path, err
 	})
 	return func() tea.Msg {
-		statuses := make([]communitytool.Status, 0, len(tools))
+		statuses := make([]codegraph.Status, 0, len(tools))
 		for _, tool := range tools {
 			statuses = append(statuses, communityToolStatusFn(tool, home, detector))
 		}
@@ -3385,11 +3385,11 @@ func (m Model) startCommunityToolStatusDetection() tea.Cmd {
 	}
 }
 
-func communityToolStatusesFromResults(results []communitytool.Result, fallback []communitytool.Status) []communitytool.Status {
+func communityToolStatusesFromResults(results []codegraph.Result, fallback []codegraph.Status) []codegraph.Status {
 	if len(results) == 0 {
 		return fallback
 	}
-	statuses := make([]communitytool.Status, 0, len(results))
+	statuses := make([]codegraph.Status, 0, len(results))
 	for _, result := range results {
 		if result.StatusAfter != nil {
 			statuses = append(statuses, *result.StatusAfter)
@@ -3405,7 +3405,7 @@ func communityToolStatusesFromResults(results []communitytool.Result, fallback [
 	return statuses
 }
 
-func hasCommunityToolResultContext(result communitytool.Result) bool {
+func hasCommunityToolResultContext(result codegraph.Result) bool {
 	return result.Tool != "" || len(result.CommandsRun) > 0 || len(result.ManualActions) > 0
 }
 
@@ -4585,8 +4585,8 @@ func openCodePluginUninstallInstalledFromTUI(home string) []model.OpenCodeCommun
 	return out
 }
 
-func communityToolDefinitions() []communitytool.Definition {
-	return communitytool.Definitions()
+func communityToolDefinitions() []codegraph.Definition {
+	return codegraph.Definitions()
 }
 
 func opencodepluginRepoURLs() []string {

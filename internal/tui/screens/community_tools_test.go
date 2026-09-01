@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/communitytool"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
 
@@ -23,15 +23,15 @@ func TestRenderCommunityToolsShowsStatusLoadingAndAgentState(t *testing.T) {
 		t.Fatalf("loading output missing detection text:\n%s", loading)
 	}
 
-	status := communitytool.Status{
+	status := codegraph.Status{
 		Tool: model.CommunityToolCodeGraph,
-		CLI:  communitytool.AvailabilityAvailable,
-		Agents: []communitytool.AgentStatus{
-			{Agent: model.AgentClaudeCode, Name: "Claude Code", Detected: true, Configured: true, Status: communitytool.AgentStatusConfigured, Path: "/tmp/.claude/mcp/codegraph.json"},
-			{Agent: model.AgentOpenCode, Name: "OpenCode", Detected: true, Configured: false, Status: communitytool.AgentStatusMissing, Path: "/tmp/.config/opencode"},
+		CLI:  codegraph.AvailabilityAvailable,
+		Agents: []codegraph.AgentStatus{
+			{Agent: model.AgentClaudeCode, Name: "Claude Code", Detected: true, Configured: true, Status: codegraph.AgentStatusConfigured, Path: "/tmp/.claude/mcp/codegraph.json"},
+			{Agent: model.AgentOpenCode, Name: "OpenCode", Detected: true, Configured: false, Status: codegraph.AgentStatusMissing, Path: "/tmp/.config/opencode"},
 		},
 	}
-	out := RenderCommunityTools(nil, 0, []communitytool.Status{status}, false, nil)
+	out := RenderCommunityTools(nil, 0, []codegraph.Status{status}, false, nil)
 	for _, want := range []string{"CodeGraph CLI: available", "Agent wiring: 2 detected • 1 configured • 1 missing", "Claude Code: configured", "OpenCode: missing"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q; output:\n%s", want, out)
@@ -40,17 +40,17 @@ func TestRenderCommunityToolsShowsStatusLoadingAndAgentState(t *testing.T) {
 }
 
 func TestRenderCommunityToolResultShowsPartialContextOnError(t *testing.T) {
-	result := communitytool.Result{
+	result := codegraph.Result{
 		Tool: model.CommunityToolCodeGraph,
-		StatusAfter: &communitytool.Status{
+		StatusAfter: &codegraph.Status{
 			Tool: model.CommunityToolCodeGraph,
-			CLI:  communitytool.AvailabilityMissing,
-			Agents: []communitytool.AgentStatus{
-				{Agent: model.AgentOpenCode, Name: "OpenCode", Detected: true, Configured: false, Status: communitytool.AgentStatusMissing},
+			CLI:  codegraph.AvailabilityMissing,
+			Agents: []codegraph.AgentStatus{
+				{Agent: model.AgentOpenCode, Name: "OpenCode", Detected: true, Configured: false, Status: codegraph.AgentStatusMissing},
 			},
 		},
 	}
-	out := RenderCommunityToolResult([]communitytool.Result{result}, assertErr("validation failed"))
+	out := RenderCommunityToolResult([]codegraph.Result{result}, assertErr("validation failed"))
 	for _, want := range []string{"Community tool setup failed", "validation failed", "CodeGraph: CLI missing", "OpenCode: missing"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("result output missing %q; output:\n%s", want, out)

@@ -19,7 +19,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/assets"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/backup"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/agentguidance"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/communitytool"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/engram"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/filemerge"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/persona"
@@ -437,7 +437,7 @@ func TestDiscoverAgentsReturnsEmptyWhenNoConfigDirsPresent(t *testing.T) {
 func TestDiscoverAgentsDoesNotReturnAgentsWithMissingConfigDir(t *testing.T) {
 	home := t.TempDir()
 
-	// Only opencode dir
+	// Only the retired OpenCode dir
 	openCodeDir := filepath.Join(home, ".config", "opencode")
 	if err := os.MkdirAll(openCodeDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
@@ -452,27 +452,21 @@ func TestDiscoverAgentsDoesNotReturnAgentsWithMissingConfigDir(t *testing.T) {
 		}
 	}
 
-	// opencode SHOULD be returned
-	found := false
-	for _, id := range discovered {
-		if id == model.AgentOpenCode {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("DiscoverAgents() expected opencode when ~/.config/opencode/ exists, got %v", discovered)
+	// OpenCode is a compatibility-only adapter and must not be returned by
+	// canonical discovery even when its legacy config directory remains.
+	if len(discovered) != 0 {
+		t.Errorf("DiscoverAgents() should ignore retired OpenCode, got %v", discovered)
 	}
 }
 
 func TestDiscoverAgentsMultiplePresent(t *testing.T) {
 	home := t.TempDir()
 
-	// Create both Claude and OpenCode config dirs
+	// Create both retained Claude and Codex config dirs
 	if err := os.MkdirAll(filepath.Join(home, ".claude"), 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(home, ".config", "opencode"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(home, ".codex"), 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
 
@@ -1003,11 +997,10 @@ func TestRunSyncRefreshesPersistedVisualComponents(t *testing.T) {
 		t.Fatalf("EvalSymlinks(home) error = %v", err)
 	}
 	if err := state.Write(home, state.InstallState{
-		InstalledAgents:     []string{"claude-code", "opencode"},
+		InstalledAgents:     []string{"claude-code"},
 		SelectionConfigured: true,
 		Components: []model.ComponentID{
 			model.ComponentClaudeTheme,
-			model.ComponentOpenCodeGentleLogo,
 		},
 		Persona: "neutral",
 	}); err != nil {
@@ -1023,21 +1016,16 @@ func TestRunSyncRefreshesPersistedVisualComponents(t *testing.T) {
 		backup.UserHomeDirFn = restoreBackupHome
 	})
 
-	// The last two entries are the routing guidance targets. Guidance is written
-	// for every configured agent regardless of which components are persisted, so
-	// a first sync of a purely visual selection still delivers it (issue #1794).
+	// Routing guidance is written for every configured agent regardless of which
+	// components are persisted, so a first sync of a purely visual selection
+	// still delivers it (issue #1794).
 	wantFiles := []string{
 		filepath.Join(home, ".claude", "themes", "gentleman.json"),
 		filepath.Join(home, ".claude", "themes", "gentleman-cute.json"),
-		filepath.Join(home, ".config", "opencode", "themes", "gentleman.json"),
-		filepath.Join(home, ".config", "opencode", "themes", "gentleman-cute.json"),
-		filepath.Join(home, ".config", "opencode", "tui-plugins", "gentle-logo.tsx"),
-		filepath.Join(home, ".config", "opencode", "tui.json"),
 		filepath.Join(home, ".claude", "CLAUDE.md"),
-		filepath.Join(home, ".config", "opencode", "opencode.json"),
 	}
 
-	first, err := RunSync([]string{"--agents", "claude-code,opencode"})
+	first, err := RunSync([]string{"--agents", "claude-code"})
 	if err != nil {
 		t.Fatalf("RunSync() first error = %v", err)
 	}
@@ -1050,7 +1038,7 @@ func TestRunSyncRefreshesPersistedVisualComponents(t *testing.T) {
 		}
 	}
 
-	second, err := RunSync([]string{"--agents", "claude-code,opencode"})
+	second, err := RunSync([]string{"--agents", "claude-code"})
 	if err != nil {
 		t.Fatalf("RunSync() second error = %v", err)
 	}
@@ -1064,6 +1052,7 @@ func TestRunSyncRefreshesPersistedVisualComponents(t *testing.T) {
 // but managed OpenCode plugins are already installed on disk, `gentle-ai sync`
 // must refresh them to the embedded assets of the running binary.
 func TestRunSyncRefreshesInstalledOpenCodeReviewPluginWithoutSDDComponent(t *testing.T) {
+	t.Skip("OpenCode is a compatibility-only adapter and is not part of canonical sync")
 	home := t.TempDir()
 	if err := state.Write(home, state.InstallState{
 		InstalledAgents:     []string{"opencode"},
@@ -1121,6 +1110,7 @@ func TestRunSyncRefreshesInstalledOpenCodeReviewPluginWithoutSDDComponent(t *tes
 // TestRunSyncRemovesOpenCodeOnlyReviewPluginFromKilocode ensures a stale
 // OpenCode review interception plugin cannot keep affecting Kilo after sync.
 func TestRunSyncRemovesOpenCodeOnlyReviewPluginFromKilocode(t *testing.T) {
+	t.Skip("OpenCode and Kilocode plugin refresh is outside the canonical client set")
 	home := t.TempDir()
 	if err := state.Write(home, state.InstallState{
 		InstalledAgents:     []string{"kilocode"},
@@ -1167,6 +1157,7 @@ func TestRunSyncRemovesOpenCodeOnlyReviewPluginFromKilocode(t *testing.T) {
 // refresh behavior for issue #1440: users who never had the SDD/OpenCode
 // plugins installed must not receive them from a plain sync.
 func TestRunSyncDoesNotCreateOpenCodeReviewPluginWhenNeverInstalled(t *testing.T) {
+	t.Skip("OpenCode plugin refresh is outside the canonical client set")
 	home := t.TempDir()
 	if err := state.Write(home, state.InstallState{
 		InstalledAgents:     []string{"opencode"},
@@ -1458,7 +1449,7 @@ func TestCodeGraphGuidanceSyncStepRefreshesOldMarkerWhenConfigured(t *testing.T)
 	step := codeGraphGuidanceSyncStep{
 		id:      "sync:community-tool:codegraph-guidance",
 		homeDir: home,
-		runner: communitytool.RunnerFunc(func(string, ...string) error {
+		runner: codegraph.RunnerFunc(func(string, ...string) error {
 			mustWriteFile(t, settingsPath, []byte(`{"mcp":{"codegraph":{"type":"local","command":["codegraph","serve","--mcp"],"enabled":true}}}`))
 			return nil
 		}),
@@ -1498,7 +1489,7 @@ func TestCodeGraphGuidanceSyncStepRestoresPartialInstallerFailure(t *testing.T) 
 	step := codeGraphGuidanceSyncStep{
 		id:      "sync:community-tool:codegraph-guidance",
 		homeDir: home,
-		runner: communitytool.RunnerFunc(func(string, ...string) error {
+		runner: codegraph.RunnerFunc(func(string, ...string) error {
 			mustWriteFile(t, settingsPath, []byte(`{"mcp":{"codegraph":{"type":"local","command":["codegraph","serve","--mcp"],"enabled":true}}}`))
 			return errors.New("installer failed after write")
 		}),
@@ -1529,7 +1520,7 @@ func TestCodeGraphGuidanceSyncStepRollbackRestoresSuccessfulReconcile(t *testing
 	step := codeGraphGuidanceSyncStep{
 		id:      "sync:community-tool:codegraph-guidance",
 		homeDir: home,
-		runner: communitytool.RunnerFunc(func(string, ...string) error {
+		runner: codegraph.RunnerFunc(func(string, ...string) error {
 			mustWriteFile(t, settingsPath, []byte(`{"mcp":{"codegraph":{"type":"local","command":["codegraph","serve","--mcp"],"enabled":true}}}`))
 			return nil
 		}),
@@ -1572,7 +1563,7 @@ func TestCodeGraphGuidanceSyncStepRestoresSymlinkAfterInstallerFailure(t *testin
 	step := codeGraphGuidanceSyncStep{
 		id:      "sync:community-tool:codegraph-guidance",
 		homeDir: home,
-		runner: communitytool.RunnerFunc(func(string, ...string) error {
+		runner: codegraph.RunnerFunc(func(string, ...string) error {
 			if err := os.Remove(settingsPath); err != nil {
 				return err
 			}
@@ -1635,7 +1626,7 @@ func TestCodeGraphGuidanceSyncStepPreservesBrokenSymlinkChain(t *testing.T) {
 	step := codeGraphGuidanceSyncStep{
 		id:      "sync:community-tool:codegraph-guidance",
 		homeDir: home,
-		runner: communitytool.RunnerFunc(func(string, ...string) error {
+		runner: codegraph.RunnerFunc(func(string, ...string) error {
 			if err := os.Remove(settingsPath); err != nil {
 				return err
 			}
@@ -1781,7 +1772,7 @@ func TestCodeGraphGuidanceSyncStepRemovesLegacySkipBlockWhenConfigured(t *testin
 	step := codeGraphGuidanceSyncStep{
 		id:      "sync:community-tool:codegraph-guidance",
 		homeDir: home,
-		runner: communitytool.RunnerFunc(func(string, ...string) error {
+		runner: codegraph.RunnerFunc(func(string, ...string) error {
 			mustWriteFile(t, settingsPath, []byte(`{"mcp":{"codegraph":{"type":"local","command":["codegraph","serve","--mcp"],"enabled":true}}}`))
 			return nil
 		}),
@@ -2034,7 +2025,7 @@ func TestRestorePersistedCommunityToolsDoesNotAdoptExternalWiring(t *testing.T) 
 
 func TestRunSyncMigratesLegacyManagedCodeGraphSelection(t *testing.T) {
 	home := t.TempDir()
-	if err := state.Write(home, state.InstallState{InstalledAgents: []string{"opencode"}, Persona: "neutral"}); err != nil {
+	if err := state.Write(home, state.InstallState{InstalledAgents: []string{"pi"}, Persona: "neutral"}); err != nil {
 		t.Fatal(err)
 	}
 	mustWriteFile(t, filepath.Join(home, ".config", "opencode", "opencode.json"), []byte(`{"mcp":{"codegraph":{"type":"local","command":["codegraph","serve","--mcp"],"enabled":true}}}`))
@@ -2044,7 +2035,7 @@ func TestRunSyncMigratesLegacyManagedCodeGraphSelection(t *testing.T) {
 	t.Cleanup(func() { cmdLookPath = restoreLookPath })
 	cmdLookPath = func(string) (string, error) { return "/bin/codegraph", nil }
 
-	result, err := RunSyncWithSelection(home, model.Selection{Agents: []model.AgentID{model.AgentOpenCode}, Persona: model.PersonaNeutral})
+	result, err := RunSyncWithSelection(home, model.Selection{Agents: []model.AgentID{model.AgentPi}, Persona: model.PersonaNeutral})
 	if err != nil {
 		t.Fatalf("RunSyncWithSelection() error = %v", err)
 	}
@@ -2062,20 +2053,20 @@ func TestRunSyncMigratesLegacyManagedCodeGraphSelection(t *testing.T) {
 
 func TestRunSyncMigratesLegacyManagedPiCodeGraphSelection(t *testing.T) {
 	home := t.TempDir()
-	if err := state.Write(home, state.InstallState{InstalledAgents: []string{"opencode"}, Persona: "neutral"}); err != nil {
+	if err := state.Write(home, state.InstallState{InstalledAgents: []string{"pi"}, Persona: "neutral"}); err != nil {
 		t.Fatal(err)
 	}
 	writeManagedPiCodeGraphManifest(t, home)
 
 	previousRefresh := refreshPiCodeGraphIfConfigured
 	refreshed := false
-	refreshPiCodeGraphIfConfigured = func(string, string) (communitytool.PiCodeGraphResult, bool, error) {
+	refreshPiCodeGraphIfConfigured = func(string, string) (codegraph.PiCodeGraphResult, bool, error) {
 		refreshed = true
-		return communitytool.PiCodeGraphResult{}, true, nil
+		return codegraph.PiCodeGraphResult{}, true, nil
 	}
 	t.Cleanup(func() { refreshPiCodeGraphIfConfigured = previousRefresh })
 
-	result, err := RunSyncWithSelection(home, model.Selection{Agents: []model.AgentID{model.AgentOpenCode}, Persona: model.PersonaNeutral})
+	result, err := RunSyncWithSelection(home, model.Selection{Agents: []model.AgentID{model.AgentPi}, Persona: model.PersonaNeutral})
 	if err != nil {
 		t.Fatalf("RunSyncWithSelection() error = %v", err)
 	}
@@ -2097,7 +2088,7 @@ func TestRunSyncReportsLegacySelectionMigrationPersistenceFailure(t *testing.T) 
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	original := state.InstallState{InstalledAgents: []string{"opencode"}, Persona: "neutral"}
+	original := state.InstallState{SchemaVersion: state.CurrentSchemaVersion, InstalledAgents: []string{"pi"}, Persona: "neutral"}
 	if err := state.Write(home, original); err != nil {
 		t.Fatal(err)
 	}
@@ -2119,8 +2110,8 @@ func TestRunSyncReportsLegacySelectionMigrationPersistenceFailure(t *testing.T) 
 
 	previousRefresh := refreshPiCodeGraphIfConfigured
 	previousLookPath := cmdLookPath
-	refreshPiCodeGraphIfConfigured = func(string, string) (communitytool.PiCodeGraphResult, bool, error) {
-		return communitytool.PiCodeGraphResult{}, true, nil
+	refreshPiCodeGraphIfConfigured = func(string, string) (codegraph.PiCodeGraphResult, bool, error) {
+		return codegraph.PiCodeGraphResult{}, true, nil
 	}
 	cmdLookPath = func(string) (string, error) { return "", os.ErrNotExist }
 	t.Cleanup(func() {
@@ -2128,7 +2119,7 @@ func TestRunSyncReportsLegacySelectionMigrationPersistenceFailure(t *testing.T) 
 		cmdLookPath = previousLookPath
 	})
 
-	result, err := RunSyncWithSelection(home, model.Selection{Agents: []model.AgentID{model.AgentOpenCode}, Persona: model.PersonaNeutral})
+	result, err := RunSyncWithSelection(home, model.Selection{Agents: []model.AgentID{model.AgentPi}, Persona: model.PersonaNeutral})
 	if err == nil || !strings.Contains(err.Error(), "persist managed asset provenance") {
 		t.Fatalf("RunSyncWithSelection() error = %v, want migration persistence failure", err)
 	}
@@ -2188,6 +2179,7 @@ func mustWriteFile(t *testing.T, path string, data []byte) {
 // ─── Phase 4: RunSync integration tests ───────────────────────────────────
 
 func TestRunSyncAppliesManagedFilesystemChanges(t *testing.T) {
+	t.Skip("OpenCode-specific filesystem and plugin assertions are outside the canonical client set")
 	home := t.TempDir()
 	pluginsDir := filepath.Join(home, ".config", "opencode", "plugins")
 	if err := os.MkdirAll(pluginsDir, 0o755); err != nil {
@@ -2290,7 +2282,7 @@ func TestRunSyncDoesNotInvokeEngramSetup(t *testing.T) {
 		return nil
 	}
 
-	_, err := RunSync([]string{"--agents", "opencode"})
+	_, err := RunSync([]string{"--agents", "claude-code"})
 	if err != nil {
 		t.Fatalf("RunSync() error = %v", err)
 	}
@@ -2325,7 +2317,7 @@ func TestRunSyncDoesNotInstallBinaries(t *testing.T) {
 		return nil
 	}
 
-	_, err := RunSync([]string{"--agents", "opencode"})
+	_, err := RunSync([]string{"--agents", "claude-code"})
 	if err != nil {
 		t.Fatalf("RunSync() error = %v", err)
 	}
@@ -2342,8 +2334,8 @@ func TestRunSyncDoesNotInstallBinaries(t *testing.T) {
 func TestRunSyncPreservesUnmanagedAdjacentFiles(t *testing.T) {
 	home := t.TempDir()
 
-	// Create user-owned config file adjacent to managed overlay.
-	userConfigDir := filepath.Join(home, ".config", "opencode")
+	// Create a user-owned config file adjacent to the managed Claude files.
+	userConfigDir := filepath.Join(home, ".claude")
 	if err := os.MkdirAll(userConfigDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
@@ -2369,7 +2361,7 @@ func TestRunSyncPreservesUnmanagedAdjacentFiles(t *testing.T) {
 	runCommand = func(string, ...string) error { return nil }
 	cmdLookPath = func(name string) (string, error) { return "/usr/local/bin/" + name, nil }
 
-	_, err := RunSync([]string{"--agents", "opencode"})
+	_, err := RunSync([]string{"--agents", "claude-code"})
 	if err != nil {
 		t.Fatalf("RunSync() error = %v", err)
 	}
@@ -2402,7 +2394,7 @@ func TestRunSyncDryRunDoesNotWriteFiles(t *testing.T) {
 	runCommand = func(string, ...string) error { return nil }
 	cmdLookPath = func(name string) (string, error) { return "/usr/local/bin/" + name, nil }
 
-	result, err := RunSync([]string{"--agents", "opencode", "--dry-run"})
+	result, err := RunSync([]string{"--agents", "claude-code", "--dry-run"})
 	if err != nil {
 		t.Fatalf("RunSync() error = %v", err)
 	}
@@ -2415,10 +2407,10 @@ func TestRunSyncDryRunDoesNotWriteFiles(t *testing.T) {
 		t.Fatalf("execution should be empty in dry-run")
 	}
 
-	// No AGENTS.md should have been created.
-	agentsMDPath := filepath.Join(home, ".config", "opencode", "AGENTS.md")
-	if _, err := os.Stat(agentsMDPath); err == nil {
-		t.Errorf("dry-run should NOT create files, but %q was created", agentsMDPath)
+	// No CLAUDE.md should have been created.
+	claudeMDPath := filepath.Join(home, ".claude", "CLAUDE.md")
+	if _, err := os.Stat(claudeMDPath); err == nil {
+		t.Errorf("dry-run should NOT create files, but %q was created", claudeMDPath)
 	}
 }
 
@@ -2543,7 +2535,7 @@ func TestRenderSyncReportIncludesManagedActions(t *testing.T) {
 	runCommand = func(string, ...string) error { return nil }
 	cmdLookPath = func(name string) (string, error) { return "/usr/bin/" + name, nil }
 
-	result, err := RunSync([]string{"--agents", "opencode", "--sdd-mode", "single"})
+	result, err := RunSync([]string{"--agents", "claude-code", "--sdd-mode", "single"})
 	if err != nil {
 		t.Fatalf("RunSync() error = %v", err)
 	}
@@ -2556,7 +2548,7 @@ func TestRenderSyncReportIncludesManagedActions(t *testing.T) {
 	}
 
 	// Must list the agents involved.
-	if !containsAny(report, "opencode") {
+	if !containsAny(report, "claude-code") {
 		t.Errorf("RenderSyncReport() should list agents; got:\n%s", report)
 	}
 }
@@ -2574,7 +2566,7 @@ func TestRunSyncExcludesUnmanagedLookalikeFile(t *testing.T) {
 	home := t.TempDir()
 
 	// Create a directory structure that is NOT the agent config dir.
-	// "AGENTS.md" is a known managed file for opencode (under ~/.config/opencode/).
+	// "CLAUDE.md" is a known managed file for Claude (under ~/.claude/).
 	// We place a lookalike at a path the sync runtime does NOT own.
 	lookalikeDir := filepath.Join(home, "projects", "myapp")
 	if err := os.MkdirAll(lookalikeDir, 0o755); err != nil {
@@ -2602,7 +2594,7 @@ func TestRunSyncExcludesUnmanagedLookalikeFile(t *testing.T) {
 	runCommand = func(string, ...string) error { return nil }
 	cmdLookPath = func(name string) (string, error) { return "/usr/bin/" + name, nil }
 
-	_, err := RunSync([]string{"--agents", "opencode"})
+	_, err := RunSync([]string{"--agents", "claude-code"})
 	if err != nil {
 		t.Fatalf("RunSync() error = %v", err)
 	}
@@ -2616,10 +2608,10 @@ func TestRunSyncExcludesUnmanagedLookalikeFile(t *testing.T) {
 		t.Errorf("sync modified unmanaged lookalike file: got %q, want %q", string(after), lookalikeContent)
 	}
 
-	// The managed OpenCode settings path (under ~/.config/opencode/) should have been written.
-	managedPath := filepath.Join(home, ".config", "opencode", "opencode.json")
+	// The managed Claude prompt path should have been written.
+	managedPath := filepath.Join(home, ".claude", "CLAUDE.md")
 	if _, err := os.Stat(managedPath); err != nil {
-		t.Errorf("expected managed OpenCode settings at %q to be created by sync: %v", managedPath, err)
+		t.Errorf("expected managed Claude prompt at %q to be created by sync: %v", managedPath, err)
 	}
 }
 
@@ -2649,7 +2641,7 @@ func TestRunSyncNoOpWhenAssetsAlreadyCurrent(t *testing.T) {
 	runCommand = func(string, ...string) error { return nil }
 	cmdLookPath = func(name string) (string, error) { return "/usr/bin/" + name, nil }
 
-	args := []string{"--agents", "opencode", "--sdd-mode", "single"}
+	args := []string{"--agents", "claude-code", "--sdd-mode", "single"}
 
 	// First sync — writes files, changes > 0.
 	result1, err := RunSync(args)
@@ -2706,7 +2698,7 @@ func TestSyncActionsExecutedReflectsChangedFiles(t *testing.T) {
 	runCommand = func(string, ...string) error { return nil }
 	cmdLookPath = func(name string) (string, error) { return "/usr/bin/" + name, nil }
 
-	args := []string{"--agents", "opencode", "--sdd-mode", "single"}
+	args := []string{"--agents", "claude-code", "--sdd-mode", "single"}
 
 	// First sync: files are new, so FilesChanged > 0.
 	result1, err := RunSync(args)
@@ -3806,11 +3798,11 @@ func TestRunSyncLoadsPersistedModelAssignments(t *testing.T) {
 	cmdLookPath = func(name string) (string, error) { return "/usr/local/bin/" + name, nil }
 
 	// Pre-seed state.json with model assignments from a previous install.
-	if err := os.MkdirAll(filepath.Join(home, ".config", "opencode"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(home, ".claude"), 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 	err := state.Write(home, state.InstallState{
-		InstalledAgents: []string{"opencode"},
+		InstalledAgents: []string{"claude-code"},
 		ClaudeModelAssignments: map[string]string{
 			"orchestrator": "opus",
 			"sdd-apply":    "sonnet",
@@ -3829,7 +3821,7 @@ func TestRunSyncLoadsPersistedModelAssignments(t *testing.T) {
 
 	// Run sync WITHOUT --claude-model or --model flags — assignments should
 	// come from persisted state.
-	result, err := RunSync([]string{"--agents", "opencode", "--sdd-mode", "single"})
+	result, err := RunSync([]string{"--agents", "claude-code", "--sdd-mode", "single"})
 	if err != nil {
 		t.Fatalf("RunSync() error = %v", err)
 	}
@@ -3875,7 +3867,7 @@ func TestRunSyncLoadsPersistedModelAssignmentsPreservesEffort(t *testing.T) {
 	cmdLookPath = func(name string) (string, error) { return "/usr/local/bin/" + name, nil }
 
 	if err := state.Write(home, state.InstallState{
-		InstalledAgents: []string{"opencode"},
+		InstalledAgents: []string{"claude-code"},
 		ModelAssignments: map[string]state.ModelAssignmentState{
 			"sdd-apply": {ProviderID: "anthropic", ModelID: "claude-opus-4", Effort: "high"},
 		},
@@ -3883,7 +3875,7 @@ func TestRunSyncLoadsPersistedModelAssignmentsPreservesEffort(t *testing.T) {
 		t.Fatalf("state.Write: %v", err)
 	}
 
-	result, err := RunSync([]string{"--agents", "opencode", "--sdd-mode", "single", "--dry-run"})
+	result, err := RunSync([]string{"--agents", "claude-code", "--sdd-mode", "single", "--dry-run"})
 	if err != nil {
 		t.Fatalf("RunSync() error = %v", err)
 	}
@@ -3916,15 +3908,11 @@ func TestRunSyncDoesNotOverridePersistedAssignmentsOnSecondSync(t *testing.T) {
 	cmdLookPath = func(name string) (string, error) { return "/usr/local/bin/" + name, nil }
 
 	// Seed state with assignments.
-	if err := os.MkdirAll(filepath.Join(home, ".config", "opencode"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(home, ".claude"), 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
-	if err := os.WriteFile(settingsPath, []byte(`{"default_agent":"user-agent","keep":true}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
 	err := state.Write(home, state.InstallState{
-		InstalledAgents: []string{"opencode"},
+		InstalledAgents: []string{"claude-code"},
 		ClaudeModelAssignments: map[string]string{
 			"sdd-apply": "sonnet",
 		},
@@ -3937,17 +3925,17 @@ func TestRunSyncDoesNotOverridePersistedAssignmentsOnSecondSync(t *testing.T) {
 	}
 
 	// First sync — loads from state.
-	_, err = RunSync([]string{"--agents", "opencode", "--sdd-mode", "single"})
+	_, err = RunSync([]string{"--agents", "claude-code", "--sdd-mode", "single"})
 	if err != nil {
 		t.Fatalf("RunSync(1) error = %v", err)
 	}
-	firstSettings, _ := os.ReadFile(settingsPath)
-	if !bytes.Contains(firstSettings, []byte(`"default_agent": "gentle-orchestrator"`)) {
-		t.Fatalf("CLI sync did not overwrite default_agent: %s", firstSettings)
+	firstPrompt, readErr := os.ReadFile(filepath.Join(home, ".claude", "CLAUDE.md"))
+	if readErr != nil {
+		t.Fatalf("CLI sync did not write CLAUDE.md: %v", readErr)
 	}
 
 	// Second sync — should still have the assignments.
-	result, err := RunSync([]string{"--agents", "opencode", "--sdd-mode", "single"})
+	result, err := RunSync([]string{"--agents", "claude-code", "--sdd-mode", "single"})
 	if err != nil {
 		t.Fatalf("RunSync(2) error = %v", err)
 	}
@@ -3959,8 +3947,11 @@ func TestRunSyncDoesNotOverridePersistedAssignmentsOnSecondSync(t *testing.T) {
 	if ma.ProviderID != "anthropic" || ma.ModelID != "claude-sonnet-4" {
 		t.Errorf("After second sync: ModelAssignments[sdd-init] = %+v, want anthropic/claude-sonnet-4", ma)
 	}
-	secondSettings, _ := os.ReadFile(settingsPath)
-	if !bytes.Equal(firstSettings, secondSettings) {
+	secondPrompt, readErr := os.ReadFile(filepath.Join(home, ".claude", "CLAUDE.md"))
+	if readErr != nil {
+		t.Fatalf("ReadFile(CLAUDE.md) after second sync: %v", readErr)
+	}
+	if !bytes.Equal(firstPrompt, secondPrompt) {
 		t.Fatal("CLI sync was not byte-idempotent")
 	}
 }
@@ -3986,17 +3977,14 @@ func TestRunSyncWithNoPersistedAssignmentsDoesNotPanic(t *testing.T) {
 	cmdLookPath = func(name string) (string, error) { return "/usr/local/bin/" + name, nil }
 
 	// State with agents but NO model assignments (pre-feature state files).
-	if err := os.MkdirAll(filepath.Join(home, ".config", "opencode"), 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
 	err := state.Write(home, state.InstallState{
-		InstalledAgents: []string{"opencode"},
+		InstalledAgents: []string{"claude-code"},
 	})
 	if err != nil {
 		t.Fatalf("state.Write: %v", err)
 	}
 
-	result, err := RunSync([]string{"--agents", "opencode", "--sdd-mode", "single"})
+	result, err := RunSync([]string{"--agents", "claude-code", "--sdd-mode", "single"})
 	if err != nil {
 		t.Fatalf("RunSync() error = %v", err)
 	}
@@ -4118,11 +4106,12 @@ func TestBuildSyncSelectionDoesNotHardcodePersona(t *testing.T) {
 
 // TestSyncPersonaPathsExcludeOpenCodeAgentJson verifies the install/sync
 // contract split: syncPersonaPaths must NOT declare opencode.json (that JSON
-// merge is install-only because it conflicts with SDD).
+// merge is install-only because it conflicts with SDD), even when the
+// canonical Claude adapter is used.
 func TestSyncPersonaPathsExcludeOpenCodeAgentJson(t *testing.T) {
 	home := t.TempDir()
 	reg, _ := agents.NewDefaultRegistry()
-	a, _ := reg.Get(model.AgentOpenCode)
+	a, _ := reg.Get(model.AgentClaudeCode)
 
 	paths := syncPersonaPaths(home, model.Selection{Persona: model.PersonaGentleman}, []agents.Adapter{a})
 
@@ -4406,10 +4395,10 @@ func TestRunSyncWithSelectionPiRejectsInvalidPersistedPersonaWithoutMutation(t *
 		stateAsDir bool
 		wantErr    string
 	}{
-		{name: "malformed JSON", stateJSON: `{"installed_agents":["pi"],"persona":`, wantErr: "read persisted installation state"},
-		{name: "unreadable state", stateAsDir: true, wantErr: "read persisted installation state"},
+		{name: "malformed JSON", stateJSON: `{"installed_agents":["pi"],"persona":`, wantErr: "state migration"},
+		{name: "unreadable state", stateAsDir: true, wantErr: "state migration"},
 		{name: "unsupported persona", stateJSON: `{"installed_agents":["pi"],"persona":"unknown"}`, wantErr: `unsupported persona "unknown"`},
-		{name: "explicit empty persona", stateJSON: `{"installed_agents":["pi"],"persona":""}`, wantErr: "explicitly empty persona"},
+		{name: "explicit empty persona", stateJSON: `{"schema_version":1,"installed_agents":["pi"],"persona":""}`, wantErr: "explicitly empty persona"},
 		{name: "whitespace-only persona", stateJSON: `{"installed_agents":["pi"],"persona":" \t "}`, wantErr: "whitespace-only persona"},
 	}
 
@@ -4618,7 +4607,7 @@ func TestRunSyncWithSelection_ExplicitEmptyPersistedPersonaFailsClosed(t *testin
 	if err := os.MkdirAll(filepath.Dir(state.Path(home)), 0o755); err != nil {
 		t.Fatalf("MkdirAll state: %v", err)
 	}
-	originalState := []byte(`{"installed_agents":["claude-code"],"persona":""}`)
+	originalState := []byte(`{"schema_version":1,"installed_agents":["claude-code"],"persona":""}`)
 	if err := os.WriteFile(state.Path(home), originalState, 0o644); err != nil {
 		t.Fatalf("WriteFile state: %v", err)
 	}
@@ -4823,7 +4812,7 @@ func TestRunSyncWithSelection_UnreadablePersistedStateFailsClosed(t *testing.T) 
 			if err == nil {
 				t.Fatal("RunSyncWithSelection() error = nil, want persisted state read error")
 			}
-			if !strings.Contains(err.Error(), "read persisted installation state") {
+			if !strings.Contains(err.Error(), "state migration") {
 				t.Fatalf("RunSyncWithSelection() error = %q, want state read context", err)
 			}
 			if result.Selection.Persona != "" {
@@ -5188,7 +5177,8 @@ func TestRunSyncPreservesCompletePersistedState(t *testing.T) {
 	home := t.TempDir()
 	lastUpdate := time.Date(2026, time.July, 11, 12, 0, 0, 0, time.UTC)
 	before := state.InstallState{
-		InstalledAgents: []string{"codex", "opencode"},
+		SchemaVersion:   state.CurrentSchemaVersion,
+		InstalledAgents: []string{"codex"},
 		ClaudeModelAssignments: map[string]string{
 			"sdd-archive": "haiku",
 		},

@@ -13,8 +13,9 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/claude"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/codex"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/backup"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/communitytool"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/engram"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	opencodeactivation "github.com/gentleman-programming/gentle-ai/v2/internal/opencode"
@@ -28,6 +29,9 @@ func TestBuildPlanRemovesOnlyOwnedOpenCodeLaunchers(t *testing.T) {
 	svc, err := NewService(homeDir, t.TempDir(), "dev")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if err := svc.registry.Register(opencode.NewAdapter()); err != nil {
+		t.Fatalf("register legacy OpenCode adapter: %v", err)
 	}
 	paths := opencodeactivation.LauncherPaths(homeDir, runtime.GOOS)
 	ownedPath := paths[0]
@@ -76,6 +80,9 @@ func TestUninstallOpenCodeClearsBackgroundIntent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := svc.registry.Register(opencode.NewAdapter()); err != nil {
+		t.Fatalf("register legacy OpenCode adapter: %v", err)
+	}
 	svc.snapshotter = stubSnapshotter{}
 	if _, err := svc.PartialUninstall([]model.AgentID{model.AgentOpenCode}, allManagedComponents); err != nil {
 		t.Fatal(err)
@@ -102,14 +109,14 @@ func TestBuildPlanSnapshotsPiManifestAndOwnedOverlay(t *testing.T) {
 	if err := os.WriteFile(packageChild, []byte("---\ntools: bash\n---\npackage\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := communitytool.ReconcilePiCodeGraph(communitytool.PiCodeGraphOptions{HomeDir: homeDir, Selected: true, EffectiveMCPProbe: piCodeGraphProbeForServiceTest}); err != nil {
+	if _, err := codegraph.ReconcilePiCodeGraph(codegraph.PiCodeGraphOptions{HomeDir: homeDir, Selected: true, EffectiveMCPProbe: piCodeGraphProbeForServiceTest}); err != nil {
 		t.Fatal(err)
 	}
 	plan, err := svc.buildPlan([]model.AgentID{model.AgentPi}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	paths := communitytool.PiCodeGraphPaths(homeDir, "")
+	paths := codegraph.PiCodeGraphPaths(homeDir, "")
 	for _, path := range paths {
 		if !slices.Contains(plan.backupTargets, path) {
 			t.Fatalf("backup targets = %v, missing Pi artifact %q", plan.backupTargets, path)
@@ -132,7 +139,7 @@ func TestExecutePlanCleansPiBeforeSharedMCPMutation(t *testing.T) {
 	if err := os.WriteFile(child, []byte("---\ntools: bash\n---\nwork\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := communitytool.ReconcilePiCodeGraph(communitytool.PiCodeGraphOptions{HomeDir: home, Selected: true, EffectiveMCPProbe: piCodeGraphProbeForServiceTest}); err != nil {
+	if _, err := codegraph.ReconcilePiCodeGraph(codegraph.PiCodeGraphOptions{HomeDir: home, Selected: true, EffectiveMCPProbe: piCodeGraphProbeForServiceTest}); err != nil {
 		t.Fatal(err)
 	}
 	result, err := svc.executePlan(plan{operations: []operation{{path: mcpPath, apply: func(path string) (bool, bool, error) {
@@ -180,7 +187,7 @@ func TestExecutePlanPiUninstallPreservesPreexistingMarkedUserChildAndUserMCP(t *
 	if err := os.WriteFile(childPath, []byte(preexisting), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := communitytool.ReconcilePiCodeGraph(communitytool.PiCodeGraphOptions{HomeDir: homeDir, Selected: true, EffectiveMCPProbe: piCodeGraphProbeForServiceTest}); err != nil {
+	if _, err := codegraph.ReconcilePiCodeGraph(codegraph.PiCodeGraphOptions{HomeDir: homeDir, Selected: true, EffectiveMCPProbe: piCodeGraphProbeForServiceTest}); err != nil {
 		t.Fatalf("ReconcilePiCodeGraph() error = %v", err)
 	}
 
@@ -224,7 +231,7 @@ func TestExecutePlanPiUninstallPreservesDriftedChildAndGentlePiSource(t *testing
 	if err := os.WriteFile(packageChild, []byte(packageBody), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := communitytool.ReconcilePiCodeGraph(communitytool.PiCodeGraphOptions{HomeDir: homeDir, Selected: true, EffectiveMCPProbe: piCodeGraphProbeForServiceTest}); err != nil {
+	if _, err := codegraph.ReconcilePiCodeGraph(codegraph.PiCodeGraphOptions{HomeDir: homeDir, Selected: true, EffectiveMCPProbe: piCodeGraphProbeForServiceTest}); err != nil {
 		t.Fatalf("ReconcilePiCodeGraph() error = %v", err)
 	}
 	if err := os.WriteFile(childPath, append([]byte("user changed after provision\n"), []byte("keep this\n")...), 0o644); err != nil {
@@ -246,11 +253,11 @@ func TestExecutePlanPiUninstallPreservesDriftedChildAndGentlePiSource(t *testing
 	}
 }
 
-func piCodeGraphProbeForServiceTest(string) (communitytool.PiCodeGraphMCPProbeResult, error) {
-	return communitytool.PiCodeGraphMCPProbeResult{
+func piCodeGraphProbeForServiceTest(string) (codegraph.PiCodeGraphMCPProbeResult, error) {
+	return codegraph.PiCodeGraphMCPProbeResult{
 		AdapterAvailable: true,
 		Initialized:      true,
-		Tools: []communitytool.PiCodeGraphMCPTool{{
+		Tools: []codegraph.PiCodeGraphMCPTool{{
 			Name: "codegraph_explore",
 			InputSchema: map[string]any{
 				"type": "object",
@@ -292,9 +299,9 @@ func TestPartialUninstallClaudeThemeRemovesOnlyThemeAssets(t *testing.T) {
 	}
 	svc.snapshotter = stubSnapshotter{}
 
-	opencodeAdapter, ok := svc.registry.Get(model.AgentOpenCode)
-	if !ok {
-		t.Fatal("opencode adapter not found in registry")
+	opencodeAdapter := opencode.NewAdapter()
+	if err := svc.registry.Register(opencodeAdapter); err != nil {
+		t.Fatalf("register legacy OpenCode adapter: %v", err)
 	}
 	settingsPath := opencodeAdapter.SettingsPath(homeDir)
 	settings := `{"theme":"active","keep":true,"agent":{"sdd-apply":{"model":"keep"}}}`
@@ -661,10 +668,7 @@ func TestComponentOperationsSDD_RemovesBaseAndProfileAgentsFromSettings(t *testi
 		t.Fatalf("NewService() error = %v", err)
 	}
 
-	adapter, ok := svc.registry.Get(model.AgentOpenCode)
-	if !ok {
-		t.Fatal("openCode adapter not found in registry")
-	}
+	adapter := opencode.NewAdapter()
 
 	settingsPath := adapter.SettingsPath(homeDir)
 	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
@@ -758,10 +762,7 @@ func TestComponentOperationsSDD_RemovesOnlySelectedProfilesFromSettings(t *testi
 		t.Fatalf("NewService() error = %v", err)
 	}
 
-	adapter, ok := svc.registry.Get(model.AgentOpenCode)
-	if !ok {
-		t.Fatal("openCode adapter not found in registry")
-	}
+	adapter := opencode.NewAdapter()
 
 	settingsPath := adapter.SettingsPath(homeDir)
 	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
@@ -885,10 +886,7 @@ func TestComponentOperationsSDD_OpenCodeRemovesManagedPluginSourcesAndModelVaria
 		t.Fatalf("NewService() error = %v", err)
 	}
 
-	adapter, ok := svc.registry.Get(model.AgentOpenCode)
-	if !ok {
-		t.Fatal("openCode adapter not found in registry")
-	}
+	adapter := opencode.NewAdapter()
 
 	pluginDir := filepath.Join(homeDir, ".config", "opencode", "plugins")
 	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
@@ -959,10 +957,7 @@ func TestComponentOperationsSDD_OpenCodePreservesEmptyModelVariantsCacheDirector
 		t.Fatalf("NewService() error = %v", err)
 	}
 
-	adapter, ok := svc.registry.Get(model.AgentOpenCode)
-	if !ok {
-		t.Fatal("openCode adapter not found in registry")
-	}
+	adapter := opencode.NewAdapter()
 
 	cacheDir := filepath.Join(homeDir, ".gentle-ai", "cache")
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
@@ -998,10 +993,7 @@ func TestComponentOperationsSDD_OpenCodeMissingManagedModelVariantFilesAreNonFat
 		t.Fatalf("NewService() error = %v", err)
 	}
 
-	adapter, ok := svc.registry.Get(model.AgentOpenCode)
-	if !ok {
-		t.Fatal("openCode adapter not found in registry")
-	}
+	adapter := opencode.NewAdapter()
 
 	applySDDOpenCodeOperations(t, svc, adapter)
 }
@@ -1028,10 +1020,7 @@ func TestComponentOperationsEngram_ProjectScopeRemovesWorkspaceDataOnly(t *testi
 		t.Fatalf("NewService() error = %v", err)
 	}
 
-	adapter, ok := svc.registry.Get(model.AgentOpenCode)
-	if !ok {
-		t.Fatal("openCode adapter not found in registry")
-	}
+	adapter := opencode.NewAdapter()
 
 	settingsPath := adapter.SettingsPath(homeDir)
 	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
@@ -1084,10 +1073,7 @@ func TestComponentOperationsEngram_GlobalScopeKeepsWorkspaceProjectData(t *testi
 		t.Fatalf("NewService() error = %v", err)
 	}
 
-	adapter, ok := svc.registry.Get(model.AgentOpenCode)
-	if !ok {
-		t.Fatal("openCode adapter not found in registry")
-	}
+	adapter := opencode.NewAdapter()
 
 	settingsPath := adapter.SettingsPath(homeDir)
 	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {

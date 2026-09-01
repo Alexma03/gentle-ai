@@ -1,4 +1,4 @@
-package communitytool
+package codegraph
 
 import (
 	"encoding/json"

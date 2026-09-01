@@ -10,7 +10,7 @@ import (
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/assets"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/communitytool"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/opencode"
 )
@@ -491,7 +491,7 @@ func TestWriteSharedPromptFilesOmitCodeGraphGuidanceByDefault(t *testing.T) {
 
 func TestWriteSharedPromptFilesIncludeCodeGraphGuidanceWhenEnabled(t *testing.T) {
 	home := t.TempDir()
-	guidance := communitytool.CodeGraphGuidanceMarkdown()
+	guidance := codegraph.CodeGraphGuidanceMarkdown()
 
 	if _, err := WriteSharedPromptFiles(home, nil, guidance); err != nil {
 		t.Fatalf("WriteSharedPromptFiles() error = %v", err)
@@ -534,7 +534,7 @@ func TestInjectOpenCodeSingleModeSubagentPromptsRespectBashCapabilityWhenCodeGra
 	home := t.TempDir()
 	mockNoPackageManager(t)
 
-	if _, err := Inject(home, opencodeAdapter(), model.SDDModeSingle, InjectOptions{CodeGraphGuidanceMarkdown: communitytool.CodeGraphGuidanceMarkdown()}); err != nil {
+	if _, err := Inject(home, opencodeAdapter(), model.SDDModeSingle, InjectOptions{CodeGraphGuidanceMarkdown: codegraph.CodeGraphGuidanceMarkdown()}); err != nil {
 		t.Fatalf("Inject(single) error = %v", err)
 	}
 
@@ -566,7 +566,7 @@ func TestInjectOpenCodeMultiModeSubagentPromptFilesIncludeCodeGraphGuidanceWhenE
 	home := t.TempDir()
 	mockNoPackageManager(t)
 
-	if _, err := Inject(home, opencodeAdapter(), model.SDDModeMulti, InjectOptions{CodeGraphGuidanceMarkdown: communitytool.CodeGraphGuidanceMarkdown()}); err != nil {
+	if _, err := Inject(home, opencodeAdapter(), model.SDDModeMulti, InjectOptions{CodeGraphGuidanceMarkdown: codegraph.CodeGraphGuidanceMarkdown()}); err != nil {
 		t.Fatalf("Inject(multi) error = %v", err)
 	}
 
@@ -616,7 +616,7 @@ func TestInjectNativeSDDSubagentsIncludeCodeGraphGuidanceWhenEnabled(t *testing.
 		t.Run(tc.name, func(t *testing.T) {
 			home := t.TempDir()
 			adapter := mustAdapter(t, tc.agentID)
-			guidance := communitytool.CodeGraphGuidanceMarkdown()
+			guidance := codegraph.CodeGraphGuidanceMarkdown()
 
 			if _, err := Inject(home, adapter, model.SDDModeSingle, InjectOptions{CodeGraphGuidanceMarkdown: guidance}); err != nil {
 				t.Fatalf("Inject(%s) error = %v", tc.name, err)
@@ -691,7 +691,7 @@ func TestInjectNativeSDDSubagentsIncludeCodeGraphGuidanceWhenEnabled(t *testing.
 }
 
 func TestInjectCodeGraphToolGrantPreservesEmptyToolsContract(t *testing.T) {
-	guidance := communitytool.CodeGraphGuidanceMarkdown()
+	guidance := codegraph.CodeGraphGuidanceMarkdown()
 	for _, tc := range []struct {
 		name    string
 		agentID model.AgentID
@@ -773,7 +773,7 @@ func TestInjectKimiYAMLSubagentsOmitCodeGraphGuidanceByDefault(t *testing.T) {
 func TestInjectKimiYAMLSubagentsRemainControlFilesWhenCodeGraphEnabled(t *testing.T) {
 	home := t.TempDir()
 
-	if _, err := Inject(home, kimiAdapter(), model.SDDModeSingle, InjectOptions{CodeGraphGuidanceMarkdown: communitytool.CodeGraphGuidanceMarkdown()}); err != nil {
+	if _, err := Inject(home, kimiAdapter(), model.SDDModeSingle, InjectOptions{CodeGraphGuidanceMarkdown: codegraph.CodeGraphGuidanceMarkdown()}); err != nil {
 		t.Fatalf("Inject(kimi) error = %v", err)
 	}
 

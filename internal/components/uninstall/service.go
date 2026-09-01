@@ -17,7 +17,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/claude"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/assets"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/backup"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/communitytool"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/engram"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/filemerge"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/gga"
@@ -402,7 +402,7 @@ func (s *Service) buildPlan(agentIDs []model.AgentID, componentIDs []model.Compo
 
 	backupTargets[state.Path(s.homeDir)] = struct{}{}
 	if slices.Contains(agentIDs, model.AgentPi) {
-		for _, target := range communitytool.PiCodeGraphPaths(s.homeDir, s.workspaceDir) {
+		for _, target := range codegraph.PiCodeGraphPaths(s.homeDir, s.workspaceDir) {
 			backupTargets[target] = struct{}{}
 		}
 	}
@@ -457,10 +457,10 @@ func (s *Service) executePlan(p plan, agentsToRemove []model.AgentID) (Result, e
 	// before other component cleanup (notably Engram) mutates that file, otherwise
 	// an unrelated mutation is indistinguishable from user drift.
 	if slices.Contains(agentsToRemove, model.AgentPi) {
-		piResult, piErr := communitytool.UninstallPiCodeGraph(s.homeDir)
+		piResult, piErr := codegraph.UninstallPiCodeGraph(s.homeDir)
 		if piErr != nil {
 			failures = append(failures, operationFailure{
-				path:   firstOrEmpty(communitytool.PiCodeGraphPaths(s.homeDir, s.workspaceDir)),
+				path:   firstOrEmpty(codegraph.PiCodeGraphPaths(s.homeDir, s.workspaceDir)),
 				agents: []model.AgentID{model.AgentPi},
 				err:    fmt.Errorf("remove Pi CodeGraph integration: %w", piErr),
 			})

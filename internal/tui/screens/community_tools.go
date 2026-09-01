@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/communitytool"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/tui/styles"
 )
 
-func RenderCommunityTools(selected []model.CommunityToolID, cursor int, statuses []communitytool.Status, loading bool, statusErr error) string {
+func RenderCommunityTools(selected []model.CommunityToolID, cursor int, statuses []codegraph.Status, loading bool, statusErr error) string {
 	var b strings.Builder
 	b.WriteString(styles.TitleStyle.Render("Community Tools/Plugins"))
 	b.WriteString("\n\n")
@@ -35,7 +35,7 @@ func RenderCommunityTools(selected []model.CommunityToolID, cursor int, statuses
 	}
 
 	row := 0
-	for _, def := range communitytool.Definitions() {
+	for _, def := range codegraph.Definitions() {
 		checkbox := "[ ]"
 		if selectedSet[def.ID] {
 			checkbox = "[x]"
@@ -71,10 +71,10 @@ func RenderCommunityTools(selected []model.CommunityToolID, cursor int, statuses
 }
 
 func CommunityToolsOptionCount() int {
-	return len(communitytool.Definitions())*2 + 2
+	return len(codegraph.Definitions())*2 + 2
 }
 
-func RenderCommunityToolInstalling(selected []model.CommunityToolID, spinner string, statuses []communitytool.Status) string {
+func RenderCommunityToolInstalling(selected []model.CommunityToolID, spinner string, statuses []codegraph.Status) string {
 	var b strings.Builder
 	b.WriteString(styles.TitleStyle.Render("Community Tools/Plugins"))
 	b.WriteString("\n\n")
@@ -101,9 +101,9 @@ func RenderCommunityToolInstalling(selected []model.CommunityToolID, spinner str
 	return styles.FrameStyle.Render(b.String())
 }
 
-func renderCommunityToolStatus(b *strings.Builder, status communitytool.Status) {
+func renderCommunityToolStatus(b *strings.Builder, status codegraph.Status) {
 	cli := "missing"
-	if status.CLI == communitytool.AvailabilityAvailable {
+	if status.CLI == codegraph.AvailabilityAvailable {
 		cli = "available"
 		if status.CLIPath != "" {
 			cli += " at " + status.CLIPath
@@ -132,15 +132,15 @@ func renderCommunityToolStatus(b *strings.Builder, status communitytool.Status) 
 }
 
 func statusName(id model.CommunityToolID) string {
-	if def, ok := communitytool.DefinitionFor(id); ok {
+	if def, ok := codegraph.DefinitionFor(id); ok {
 		return def.Name
 	}
 	return string(id)
 }
 
 func selectedCommunityToolNames(selected []model.CommunityToolID) []string {
-	namesByID := make(map[model.CommunityToolID]string, len(communitytool.Definitions()))
-	for _, def := range communitytool.Definitions() {
+	namesByID := make(map[model.CommunityToolID]string, len(codegraph.Definitions()))
+	for _, def := range codegraph.Definitions() {
 		namesByID[def.ID] = def.Name
 	}
 

@@ -1,4 +1,4 @@
-package communitytool
+package codegraph
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/filemerge"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
@@ -88,12 +89,12 @@ func RefreshCodeGraphGuidanceIfConfigured(homeDir string, detector Detector) (Gu
 }
 
 func hasAvailableCodeGraphGuidance(homeDir string, detector Detector) bool {
-	status := DetectStatus(model.CommunityToolCodeGraph, homeDir, detector)
+	status := DetectStatusByID(model.CommunityToolCodeGraph, homeDir, detector)
 	return status.CLI == AvailabilityAvailable && HasAnyCodeGraphGuidance(homeDir)
 }
 
 func HasConfiguredCodeGraph(homeDir string, detector Detector) bool {
-	status := DetectStatus(model.CommunityToolCodeGraph, homeDir, detector)
+	status := DetectStatusByID(model.CommunityToolCodeGraph, homeDir, detector)
 	if status.CLI != AvailabilityAvailable {
 		return false
 	}
@@ -188,6 +189,21 @@ func InjectCodeGraphGuidance(homeDir string) (GuidanceInjectionResult, error) {
 		result.Files = append(result.Files, file)
 	}
 
+	// OpenCode is no longer selectable, but existing installations remain a
+	// compatibility surface for migration and rollback. Refresh its managed
+	// guidance when its legacy config directory is still present.
+	legacyAdapter := opencode.NewAdapter()
+	if legacyOpenCodeConfigPresent(homeDir) {
+		file, changed, err := injectCodeGraphGuidanceForAgent(homeDir, legacyAdapter)
+		if err != nil {
+			return result, fmt.Errorf("inject CodeGraph guidance for %s: %w", legacyAdapter.Agent(), err)
+		}
+		if file != "" {
+			result.Changed = result.Changed || changed
+			result.Files = append(result.Files, file)
+		}
+	}
+
 	return result, nil
 }
 
@@ -207,6 +223,12 @@ func CodeGraphGuidancePaths(homeDir string) []string {
 			continue
 		}
 		path := adapter.SystemPromptFile(homeDir)
+		if strings.TrimSpace(path) != "" {
+			paths = append(paths, path)
+		}
+	}
+	if legacyOpenCodeConfigPresent(homeDir) {
+		path := opencode.NewAdapter().SystemPromptFile(homeDir)
 		if strings.TrimSpace(path) != "" {
 			paths = append(paths, path)
 		}
@@ -231,6 +253,9 @@ func CodeGraphManagedPaths(homeDir string) []string {
 		}
 		paths = append(paths, codeGraphToolWiringPaths(homeDir, adapter)...)
 	}
+	if legacyOpenCodeConfigPresent(homeDir) {
+		paths = append(paths, legacyOpenCodeManagedPaths(homeDir)...)
+	}
 
 	seen := make(map[string]struct{}, len(paths))
 	managed := make([]string, 0, len(paths))
@@ -249,22 +274,19 @@ func CodeGraphManagedPaths(homeDir string) []string {
 }
 
 func NeedsOpenCodeCodeGraphReconcile(homeDir string) bool {
-	reg, err := agents.NewDefaultRegistry()
-	if err != nil {
-		return false
-	}
-	adapter, ok := reg.Get(model.AgentOpenCode)
-	if !ok {
-		return false
-	}
-	detected := slices.ContainsFunc(agents.DiscoverInstalled(reg, homeDir), func(agent agents.InstalledAgent) bool {
-		return agent.ID == model.AgentOpenCode
-	})
-	if !detected {
+	// OpenCode is retired from the selectable registry, but existing installs
+	// still need a read/repair path so rollback and migration remain safe.
+	adapter := opencode.NewAdapter()
+	if !legacyOpenCodeConfigPresent(homeDir) {
 		return false
 	}
 	_, configured := hasCodeGraphToolWiring(homeDir, adapter)
 	return !configured
+}
+
+func legacyOpenCodeConfigPresent(homeDir string) bool {
+	_, err := os.Stat(opencode.NewAdapter().GlobalConfigDir(homeDir))
+	return err == nil
 }
 
 // ReconcileOpenCodeCodeGraph delegates JSON/JSONC editing to CodeGraph's own
@@ -299,6 +321,16 @@ func ReconcileOpenCodeCodeGraph(homeDir string, runner Runner) (GuidanceInjectio
 		result.Files = append(result.Files, path)
 	}
 	return result, nil
+}
+
+func legacyOpenCodeManagedPaths(homeDir string) []string {
+	adapter := opencode.NewAdapter()
+	settingsPath := adapter.SettingsPath(homeDir)
+	paths := []string{settingsPath}
+	if strings.HasSuffix(settingsPath, ".json") {
+		paths = append(paths, strings.TrimSuffix(settingsPath, ".json")+".jsonc")
+	}
+	return paths
 }
 
 func readCodeGraphManagedFiles(paths []string) map[string]string {

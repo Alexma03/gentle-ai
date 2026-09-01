@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/communitytool"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/pipeline"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/planner"
@@ -65,14 +65,14 @@ func TestInstallRuntimeStagePlanKeepsPiReconcileIndependentFromOpenCode(t *testi
 func TestInstallRuntimeStagePlanDeselectionCleansOwnedPiIntegration(t *testing.T) {
 	home := t.TempDir()
 	writePiInstallFixture(t, home)
-	if _, err := communitytool.ReconcilePiCodeGraph(communitytool.PiCodeGraphOptions{
+	if _, err := codegraph.ReconcilePiCodeGraph(codegraph.PiCodeGraphOptions{
 		HomeDir:  home,
 		Selected: true,
-		EffectiveMCPProbe: func(string) (communitytool.PiCodeGraphMCPProbeResult, error) {
-			return communitytool.PiCodeGraphMCPProbeResult{
+		EffectiveMCPProbe: func(string) (codegraph.PiCodeGraphMCPProbeResult, error) {
+			return codegraph.PiCodeGraphMCPProbeResult{
 				AdapterAvailable: true,
 				Initialized:      true,
-				Tools: []communitytool.PiCodeGraphMCPTool{{
+				Tools: []codegraph.PiCodeGraphMCPTool{{
 					Name: "codegraph_explore",
 					InputSchema: map[string]any{
 						"type": "object",
@@ -150,7 +150,7 @@ func TestBackupTargetsSnapshotCrossAgentCodeGraphGuidance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	guidancePaths := communitytool.CodeGraphGuidancePaths(home)
+	guidancePaths := codegraph.CodeGraphGuidancePaths(home)
 	if len(guidancePaths) == 0 {
 		t.Fatal("CodeGraphGuidancePaths() = empty; Claude fixture was not detected")
 	}
@@ -191,8 +191,8 @@ func TestCodeGraphFailureDoesNotLeaveEarlierOpenCodePluginRegistration(t *testin
 
 	previousInstall := installCommunityToolWithHome
 	t.Cleanup(func() { installCommunityToolWithHome = previousInstall })
-	installCommunityToolWithHome = func(model.CommunityToolID, string, string, communitytool.Runner, communitytool.Detector) (communitytool.Result, error) {
-		return communitytool.Result{Tool: model.CommunityToolCodeGraph}, errors.New("CodeGraph reconciliation failed")
+	installCommunityToolWithHome = func(model.CommunityToolID, string, string, codegraph.Runner, codegraph.Detector) (codegraph.Result, error) {
+		return codegraph.Result{Tool: model.CommunityToolCodeGraph}, errors.New("CodeGraph reconciliation failed")
 	}
 
 	runtime, err := newInstallRuntime(home, ScopeGlobal, ChannelStable, model.Selection{
@@ -238,9 +238,9 @@ func TestInstallRollbackRestoresSelectedOpenCodePluginPathsAfterPluginRegistrati
 			previousInstall := installCommunityToolWithHome
 			t.Cleanup(func() { installCommunityToolWithHome = previousInstall })
 			codeGraphSucceeded := false
-			installCommunityToolWithHome = func(model.CommunityToolID, string, string, communitytool.Runner, communitytool.Detector) (communitytool.Result, error) {
+			installCommunityToolWithHome = func(model.CommunityToolID, string, string, codegraph.Runner, codegraph.Detector) (codegraph.Result, error) {
 				codeGraphSucceeded = true
-				return communitytool.Result{Tool: model.CommunityToolCodeGraph}, nil
+				return codegraph.Result{Tool: model.CommunityToolCodeGraph}, nil
 			}
 
 			runtime, err := newInstallRuntime(home, ScopeGlobal, ChannelStable, model.Selection{
@@ -329,8 +329,8 @@ func TestSuccessfulCodeGraphReconciliationStillRegistersOpenCodePlugin(t *testin
 
 	previousInstall := installCommunityToolWithHome
 	t.Cleanup(func() { installCommunityToolWithHome = previousInstall })
-	installCommunityToolWithHome = func(model.CommunityToolID, string, string, communitytool.Runner, communitytool.Detector) (communitytool.Result, error) {
-		return communitytool.Result{Tool: model.CommunityToolCodeGraph}, nil
+	installCommunityToolWithHome = func(model.CommunityToolID, string, string, codegraph.Runner, codegraph.Detector) (codegraph.Result, error) {
+		return codegraph.Result{Tool: model.CommunityToolCodeGraph}, nil
 	}
 
 	runtime, err := newInstallRuntime(home, ScopeGlobal, ChannelStable, model.Selection{
@@ -387,15 +387,15 @@ func TestPiCodeGraphPendingClassification(t *testing.T) {
 		err     error
 		pending bool
 	}{
-		{name: "bare", err: communitytool.ErrPiCodeGraphAdapterHealthUnavailable, pending: true},
-		{name: "wrapped", err: fmt.Errorf("verify adapter: %w", communitytool.ErrPiCodeGraphAdapterHealthUnavailable), pending: true},
-		{name: "all pending join", err: errors.Join(communitytool.ErrPiCodeGraphAdapterHealthUnavailable, fmt.Errorf("wrapped: %w", communitytool.ErrPiCodeGraphAdapterHealthUnavailable)), pending: true},
-		{name: "pending plus rollback failure", err: errors.Join(communitytool.ErrPiCodeGraphAdapterHealthUnavailable, realErr)},
+		{name: "bare", err: codegraph.ErrPiCodeGraphAdapterHealthUnavailable, pending: true},
+		{name: "wrapped", err: fmt.Errorf("verify adapter: %w", codegraph.ErrPiCodeGraphAdapterHealthUnavailable), pending: true},
+		{name: "all pending join", err: errors.Join(codegraph.ErrPiCodeGraphAdapterHealthUnavailable, fmt.Errorf("wrapped: %w", codegraph.ErrPiCodeGraphAdapterHealthUnavailable)), pending: true},
+		{name: "pending plus rollback failure", err: errors.Join(codegraph.ErrPiCodeGraphAdapterHealthUnavailable, realErr)},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := communitytool.PreservePiCodeGraphPending(communitytool.PiCodeGraphResult{}, tc.err)
+			result, err := codegraph.PreservePiCodeGraphPending(codegraph.PiCodeGraphResult{}, tc.err)
 			if tc.pending {
 				if err != nil || len(result.ManualActions) != 1 || !strings.Contains(result.ManualActions[0], "pending") {
 					t.Fatalf("result=%#v error=%v, want exactly one pending action", result, err)
@@ -410,7 +410,7 @@ func TestPiCodeGraphPendingClassification(t *testing.T) {
 }
 
 func TestRenderInstallManualActionsIncludesPiCodeGraphDrift(t *testing.T) {
-	out := RenderInstallManualActions(InstallResult{PiCodeGraph: &communitytool.PiCodeGraphResult{ManualActions: []string{"Pi CodeGraph child drifted; preserved: /tmp/worker.md"}}})
+	out := RenderInstallManualActions(InstallResult{PiCodeGraph: &codegraph.PiCodeGraphResult{ManualActions: []string{"Pi CodeGraph child drifted; preserved: /tmp/worker.md"}}})
 	if !strings.Contains(out, "Manual actions required") || !strings.Contains(out, "child drifted") {
 		t.Fatalf("CLI manual action missing: %q", out)
 	}
@@ -616,12 +616,12 @@ func TestCommunityToolInstallStepUsesInjectableInstaller(t *testing.T) {
 
 	var gotTool model.CommunityToolID
 	var gotWorkspace string
-	var runner communitytool.Runner
-	installCommunityToolWithHome = func(tool model.CommunityToolID, workspaceDir string, _ string, r communitytool.Runner, _ communitytool.Detector) (communitytool.Result, error) {
+	var runner codegraph.Runner
+	installCommunityToolWithHome = func(tool model.CommunityToolID, workspaceDir string, _ string, r codegraph.Runner, _ codegraph.Detector) (codegraph.Result, error) {
 		gotTool = tool
 		gotWorkspace = workspaceDir
 		runner = r
-		return communitytool.Result{Tool: tool}, nil
+		return codegraph.Result{Tool: tool}, nil
 	}
 
 	step := communityToolInstallStep{id: "community-tool:codegraph", tool: model.CommunityToolCodeGraph, workspaceDir: "/work/project"}
@@ -637,9 +637,9 @@ func TestCommunityToolInstallStepPassesRuntimeHomeToPiReconciler(t *testing.T) {
 	previous := installCommunityToolWithHome
 	t.Cleanup(func() { installCommunityToolWithHome = previous })
 	var gotHome string
-	installCommunityToolWithHome = func(_ model.CommunityToolID, _ string, home string, _ communitytool.Runner, _ communitytool.Detector) (communitytool.Result, error) {
+	installCommunityToolWithHome = func(_ model.CommunityToolID, _ string, home string, _ codegraph.Runner, _ codegraph.Detector) (codegraph.Result, error) {
 		gotHome = home
-		return communitytool.Result{Tool: model.CommunityToolCodeGraph}, nil
+		return codegraph.Result{Tool: model.CommunityToolCodeGraph}, nil
 	}
 	step := communityToolInstallStep{id: "community-tool:codegraph", tool: model.CommunityToolCodeGraph, workspaceDir: "/work/project", homeDir: "/tmp/pi-home"}
 	if err := step.Run(); err != nil {
@@ -653,9 +653,9 @@ func TestCommunityToolInstallStepPassesRuntimeHomeToPiReconciler(t *testing.T) {
 func TestInstallPipelinePropagatesInitialPiPendingWhenPiUnselected(t *testing.T) {
 	previous := installCommunityToolWithHome
 	t.Cleanup(func() { installCommunityToolWithHome = previous })
-	pending := communitytool.PiCodeGraphResult{ManualActions: []string{"Pi CodeGraph runtime verification is pending."}}
-	installCommunityToolWithHome = func(_ model.CommunityToolID, _ string, _ string, _ communitytool.Runner, _ communitytool.Detector) (communitytool.Result, error) {
-		return communitytool.Result{Tool: model.CommunityToolCodeGraph, PiCodeGraph: &pending}, nil
+	pending := codegraph.PiCodeGraphResult{ManualActions: []string{"Pi CodeGraph runtime verification is pending."}}
+	installCommunityToolWithHome = func(_ model.CommunityToolID, _ string, _ string, _ codegraph.Runner, _ codegraph.Detector) (codegraph.Result, error) {
+		return codegraph.Result{Tool: model.CommunityToolCodeGraph, PiCodeGraph: &pending}, nil
 	}
 	runtime := &installRuntime{
 		selection: model.Selection{CommunityTools: []model.CommunityToolID{model.CommunityToolCodeGraph}},
@@ -680,12 +680,12 @@ func TestInstallPipelineDoesNotDuplicatePiPendingWhenSelected(t *testing.T) {
 		installCommunityToolWithHome = previousInstall
 		reconcilePiCodeGraph = previousReconcile
 	})
-	pending := communitytool.PiCodeGraphResult{ManualActions: []string{"Pi CodeGraph integration remains pending: CodeGraph configuration was installed and preserved, and direct MCP capability was verified. Pi adapter activation health cannot be machine-verified on the detected Pi version."}}
-	installCommunityToolWithHome = func(_ model.CommunityToolID, _ string, _ string, _ communitytool.Runner, _ communitytool.Detector) (communitytool.Result, error) {
-		return communitytool.Result{Tool: model.CommunityToolCodeGraph, PiCodeGraph: &pending}, nil
+	pending := codegraph.PiCodeGraphResult{ManualActions: []string{"Pi CodeGraph integration remains pending: CodeGraph configuration was installed and preserved, and direct MCP capability was verified. Pi adapter activation health cannot be machine-verified on the detected Pi version."}}
+	installCommunityToolWithHome = func(_ model.CommunityToolID, _ string, _ string, _ codegraph.Runner, _ codegraph.Detector) (codegraph.Result, error) {
+		return codegraph.Result{Tool: model.CommunityToolCodeGraph, PiCodeGraph: &pending}, nil
 	}
-	reconcilePiCodeGraph = func(communitytool.PiCodeGraphOptions) (communitytool.PiCodeGraphResult, error) {
-		return pending, communitytool.ErrPiCodeGraphAdapterHealthUnavailable
+	reconcilePiCodeGraph = func(codegraph.PiCodeGraphOptions) (codegraph.PiCodeGraphResult, error) {
+		return pending, codegraph.ErrPiCodeGraphAdapterHealthUnavailable
 	}
 	runtime := &installRuntime{
 		// newInstallRuntime never yields an empty homeDir, and the routing
@@ -730,15 +730,15 @@ func TestPiCodeGraphMCPRuntimeClassification(t *testing.T) {
 			mustWriteFile(t, filepath.Join(home, ".pi", "agent", "npm", "node_modules", "pi-mcp-adapter", "index.ts"), []byte("export default {}\n"))
 			installFakeCodeGraphMCP(t, tc.tools)
 
-			result, err := communitytool.ReconcilePiCodeGraph(communitytool.PiCodeGraphOptions{HomeDir: home, Selected: true})
-			result, err = communitytool.PreservePiCodeGraphPending(result, err)
+			result, err := codegraph.ReconcilePiCodeGraph(codegraph.PiCodeGraphOptions{HomeDir: home, Selected: true})
+			result, err = codegraph.PreservePiCodeGraphPending(result, err)
 			if tc.pending {
 				if err != nil || len(result.ManualActions) != 1 {
 					t.Fatalf("result=%#v error=%v, want exactly one pending action", result, err)
 				}
 				return
 			}
-			if err == nil || errors.Is(err, communitytool.ErrPiCodeGraphAdapterHealthUnavailable) {
+			if err == nil || errors.Is(err, codegraph.ErrPiCodeGraphAdapterHealthUnavailable) {
 				t.Fatalf("result=%#v error=%v, want concrete fatal runtime error", result, err)
 			}
 		})

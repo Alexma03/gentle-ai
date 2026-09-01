@@ -21,7 +21,6 @@ import (
 	opencodeagent "github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/backup"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/communitytool"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/engram"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/filemerge"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/gga"
@@ -720,7 +719,7 @@ func syncBackupTargets(homeDir, workspaceDir string, selection model.Selection, 
 			paths[path] = struct{}{}
 		}
 	}
-	for _, path := range communitytool.PiCodeGraphPaths(homeDir, workspaceDir) {
+	for _, path := range codegraph.PiCodeGraphPaths(homeDir, workspaceDir) {
 		paths[path] = struct{}{}
 	}
 	if containsAgent(selection.Agents, model.AgentOpenCode) {
@@ -858,7 +857,7 @@ type componentSyncStep struct {
 type codeGraphGuidanceSyncStep struct {
 	id           string
 	homeDir      string
-	runner       communitytool.Runner
+	runner       codegraph.Runner
 	changedFiles *[]string
 	before       map[string]syncFileSnapshot
 }
@@ -908,7 +907,7 @@ func anyAgentReceivesManagedOpenCodePlugins(agentIDs []model.AgentID) bool {
 	return false
 }
 
-var refreshPiCodeGraphIfConfigured = communitytool.RefreshPiCodeGraphIfConfigured
+var refreshPiCodeGraphIfConfigured = codegraph.RefreshPiCodeGraphIfConfigured
 
 func (s piCodeGraphSyncStep) ID() string { return s.id }
 func (s piCodeGraphSyncStep) Run() error {
@@ -927,7 +926,7 @@ func (s *codeGraphGuidanceSyncStep) ID() string {
 }
 
 func (s *codeGraphGuidanceSyncStep) Run() (runErr error) {
-	before, err := snapshotSyncFiles(communitytool.CodeGraphManagedPaths(s.homeDir))
+	before, err := snapshotSyncFiles(codegraph.CodeGraphManagedPaths(s.homeDir))
 	if err != nil {
 		return err
 	}
@@ -938,9 +937,9 @@ func (s *codeGraphGuidanceSyncStep) Run() (runErr error) {
 		}
 	}()
 
-	status := communitytool.DetectStatus(model.CommunityToolCodeGraph, s.homeDir, communitytool.DetectorFunc(cmdLookPath))
-	if status.CLI == communitytool.AvailabilityAvailable && communitytool.NeedsOpenCodeCodeGraphReconcile(s.homeDir) {
-		reconciled, err := communitytool.ReconcileOpenCodeCodeGraph(s.homeDir, s.runner)
+	status := codegraph.DetectStatusByID(model.CommunityToolCodeGraph, s.homeDir, codegraph.DetectorFunc(cmdLookPath))
+	if status.CLI == codegraph.AvailabilityAvailable && codegraph.NeedsOpenCodeCodeGraphReconcile(s.homeDir) {
+		reconciled, err := codegraph.ReconcileOpenCodeCodeGraph(s.homeDir, s.runner)
 		if err != nil {
 			return fmt.Errorf("sync OpenCode CodeGraph wiring: %w", err)
 		}
@@ -949,12 +948,12 @@ func (s *codeGraphGuidanceSyncStep) Run() (runErr error) {
 		}
 	}
 
-	res, configured, err := communitytool.RefreshCodeGraphGuidanceIfConfigured(s.homeDir, communitytool.DetectorFunc(cmdLookPath))
+	res, configured, err := codegraph.RefreshCodeGraphGuidanceIfConfigured(s.homeDir, codegraph.DetectorFunc(cmdLookPath))
 	if err != nil {
 		return fmt.Errorf("sync CodeGraph guidance: %w", err)
 	}
 	if !configured {
-		res, err = communitytool.CleanLegacyCodeGraphGuidance(s.homeDir)
+		res, err = codegraph.CleanLegacyCodeGraphGuidance(s.homeDir)
 		if err != nil {
 			return fmt.Errorf("sync legacy CodeGraph guidance cleanup: %w", err)
 		}
@@ -1967,7 +1966,7 @@ func restorePersistedCommunityTools(homeDir string, selection *model.Selection, 
 		}
 		return
 	}
-	if communitytool.HasManagedCodeGraphGuidance(homeDir) || hasManagedPiCodeGraphManifest(homeDir) {
+	if codegraph.HasManagedCodeGraphGuidance(homeDir) || hasManagedPiCodeGraphManifest(homeDir) {
 		selection.CommunityTools = []model.CommunityToolID{model.CommunityToolCodeGraph}
 	}
 }

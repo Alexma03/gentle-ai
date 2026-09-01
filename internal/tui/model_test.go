@@ -16,7 +16,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/backup"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/cli"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/communitytool"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/opencodeplugin"
 	componentuninstall "github.com/gentleman-programming/gentle-ai/v2/internal/components/uninstall"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
@@ -755,7 +755,7 @@ func TestPiCombinedWithOtherAgentsTUIInstallKeepsAllAgentsInPlan(t *testing.T) {
 	m := NewModel(system.DetectionResult{}, "dev")
 	m.Screen = ScreenAgents
 	m.InstallFlowActive = true
-	m.Selection.Agents = []model.AgentID{model.AgentPi, model.AgentOpenCode, model.AgentClaudeCode}
+	m.Selection.Agents = []model.AgentID{model.AgentPi, model.AgentCodex, model.AgentClaudeCode}
 	m.Cursor = len(screensAgentOptions())
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -787,18 +787,11 @@ func TestPiCombinedWithOtherAgentsTUIInstallKeepsAllAgentsInPlan(t *testing.T) {
 	state.Cursor = len(communityToolDefinitions()) * 2
 	updated, _ = state.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	state = updated.(Model)
-	if state.Screen != ScreenOpenCodePlugins {
-		t.Fatalf("after community tools screen = %v, want %v", state.Screen, ScreenOpenCodePlugins)
-	}
-
-	state.Cursor = len(opencodepluginDefinitions()) * 2 // Continue without optional plugins.
-	updated, _ = state.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	state = updated.(Model)
 	if state.Screen != ScreenDependencyTree {
-		t.Fatalf("after OpenCode plugins screen = %v, want %v", state.Screen, ScreenDependencyTree)
+		t.Fatalf("after community tools screen = %v, want %v", state.Screen, ScreenDependencyTree)
 	}
 
-	wantAgents := []model.AgentID{model.AgentPi, model.AgentOpenCode, model.AgentClaudeCode}
+	wantAgents := []model.AgentID{model.AgentPi, model.AgentCodex, model.AgentClaudeCode}
 	if !reflect.DeepEqual(state.DependencyPlan.Agents, wantAgents) {
 		t.Fatalf("dependency agents = %v, want %v", state.DependencyPlan.Agents, wantAgents)
 	}
@@ -2029,16 +2022,16 @@ func TestStandaloneCommunityToolsLoadsStatusBeforeInstall(t *testing.T) {
 	originalStatus := communityToolStatusFn
 	t.Cleanup(func() { communityToolStatusFn = originalStatus })
 
-	communityToolStatusFn = func(id model.CommunityToolID, homeDir string, detector communitytool.Detector) communitytool.Status {
+	communityToolStatusFn = func(id model.CommunityToolID, homeDir string, detector codegraph.Detector) codegraph.Status {
 		if id != model.CommunityToolCodeGraph {
 			t.Fatalf("status id = %q, want CodeGraph", id)
 		}
-		return communitytool.Status{
+		return codegraph.Status{
 			Tool: id,
-			CLI:  communitytool.AvailabilityAvailable,
-			Agents: []communitytool.AgentStatus{
-				{Agent: model.AgentClaudeCode, Name: "Claude Code", Detected: true, Configured: true, Status: communitytool.AgentStatusConfigured},
-				{Agent: model.AgentOpenCode, Name: "OpenCode", Detected: true, Configured: false, Status: communitytool.AgentStatusMissing},
+			CLI:  codegraph.AvailabilityAvailable,
+			Agents: []codegraph.AgentStatus{
+				{Agent: model.AgentClaudeCode, Name: "Claude Code", Detected: true, Configured: true, Status: codegraph.AgentStatusConfigured},
+				{Agent: model.AgentOpenCode, Name: "OpenCode", Detected: true, Configured: false, Status: codegraph.AgentStatusMissing},
 			},
 		}
 	}
@@ -2078,7 +2071,7 @@ func TestStandaloneCommunityToolsShowsResultAfterCompletion(t *testing.T) {
 	}{
 		{
 			name: "success",
-			msg: CommunityToolInstallationDoneMsg{Results: []communitytool.Result{{
+			msg: CommunityToolInstallationDoneMsg{Results: []codegraph.Result{{
 				Tool: model.CommunityToolCodeGraph,
 			}}},
 			wantText: "✓ Community tools configured",
@@ -2086,7 +2079,7 @@ func TestStandaloneCommunityToolsShowsResultAfterCompletion(t *testing.T) {
 		{
 			name: "error with partial result",
 			msg: CommunityToolInstallationDoneMsg{
-				Results: []communitytool.Result{{Tool: model.CommunityToolCodeGraph}},
+				Results: []codegraph.Result{{Tool: model.CommunityToolCodeGraph}},
 				Err:     errors.New("install failed"),
 			},
 			wantText: "Community tool setup failed",
@@ -2129,11 +2122,11 @@ func TestCommunityToolInstallationPreservesPartialResultOnError(t *testing.T) {
 	})
 
 	osGetwdFn = func() (string, error) { return "/work/project", nil }
-	communityToolInstallFn = func(id model.CommunityToolID, workspaceDir string, runner communitytool.Runner) (communitytool.Result, error) {
+	communityToolInstallFn = func(id model.CommunityToolID, workspaceDir string, runner codegraph.Runner) (codegraph.Result, error) {
 		if id != model.CommunityToolCodeGraph || workspaceDir != "/work/project" || runner == nil {
 			t.Fatalf("install args = (%q, %q, %#v), want CodeGraph, workspace, runner", id, workspaceDir, runner)
 		}
-		return communitytool.Result{
+		return codegraph.Result{
 			Tool:        id,
 			CommandsRun: []string{"npm exec --yes --package @colbymchenry/codegraph@latest -- codegraph install --yes"},
 		}, errors.New("install failed")
@@ -2324,6 +2317,7 @@ func TestUninstallModeScreen_CleanInstallNavigatesToConfirm(t *testing.T) {
 }
 
 func TestUninstallModeScreen_FullWithProfilesNavigatesToProfileSelection(t *testing.T) {
+	t.Skip("OpenCode profile selection is retired from the canonical client flow")
 	orig := readProfilesFn
 	readProfilesFn = func(_ string) ([]model.Profile, error) {
 		return []model.Profile{{Name: "cheap"}, {Name: "fast"}}, nil

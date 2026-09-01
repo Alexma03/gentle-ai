@@ -1,4 +1,4 @@
-package communitytool
+package codegraph
 
 import (
 	"errors"
@@ -72,7 +72,7 @@ func TestExcludedAgentsNeverEnterCodeGraphSurfaces(t *testing.T) {
 			if _, ok := reg.Get(id); ok {
 				t.Fatalf("retired adapter %q entered default registry", id)
 			}
-			status := DetectStatus(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) { return "/bin/codegraph", nil }))
+			status := DetectStatusByID(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) { return "/bin/codegraph", nil }))
 			if slices.ContainsFunc(status.Agents, func(agent AgentStatus) bool { return agent.Agent == id }) {
 				t.Fatalf("excluded agent entered status: %#v", status.Agents)
 			}

@@ -23,7 +23,6 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/backup"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/agentguidance"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/communitytool"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/engram"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/filemerge"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/gga"
@@ -53,7 +52,7 @@ type InstallResult struct {
 	Execution    pipeline.ExecutionResult
 	Verify       verify.Report
 	Dependencies system.DependencyReport
-	PiCodeGraph  *communitytool.PiCodeGraphResult
+	PiCodeGraph  *codegraph.PiCodeGraphResult
 	DryRun       bool
 
 	Background              OpenCodeBackgroundResolution
@@ -70,8 +69,8 @@ var (
 	cmdLookPath                  = exec.LookPath
 	streamCommandOutput          = true
 	goEnv                        = defaultGoEnv
-	installCommunityTool         = communitytool.Install
-	installCommunityToolWithHome = communitytool.InstallWithHome
+	installCommunityTool         = codegraph.InstallByID
+	installCommunityToolWithHome = codegraph.InstallWithHome
 	installCodeGraph             = codegraph.Install
 	injectSDD                    = sdd.Inject
 	pathEnvEntries               = func(profile system.PlatformProfile) []string {
@@ -665,7 +664,7 @@ type installRuntime struct {
 type runtimeState struct {
 	manifest                 backup.Manifest
 	rollbackSnapshotDir      string
-	piCodeGraph              *communitytool.PiCodeGraphResult
+	piCodeGraph              *codegraph.PiCodeGraphResult
 	compatibilityTransaction compatibilityRefreshTransaction
 
 	// engramVersionResolved, engramVersion, and engramVersionErr cache the
@@ -1033,12 +1032,12 @@ type piCodeGraphReconcileStep struct {
 	state                     *runtimeState
 }
 
-var reconcilePiCodeGraph = communitytool.ReconcilePiCodeGraph
+var reconcilePiCodeGraph = codegraph.ReconcilePiCodeGraph
 
 func (s piCodeGraphReconcileStep) ID() string { return s.id }
 func (s piCodeGraphReconcileStep) Run() error {
-	result, err := reconcilePiCodeGraph(communitytool.PiCodeGraphOptions{HomeDir: s.homeDir, WorkspaceDir: s.workspaceDir, Selected: s.selected})
-	result, err = communitytool.PreservePiCodeGraphPending(result, err)
+	result, err := reconcilePiCodeGraph(codegraph.PiCodeGraphOptions{HomeDir: s.homeDir, WorkspaceDir: s.workspaceDir, Selected: s.selected})
+	result, err = codegraph.PreservePiCodeGraphPending(result, err)
 	if err == nil && s.state != nil {
 		s.state.piCodeGraph = &result
 	}
@@ -1049,7 +1048,7 @@ func (s piCodeGraphReconcileStep) Run() error {
 // this late pipeline step. This covers overlays discovered after package
 // installation, which cannot be part of the pre-install static snapshot.
 func (s piCodeGraphReconcileStep) Rollback() error {
-	_, err := communitytool.UninstallPiCodeGraph(s.homeDir)
+	_, err := codegraph.UninstallPiCodeGraph(s.homeDir)
 	return err
 }
 
@@ -1325,7 +1324,7 @@ type communityToolInstallStep struct {
 func (s communityToolInstallStep) ID() string { return s.id }
 
 func (s communityToolInstallStep) Run() error {
-	result, err := installCommunityToolWithHome(s.tool, s.workspaceDir, s.homeDir, communitytool.RunnerFunc(runCommand), communitytool.DetectorFunc(cmdLookPath))
+	result, err := installCommunityToolWithHome(s.tool, s.workspaceDir, s.homeDir, codegraph.RunnerFunc(runCommand), codegraph.DetectorFunc(cmdLookPath))
 	if err != nil {
 		return fmt.Errorf("install community tool %q: %w", s.tool, err)
 	}
@@ -2062,7 +2061,7 @@ func backupTargets(homeDir, workspaceDir string, scope InstallScope, selection m
 		}
 	}
 	if containsAgent(resolved.Agents, model.AgentPi) {
-		for _, path := range communitytool.PiCodeGraphPaths(homeDir, workspaceDir) {
+		for _, path := range codegraph.PiCodeGraphPaths(homeDir, workspaceDir) {
 			paths[path] = struct{}{}
 		}
 	}
@@ -2432,7 +2431,7 @@ func codeGraphGuidanceMarkdownForSDD(homeDir string, selected []model.CommunityT
 	if !shouldInjectCodeGraphGuidanceForSDD(homeDir, selected) {
 		return ""
 	}
-	return communitytool.CodeGraphGuidanceMarkdown()
+	return codegraph.CodeGraphGuidanceMarkdown()
 }
 
 func codeGraphGuidanceMarkdownForSelection(homeDir string, selection model.Selection) string {
@@ -2680,39 +2679,12 @@ func engramHealthChecks(state *runtimeState) []verify.Check {
 	}
 }
 
-// antigravityCollisionCheck returns a soft verify check that warns the user
-// when Antigravity and Gemini CLI are selected together. These agents
-// intentionally share ~/.gemini/GEMINI.md because Antigravity uses a
-// Gemini-compatible prompt surface; the last synced SDD orchestrator owns the
-// shared gentle-ai:sdd-orchestrator section.
+// antigravityCollisionCheck is retained as a compatibility seam for callers
+// that still pass legacy agent selections. Gemini CLI is no longer a
+// selectable client, so Antigravity's shared ~/.gemini/GEMINI.md prompt must
+// never produce a selection collision warning.
 func antigravityCollisionCheck(agents []model.AgentID) []verify.Check {
-	hasAntigravitySurface := false
-	hasGemini := false
-	for _, id := range agents {
-		if id == model.AgentAntigravity {
-			hasAntigravitySurface = true
-		}
-		if id == model.AgentGeminiCLI {
-			hasGemini = true
-		}
-	}
-	if !hasAntigravitySurface || !hasGemini {
-		return nil
-	}
-	return []verify.Check{
-		{
-			ID:          "verify:antigravity:rules-collision",
-			Description: "Antigravity and Gemini CLI share ~/.gemini/GEMINI.md",
-			Soft:        true,
-			Run: func(context.Context) error {
-				return fmt.Errorf(
-					"Antigravity and Gemini CLI write rules to ~/.gemini/GEMINI.md\n" +
-						"Antigravity intentionally uses the Gemini-compatible global prompt surface; the last synced SDD orchestrator owns the shared gentle-ai:sdd-orchestrator section.\n" +
-						"Prefer Antigravity for new installs; keep Gemini CLI selected only when you intentionally want that legacy prompt to be the active one.",
-				)
-			},
-		},
-	}
+	return nil
 }
 
 func engramPathGuidance(shellPath string) string {

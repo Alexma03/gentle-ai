@@ -1,4 +1,4 @@
-package communitytool
+package codegraph
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
 	piagent "github.com/gentleman-programming/gentle-ai/v2/internal/agents/pi"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/catalog"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
@@ -117,7 +118,7 @@ func DefinitionFor(id model.CommunityToolID) (Definition, bool) {
 	return Definition{}, false
 }
 
-func Install(id model.CommunityToolID, workspaceDir string, runner Runner) (Result, error) {
+func InstallByID(id model.CommunityToolID, workspaceDir string, runner Runner) (Result, error) {
 	return InstallWithHome(id, workspaceDir, defaultHomeDir(), runner, DetectorFunc(exec.LookPath))
 }
 
@@ -134,7 +135,7 @@ func InstallWithHome(id model.CommunityToolID, workspaceDir string, homeDir stri
 	}
 
 	result := Result{Tool: id}
-	before := DetectStatus(id, homeDir, detector)
+	before := DetectStatusByID(id, homeDir, detector)
 	result.StatusBefore = &before
 	snapshots, err := snapshotCodeGraphPaths(CodeGraphManagedPaths(homeDir))
 	if err != nil {
@@ -166,7 +167,7 @@ func InstallWithHome(id model.CommunityToolID, workspaceDir string, homeDir stri
 		if piResult != nil {
 			result.ManualActions = append(result.ManualActions, piResult.ManualActions...)
 		}
-		after := DetectStatus(id, homeDir, detector)
+		after := DetectStatusByID(id, homeDir, detector)
 		result.StatusAfter = &after
 		if err := validateCodeGraphInstallStatus(after); err != nil {
 			return rollback(err)
@@ -224,7 +225,7 @@ func InstallWithHome(id model.CommunityToolID, workspaceDir string, homeDir stri
 			return rollback(fmt.Errorf("run %q: %w", strings.Join(command, " "), err))
 		}
 		if before.CLI != AvailabilityAvailable && index == 0 {
-			afterPackageInstall := DetectStatus(id, homeDir, detector)
+			afterPackageInstall := DetectStatusByID(id, homeDir, detector)
 			result.StatusAfter = &afterPackageInstall
 			if afterPackageInstall.CLI != AvailabilityAvailable {
 				return rollback(fmt.Errorf("CodeGraph package installation did not leave a runnable codegraph CLI available"))
@@ -245,7 +246,7 @@ func InstallWithHome(id model.CommunityToolID, workspaceDir string, homeDir stri
 	if piResult != nil {
 		result.ManualActions = append(result.ManualActions, piResult.ManualActions...)
 	}
-	after := DetectStatus(id, homeDir, detector)
+	after := DetectStatusByID(id, homeDir, detector)
 	result.StatusAfter = &after
 	if err := validateCodeGraphInstallStatus(after); err != nil {
 		return rollback(err)
@@ -316,7 +317,7 @@ func validateCodeGraphInstallStatus(status Status) error {
 	return nil
 }
 
-func DetectStatus(id model.CommunityToolID, homeDir string, detector Detector) Status {
+func DetectStatusByID(id model.CommunityToolID, homeDir string, detector Detector) Status {
 	status := Status{Tool: id, CLI: AvailabilityMissing}
 	def, ok := DefinitionFor(id)
 	if !ok || id != model.CommunityToolCodeGraph {
@@ -484,6 +485,14 @@ func hasDetectedCodeGraphToolWiring(homeDir string) bool {
 			continue
 		}
 		if _, ok := hasCodeGraphToolWiring(homeDir, adapter); ok {
+			return true
+		}
+	}
+	// OpenCode is retired from the selectable registry, but its existing
+	// configuration remains readable so migration and rollback can repair it
+	// without reintroducing the selector.
+	if legacyOpenCodeConfigPresent(homeDir) {
+		if _, configured := hasCodeGraphToolWiring(homeDir, opencode.NewAdapter()); configured {
 			return true
 		}
 	}

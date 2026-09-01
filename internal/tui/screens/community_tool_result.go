@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/communitytool"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/tui/styles"
 )
 
-func RenderCommunityToolResult(results []communitytool.Result, err error) string {
+func RenderCommunityToolResult(results []codegraph.Result, err error) string {
 	var b strings.Builder
 	b.WriteString(styles.TitleStyle.Render("Community Tools/Plugins"))
 	b.WriteString("\n\n")
@@ -38,7 +38,7 @@ func RenderCommunityToolResult(results []communitytool.Result, err error) string
 	return styles.FrameStyle.Render(b.String())
 }
 
-func renderCommunityToolResultDetails(b *strings.Builder, results []communitytool.Result) {
+func renderCommunityToolResultDetails(b *strings.Builder, results []codegraph.Result) {
 	for _, result := range results {
 		status := result.StatusAfter
 		if status == nil {
@@ -71,7 +71,7 @@ func renderCommunityToolResultDetails(b *strings.Builder, results []communitytoo
 }
 
 func toolName(id model.CommunityToolID) string {
-	if def, ok := communitytool.DefinitionFor(id); ok {
+	if def, ok := codegraph.DefinitionFor(id); ok {
 		return def.Name
 	}
 	return string(id)

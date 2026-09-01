@@ -1,4 +1,4 @@
-package communitytool
+package codegraph
 
 import (
 	"bufio"
@@ -356,7 +356,6 @@ func TestCodeGraphGuidanceContainsLazyInitAndUsageRules(t *testing.T) {
 
 func TestCodeGraphGuidanceInjectsForRepresentativeAgents(t *testing.T) {
 	home := t.TempDir()
-	mustWrite(t, filepath.Join(home, ".config", "opencode", "opencode.json"), `{"agent":{"worker":{"prompt":"use codegraph_explore"}}}`)
 	mustWrite(t, filepath.Join(home, ".claude", "settings.json"), `{}`)
 	mustWrite(t, filepath.Join(home, ".codex", "config.toml"), `[mcp_servers.codegraph]`)
 	mustWrite(t, filepath.Join(home, ".pi", "agent", "settings.json"), `{}`)
@@ -364,7 +363,6 @@ func TestCodeGraphGuidanceInjectsForRepresentativeAgents(t *testing.T) {
 	installed := false
 	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(string, ...string) error {
 		installed = true
-		mustWrite(t, filepath.Join(home, ".config", "opencode", "opencode.json"), `{"mcp":{"codegraph":{"type":"local","command":["codegraph","serve","--mcp"],"enabled":true}}}`)
 		mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
 		return nil
 	}), DetectorFunc(func(string) (string, error) {
@@ -381,7 +379,6 @@ func TestCodeGraphGuidanceInjectsForRepresentativeAgents(t *testing.T) {
 	}
 
 	for _, path := range []string{
-		filepath.Join(home, ".config", "opencode", "AGENTS.md"),
 		filepath.Join(home, ".claude", "CLAUDE.md"),
 		filepath.Join(home, ".codex", "AGENTS.md"),
 	} {
@@ -403,8 +400,8 @@ func TestCodeGraphGuidanceInjectsForRepresentativeAgents(t *testing.T) {
 
 func TestCodeGraphGuidanceInjectRemovesLegacySkipBlock(t *testing.T) {
 	home := t.TempDir()
-	agentsPath := filepath.Join(home, ".config", "opencode", "AGENTS.md")
-	mustWrite(t, filepath.Join(home, ".config", "opencode", "opencode.json"), `{}`)
+	agentsPath := filepath.Join(home, ".claude", "CLAUDE.md")
+	mustWrite(t, filepath.Join(home, ".claude", "settings.json"), `{}`)
 	mustWrite(t, agentsPath, strings.Join([]string{
 		"custom notes",
 		"<!-- CODEGRAPH_START -->",
@@ -441,8 +438,8 @@ func TestCodeGraphGuidanceInjectRemovesLegacySkipBlock(t *testing.T) {
 
 func TestCodeGraphGuidanceInjectRemovesUnmarkedUpstreamDuplicateBlock(t *testing.T) {
 	home := t.TempDir()
-	agentsPath := filepath.Join(home, ".config", "opencode", "AGENTS.md")
-	mustWrite(t, filepath.Join(home, ".config", "opencode", "opencode.json"), `{}`)
+	agentsPath := filepath.Join(home, ".claude", "CLAUDE.md")
+	mustWrite(t, filepath.Join(home, ".claude", "settings.json"), `{}`)
 	mustWrite(t, agentsPath, strings.Join([]string{
 		"custom notes",
 		"",
@@ -488,8 +485,8 @@ func TestCodeGraphGuidanceInjectRemovesUnmarkedUpstreamDuplicateBlock(t *testing
 
 func TestCodeGraphGuidanceInjectPreservesManualNotesInsideUnmarkedCodeGraphSection(t *testing.T) {
 	home := t.TempDir()
-	agentsPath := filepath.Join(home, ".config", "opencode", "AGENTS.md")
-	mustWrite(t, filepath.Join(home, ".config", "opencode", "opencode.json"), `{}`)
+	agentsPath := filepath.Join(home, ".claude", "CLAUDE.md")
+	mustWrite(t, filepath.Join(home, ".claude", "settings.json"), `{}`)
 	mustWrite(t, agentsPath, strings.Join([]string{
 		"custom notes",
 		"",
@@ -535,8 +532,8 @@ func TestCodeGraphGuidanceInjectPreservesManualNotesInsideUnmarkedCodeGraphSecti
 
 func TestCodeGraphGuidanceInjectPreservesManualNoteBoundaryBeforeNextHeading(t *testing.T) {
 	home := t.TempDir()
-	agentsPath := filepath.Join(home, ".config", "opencode", "AGENTS.md")
-	mustWrite(t, filepath.Join(home, ".config", "opencode", "opencode.json"), `{}`)
+	agentsPath := filepath.Join(home, ".claude", "CLAUDE.md")
+	mustWrite(t, filepath.Join(home, ".claude", "settings.json"), `{}`)
 	mustWrite(t, agentsPath, strings.Join([]string{
 		"custom notes",
 		"",
@@ -589,8 +586,8 @@ func TestCodeGraphGuidanceInjectPreservesManualNoteBoundaryBeforeNextHeading(t *
 
 func TestCodeGraphGuidanceInjectPreservesManualNotesBeforeUnmarkedUpstreamDuplicateBlock(t *testing.T) {
 	home := t.TempDir()
-	agentsPath := filepath.Join(home, ".config", "opencode", "AGENTS.md")
-	mustWrite(t, filepath.Join(home, ".config", "opencode", "opencode.json"), `{}`)
+	agentsPath := filepath.Join(home, ".claude", "CLAUDE.md")
+	mustWrite(t, filepath.Join(home, ".claude", "settings.json"), `{}`)
 	mustWrite(t, agentsPath, strings.Join([]string{
 		"custom notes",
 		"",
@@ -636,8 +633,8 @@ func TestCodeGraphGuidanceInjectPreservesManualNotesBeforeUnmarkedUpstreamDuplic
 
 func TestCodeGraphGuidanceInjectPreservesManualNotesInterleavedWithUnmarkedUpstreamDuplicateBlock(t *testing.T) {
 	home := t.TempDir()
-	agentsPath := filepath.Join(home, ".config", "opencode", "AGENTS.md")
-	mustWrite(t, filepath.Join(home, ".config", "opencode", "opencode.json"), `{}`)
+	agentsPath := filepath.Join(home, ".claude", "CLAUDE.md")
+	mustWrite(t, filepath.Join(home, ".claude", "settings.json"), `{}`)
 	mustWrite(t, agentsPath, strings.Join([]string{
 		"custom notes",
 		"",
@@ -775,10 +772,8 @@ func TestDetectStatusReportsCLIAndPerAgentWiring(t *testing.T) {
 		"CodeGraph guidance with `gentle-ai codegraph init --cwd <project-root>`",
 		"<!-- /gentle-ai:codegraph-guidance -->",
 	}, "\n"))
-	mustWrite(t, filepath.Join(home, ".config", "opencode", "opencode.json"), `{}`)
-	mustWrite(t, filepath.Join(home, ".config", "opencode", "AGENTS.md"), "<!-- gentle-ai:codegraph-guidance -->\nmanaged\n<!-- /gentle-ai:codegraph-guidance -->\n")
 
-	status := DetectStatus(model.CommunityToolCodeGraph, home, DetectorFunc(func(name string) (string, error) {
+	status := DetectStatusByID(model.CommunityToolCodeGraph, home, DetectorFunc(func(name string) (string, error) {
 		if name != "codegraph" {
 			t.Fatalf("LookPath(%q), want codegraph", name)
 		}
@@ -792,43 +787,36 @@ func TestDetectStatusReportsCLIAndPerAgentWiring(t *testing.T) {
 	if !claude.Detected || !claude.Configured || claude.Status != AgentStatusConfigured {
 		t.Fatalf("claude status = %#v, want detected configured", claude)
 	}
-	opencode := findAgentStatus(t, status, model.AgentOpenCode)
-	if !opencode.Detected || opencode.Configured || opencode.Status != AgentStatusMissing {
-		t.Fatalf("opencode status = %#v, want marker-only agent reported missing", opencode)
-	}
-	if !strings.Contains(opencode.Reason, "no effective MCP") {
-		t.Fatalf("opencode reason = %q, want missing effective MCP wiring", opencode.Reason)
-	}
 }
 
-func TestDetectStatusRecognizesOpenCodeJSONCWiring(t *testing.T) {
+func TestDetectStatusRecognizesCursorJSONCWiring(t *testing.T) {
 	home := t.TempDir()
-	mustWrite(t, filepath.Join(home, ".config", "opencode", "opencode.jsonc"), `{
+	mustWrite(t, filepath.Join(home, ".cursor", "mcp.json"), `{
   // user comment
-  "mcp": {"codegraph": {"type": "local", "command": ["codegraph", "serve", "--mcp"], "enabled": true,},},
+  "mcpServers": {"codegraph": {"command": "codegraph",},},
 }`)
-	mustWrite(t, filepath.Join(home, ".config", "opencode", "AGENTS.md"), "<!-- gentle-ai:codegraph-guidance -->\nmanaged\n<!-- /gentle-ai:codegraph-guidance -->\n")
+	mustWrite(t, filepath.Join(home, ".cursor", "rules", "gentle-ai.mdc"), "<!-- gentle-ai:codegraph-guidance -->\nmanaged\n<!-- /gentle-ai:codegraph-guidance -->\n")
 
-	status := DetectStatus(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) {
+	status := DetectStatusByID(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) {
 		return "/bin/codegraph", nil
 	}))
-	opencode := findAgentStatus(t, status, model.AgentOpenCode)
-	if !opencode.Detected || !opencode.Configured || opencode.Status != AgentStatusConfigured {
-		t.Fatalf("opencode status = %#v, want JSONC wiring configured", opencode)
+	cursor := findAgentStatus(t, status, model.AgentCursor)
+	if !cursor.Detected || !cursor.Configured || cursor.Status != AgentStatusConfigured {
+		t.Fatalf("cursor status = %#v, want JSONC wiring configured", cursor)
 	}
 }
 
-func TestDetectStatusRejectsDisabledOpenCodeWiring(t *testing.T) {
+func TestDetectStatusRejectsNonCanonicalClaudeWiring(t *testing.T) {
 	home := t.TempDir()
-	mustWrite(t, filepath.Join(home, ".config", "opencode", "opencode.json"), `{"mcp":{"codegraph":{"type":"local","command":["codegraph","serve","--mcp"],"enabled":false}}}`)
-	mustWrite(t, filepath.Join(home, ".config", "opencode", "AGENTS.md"), "<!-- gentle-ai:codegraph-guidance -->\nmanaged\n<!-- /gentle-ai:codegraph-guidance -->\n")
+	mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"./codegraph"}}}`)
+	mustWrite(t, filepath.Join(home, ".claude", "CLAUDE.md"), "<!-- gentle-ai:codegraph-guidance -->\nmanaged\n<!-- /gentle-ai:codegraph-guidance -->\n")
 
-	status := DetectStatus(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) {
+	status := DetectStatusByID(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) {
 		return "/bin/codegraph", nil
 	}))
-	opencode := findAgentStatus(t, status, model.AgentOpenCode)
-	if opencode.Configured || opencode.Status != AgentStatusMissing {
-		t.Fatalf("opencode status = %#v, want disabled MCP reported missing", opencode)
+	claude := findAgentStatus(t, status, model.AgentClaudeCode)
+	if claude.Configured || claude.Status != AgentStatusMissing {
+		t.Fatalf("claude status = %#v, want non-canonical MCP reported missing", claude)
 	}
 }
 
@@ -940,7 +928,7 @@ func TestInstallUsesUnifiedAntigravityConfigWithoutMigratedMarker(t *testing.T) 
 
 	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(name string, args ...string) error {
 		command := strings.Join(append([]string{name}, args...), " ")
-		if command != "codegraph install --target antigravity,gemini --location global --yes" {
+		if command != "codegraph install --target antigravity --location global --yes" {
 			t.Fatalf("command = %q, want targeted Antigravity install", command)
 		}
 		mustWrite(t, unifiedPath, fmt.Sprintf(`{"mcpServers":{"user":{"command":"other"},"codegraph":{"command":%q,"args":["serve","--mcp"]}}}`, absoluteCodeGraph))
@@ -950,7 +938,7 @@ func TestInstallUsesUnifiedAntigravityConfigWithoutMigratedMarker(t *testing.T) 
 	if err != nil {
 		t.Fatalf("InstallWithHome() error = %v", err)
 	}
-	if !reflect.DeepEqual(result.CommandsRun, []string{"codegraph install --target antigravity,gemini --location global --yes"}) {
+	if !reflect.DeepEqual(result.CommandsRun, []string{"codegraph install --target antigravity --location global --yes"}) {
 		t.Fatalf("CommandsRun = %#v, want targeted Antigravity install", result.CommandsRun)
 	}
 	antigravity := findAgentStatus(t, *result.StatusAfter, model.AgentAntigravity)
@@ -975,7 +963,7 @@ func TestInstallRepairsRelativeAntigravityCommand(t *testing.T) {
 
 	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(name string, args ...string) error {
 		command := strings.Join(append([]string{name}, args...), " ")
-		if command != "codegraph install --target antigravity,gemini --location global --yes" {
+		if command != "codegraph install --target antigravity --location global --yes" {
 			t.Fatalf("command = %q, want targeted Antigravity repair", command)
 		}
 		mustWrite(t, unifiedPath, `{"mcpServers":{"user":{"command":"other"},"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
@@ -989,7 +977,7 @@ func TestInstallRepairsRelativeAntigravityCommand(t *testing.T) {
 	if !before.Detected || before.Configured || before.Status != AgentStatusMissing {
 		t.Fatalf("Antigravity status before repair = %#v, want detected and missing", before)
 	}
-	wantCommands := []string{"codegraph install --target antigravity,gemini --location global --yes"}
+	wantCommands := []string{"codegraph install --target antigravity --location global --yes"}
 	if !reflect.DeepEqual(result.CommandsRun, wantCommands) {
 		t.Fatalf("CommandsRun = %#v, want repair command %#v", result.CommandsRun, wantCommands)
 	}
@@ -1046,7 +1034,7 @@ func TestDetectStatusReportsCodexMissingWhenConfigHasCodeGraphButGuidanceIsMissi
 		`command = "codegraph"`,
 	}, "\n"))
 
-	status := DetectStatus(model.CommunityToolCodeGraph, home, DetectorFunc(func(name string) (string, error) {
+	status := DetectStatusByID(model.CommunityToolCodeGraph, home, DetectorFunc(func(name string) (string, error) {
 		if name != "codegraph" {
 			t.Fatalf("LookPath(%q), want codegraph", name)
 		}
@@ -1064,7 +1052,7 @@ func TestDetectStatusReportsCodexMissingWhenConfigHasCodeGraphButGuidanceIsMissi
 }
 
 func TestDetectStatusReportsMissingCLIThroughMock(t *testing.T) {
-	status := DetectStatus(model.CommunityToolCodeGraph, t.TempDir(), DetectorFunc(func(string) (string, error) {
+	status := DetectStatusByID(model.CommunityToolCodeGraph, t.TempDir(), DetectorFunc(func(string) (string, error) {
 		return "", errors.New("not found")
 	}))
 	if status.CLI != AvailabilityMissing {
@@ -1076,7 +1064,7 @@ func TestDetectStatusReportsPiRuntimeMissingWhenAppendSystemHasNoMarker(t *testi
 	home := t.TempDir()
 	mustWrite(t, filepath.Join(home, ".pi", "agent", "settings.json"), `{}`)
 
-	status := DetectStatus(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) {
+	status := DetectStatusByID(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) {
 		return "/bin/codegraph", nil
 	}))
 	pi := findAgentStatus(t, status, model.AgentPi)
@@ -1097,7 +1085,7 @@ func TestDetectStatusRejectsPiParentMarkerAsCapabilityEvidence(t *testing.T) {
 		"<!-- /gentle-ai:codegraph-guidance -->",
 	}, "\n"))
 
-	status := DetectStatus(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) {
+	status := DetectStatusByID(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) {
 		return "/bin/codegraph", nil
 	}))
 	pi := findAgentStatus(t, status, model.AgentPi)
@@ -1113,7 +1101,7 @@ func TestDetectStatusReportsPiChildClassifications(t *testing.T) {
 	if _, err := ReconcilePiCodeGraph(PiCodeGraphOptions{HomeDir: home, Selected: true}); err != nil {
 		t.Fatal(err)
 	}
-	status := DetectStatus(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) { return "/bin/codegraph", nil }))
+	status := DetectStatusByID(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) { return "/bin/codegraph", nil }))
 	pi := findAgentStatus(t, status, model.AgentPi)
 	if len(pi.Children) != 1 || pi.Children[0].Classification != PiChildCompatible {
 		t.Fatalf("Pi classifications = %#v", pi.Children)
@@ -1203,8 +1191,8 @@ func TestInstallSkipsWhenCodeGraphAlreadyReconciled(t *testing.T) {
 
 func TestInstallRefreshesOldCodeGraphGuidanceMarker(t *testing.T) {
 	home := t.TempDir()
-	agentsPath := filepath.Join(home, ".config", "opencode", "AGENTS.md")
-	mustWrite(t, filepath.Join(home, ".config", "opencode", "opencode.json"), `{}`)
+	agentsPath := filepath.Join(home, ".claude", "CLAUDE.md")
+	mustWrite(t, filepath.Join(home, ".claude", "settings.json"), `{}`)
 	mustWrite(t, agentsPath, strings.Join([]string{
 		"user content",
 		"<!-- gentle-ai:codegraph-guidance -->",
@@ -1213,7 +1201,7 @@ func TestInstallRefreshesOldCodeGraphGuidanceMarker(t *testing.T) {
 	}, "\n"))
 
 	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(string, ...string) error {
-		mustWrite(t, filepath.Join(home, ".config", "opencode", "opencode.json"), `{"mcp":{"codegraph":{"type":"local","command":["codegraph","serve","--mcp"],"enabled":true}}}`)
+		mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
 		return nil
 	}), DetectorFunc(func(string) (string, error) {
 		return "/bin/codegraph", nil
@@ -1221,7 +1209,7 @@ func TestInstallRefreshesOldCodeGraphGuidanceMarker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InstallWithHome() error = %v", err)
 	}
-	if !reflect.DeepEqual(result.CommandsRun, []string{"codegraph install --target opencode --location global --yes"}) {
+	if !reflect.DeepEqual(result.CommandsRun, []string{"codegraph install --target claude --location global --yes"}) {
 		t.Fatalf("CommandsRun = %#v, want MCP reconciliation only", result.CommandsRun)
 	}
 
@@ -1277,7 +1265,7 @@ func TestDetectStatusRejectsWSLWindowsNPMShimWithoutExecutingIt(t *testing.T) {
 		return "", false
 	}
 
-	status := DetectStatus(model.CommunityToolCodeGraph, t.TempDir(), DetectorFunc(func(string) (string, error) {
+	status := DetectStatusByID(model.CommunityToolCodeGraph, t.TempDir(), DetectorFunc(func(string) (string, error) {
 		return "/mnt/c/Users/alan/AppData/Roaming/npm/codegraph", nil
 	}))
 	if status.CLI != AvailabilityMissing || status.CLIPath != "" {
@@ -1300,7 +1288,7 @@ func TestDetectStatusAdmitsLinuxCLIPathsWithoutRequiringFiles(t *testing.T) {
 		"/home/alan/AppData/Roaming/npm/codegraph",
 	} {
 		t.Run(path, func(t *testing.T) {
-			status := DetectStatus(model.CommunityToolCodeGraph, t.TempDir(), DetectorFunc(func(string) (string, error) {
+			status := DetectStatusByID(model.CommunityToolCodeGraph, t.TempDir(), DetectorFunc(func(string) (string, error) {
 				return path, nil
 			}))
 			if status.CLI != AvailabilityAvailable || status.CLIPath != path {
@@ -1357,7 +1345,7 @@ func TestInstallRejectsWSLWindowsNPMShimAfterPackageInstall(t *testing.T) {
 
 func TestInstallFailurePaths(t *testing.T) {
 	t.Run("nil runner", func(t *testing.T) {
-		result, err := Install(model.CommunityToolCodeGraph, "/work/project", nil)
+		result, err := InstallByID(model.CommunityToolCodeGraph, "/work/project", nil)
 		if err == nil {
 			t.Fatal("Install() error = nil, want configured runner error")
 		}
@@ -1367,7 +1355,7 @@ func TestInstallFailurePaths(t *testing.T) {
 	})
 
 	t.Run("unknown tool", func(t *testing.T) {
-		result, err := Install(model.CommunityToolID("missing-tool"), "/work/project", RunnerFunc(func(string, ...string) error { return nil }))
+		result, err := InstallByID(model.CommunityToolID("missing-tool"), "/work/project", RunnerFunc(func(string, ...string) error { return nil }))
 		if err == nil || !strings.Contains(err.Error(), "unknown community tool") {
 			t.Fatalf("Install() error = %v, want unknown tool error", err)
 		}
