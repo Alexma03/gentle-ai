@@ -33,6 +33,14 @@ func (s Selection) HasCommunityTool(tool CommunityToolID) bool {
 	return false
 }
 
+// HasCodeGraph reports whether CodeGraph is enabled through the canonical
+// component selection or the legacy community-tool field. The latter is kept
+// only as a compatibility bridge for state written before CodeGraph became a
+// first-class component.
+func (s Selection) HasCodeGraph() bool {
+	return s.HasComponent(ComponentCodeGraph) || s.HasCommunityTool(CommunityToolCodeGraph)
+}
+
 func (s Selection) HasAgent(agent AgentID) bool {
 	for _, current := range s.Agents {
 		if current == agent {

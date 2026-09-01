@@ -39,6 +39,7 @@ func MVPGraph() Graph {
 		model.ComponentSDD:                {model.ComponentEngram},
 		model.ComponentSkills:             {model.ComponentSDD},
 		model.ComponentContext7:           nil,
+		model.ComponentCodeGraph:          nil,
 		model.ComponentPersona:            nil,
 		model.ComponentPermission:         nil,
 		model.ComponentGGA:                nil,

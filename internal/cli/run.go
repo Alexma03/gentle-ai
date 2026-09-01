@@ -22,6 +22,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/assets"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/backup"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/agentguidance"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/communitytool"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/engram"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/filemerge"
@@ -71,6 +72,7 @@ var (
 	goEnv                        = defaultGoEnv
 	installCommunityTool         = communitytool.Install
 	installCommunityToolWithHome = communitytool.InstallWithHome
+	installCodeGraph             = codegraph.Install
 	injectSDD                    = sdd.Inject
 	pathEnvEntries               = func(profile system.PlatformProfile) []string {
 		return splitPathForOS(os.Getenv("PATH"), profile.OS)
@@ -826,7 +828,7 @@ func (r *installRuntime) stagePlan() pipeline.StagePlan {
 		})
 	}
 	if containsAgent(r.resolved.Agents, model.AgentPi) {
-		selected := r.selection.HasCommunityTool(model.CommunityToolCodeGraph)
+		selected := r.selection.HasCodeGraph()
 		stepID := "community-tool:pi-codegraph-reconcile"
 		if !selected {
 			stepID = "community-tool:pi-codegraph-deselect"
@@ -1457,6 +1459,16 @@ func (s componentApplyStep) Run() error {
 	adapters := resolveAdapters(s.agents)
 
 	switch s.component {
+	case model.ComponentCodeGraph:
+		result, err := installCodeGraph(s.homeDir, s.workspaceDir, codegraph.RunnerFunc(runCommand), codegraph.DetectorFunc(cmdLookPath))
+		if err != nil {
+			return fmt.Errorf("install CodeGraph: %w", err)
+		}
+		if result.PiCodeGraph != nil && s.state != nil {
+			s.state.piCodeGraph = result.PiCodeGraph
+		}
+		return nil
+
 	case model.ComponentEngram:
 		engramCommand := "engram"
 		if s.channel.IsBeta() {
@@ -1647,7 +1659,7 @@ func (s componentApplyStep) Run() error {
 				WorkspaceDir:                s.workspaceDir,
 				StrictTDD:                   s.selection.StrictTDD,
 				Profiles:                    s.selection.Profiles,
-				CodeGraphGuidanceMarkdown:   codeGraphGuidanceMarkdownForSDD(s.homeDir, s.selection.CommunityTools),
+				CodeGraphGuidanceMarkdown:   codeGraphGuidanceMarkdownForSelection(s.homeDir, s.selection),
 			}
 			opts.IncludeOpenCodeBackgroundPolicy = s.backgroundPolicy && adapter.Agent() == model.AgentOpenCode
 			if _, err := injectSDD(targetDir, adapter, s.selection.SDDMode, opts); err != nil {
@@ -2050,8 +2062,8 @@ func backupTargets(homeDir, workspaceDir string, scope InstallScope, selection m
 			paths[path] = struct{}{}
 		}
 	}
-	if selection.HasCommunityTool(model.CommunityToolCodeGraph) {
-		for _, path := range communitytool.CodeGraphManagedPaths(homeDir) {
+	if selection.HasCodeGraph() {
+		for _, path := range codegraph.ManagedPaths(homeDir) {
 			paths[path] = struct{}{}
 		}
 	}
@@ -2153,6 +2165,9 @@ func componentPathsWithWorkspace(homeDir, workspaceDir string, selection model.S
 }
 
 func componentPathsWithWorkspaceScoped(homeDir, workspaceDir string, scope InstallScope, selection model.Selection, adapters []agents.Adapter, component model.ComponentID) []string {
+	if component == model.ComponentCodeGraph {
+		return codegraph.ManagedPaths(homeDir)
+	}
 	paths := []string{}
 	for _, adapter := range adapters {
 		targetDir := componentPathDirScoped(homeDir, workspaceDir, scope, adapter, component)
@@ -2414,6 +2429,13 @@ func codeGraphGuidanceMarkdownForSDD(homeDir string, selected []model.CommunityT
 		return ""
 	}
 	return communitytool.CodeGraphGuidanceMarkdown()
+}
+
+func codeGraphGuidanceMarkdownForSelection(homeDir string, selection model.Selection) string {
+	if !selection.HasCodeGraph() {
+		return ""
+	}
+	return codegraph.CodeGraphGuidanceMarkdown()
 }
 
 func shouldInjectCodeGraphGuidanceForSDD(homeDir string, selected []model.CommunityToolID) bool {

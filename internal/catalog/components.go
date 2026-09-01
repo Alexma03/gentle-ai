@@ -13,6 +13,7 @@ var mvpComponents = []Component{
 	{ID: model.ComponentSDD, Name: "SDD", Description: "Spec-driven development workflow"},
 	{ID: model.ComponentSkills, Name: "Skills", Description: "Curated coding skill library"},
 	{ID: model.ComponentContext7, Name: "Context7", Description: "Latest framework and library docs"},
+	{ID: model.ComponentCodeGraph, Name: "CodeGraph", Description: "Code graph indexing and MCP wiring"},
 	{ID: model.ComponentPersona, Name: "Persona", Description: "Managed agent behavior and conversation tone"},
 	{ID: model.ComponentPermission, Name: "Permissions", Description: "Security-first defaults and guardrails"},
 	{ID: model.ComponentGGA, Name: "GGA", Description: "Gentleman Guardian Angel — AI provider switcher"},

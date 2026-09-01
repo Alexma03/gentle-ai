@@ -20,6 +20,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
 	opencodeagent "github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/backup"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/communitytool"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/engram"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/filemerge"
@@ -617,6 +618,10 @@ func (r *syncRuntime) stagePlan() pipeline.StagePlan {
 			runner:       codeGraphHomeRunner{homeDir: r.homeDir},
 			changedFiles: &r.changedFiles,
 		})
+	}
+	if r.selection.HasCodeGraph() {
+		// Keep the historical step ID stable for persisted community-tool
+		// selections while the canonical component is rolled out.
 		apply = append(apply, piCodeGraphSyncStep{id: "sync:community-tool:pi-codegraph", homeDir: r.homeDir, workspaceDir: r.workspaceDir, changedFiles: &r.changedFiles})
 	}
 
@@ -710,8 +715,8 @@ func syncBackupTargets(homeDir, workspaceDir string, selection model.Selection, 
 			}
 		}
 	}
-	if selection.HasCommunityTool(model.CommunityToolCodeGraph) {
-		for _, path := range communitytool.CodeGraphManagedPaths(homeDir) {
+	if selection.HasCodeGraph() {
+		for _, path := range codegraph.ManagedPaths(homeDir) {
 			paths[path] = struct{}{}
 		}
 	}
@@ -1017,6 +1022,39 @@ func (s componentSyncStep) Run() error {
 	adapters := resolveAdapters(s.agents)
 
 	switch s.component {
+	case model.ComponentCodeGraph:
+		before, err := snapshotSyncFiles(codegraph.ManagedPaths(s.homeDir))
+		if err != nil {
+			return err
+		}
+		status := codegraph.DetectStatus(s.homeDir, codegraph.DetectorFunc(cmdLookPath))
+		if status.CLI == codegraph.AvailabilityAvailable && codegraph.NeedsOpenCodeReconcile(s.homeDir) {
+			reconciled, err := codegraph.ReconcileOpenCode(s.homeDir, codeGraphHomeRunner{homeDir: s.homeDir})
+			if err != nil {
+				_ = restoreSyncFiles(before)
+				return fmt.Errorf("sync OpenCode CodeGraph wiring: %w", err)
+			}
+			if reconciled.Changed {
+				s.countChanged(boolToInt(reconciled.Changed), reconciled.Files...)
+			}
+		}
+		res, configured, err := codegraph.RefreshGuidanceIfConfigured(s.homeDir, codegraph.DetectorFunc(cmdLookPath))
+		if err != nil {
+			_ = restoreSyncFiles(before)
+			return fmt.Errorf("sync CodeGraph guidance: %w", err)
+		}
+		if !configured {
+			res, err = codegraph.CleanLegacyGuidance(s.homeDir)
+			if err != nil {
+				_ = restoreSyncFiles(before)
+				return fmt.Errorf("sync legacy CodeGraph guidance cleanup: %w", err)
+			}
+		}
+		if res.Changed {
+			s.countChanged(boolToInt(res.Changed), res.Files...)
+		}
+		return nil
+
 	case model.ComponentEngram:
 		// Sync: inject MCP config + system prompt protocol only.
 		// NO binary install. NO engram setup.
@@ -1110,7 +1148,7 @@ func (s componentSyncStep) Run() error {
 				StrictTDD:                          s.selection.StrictTDD,
 				PreserveOpenCodeOrchestratorPrompt: profileStrategy == model.SDDProfileStrategyExternalSingleActive,
 				Profiles:                           profiles,
-				CodeGraphGuidanceMarkdown:          codeGraphGuidanceMarkdownForSDD(s.homeDir, s.selection.CommunityTools),
+				CodeGraphGuidanceMarkdown:          codeGraphGuidanceMarkdownForSelection(s.homeDir, s.selection),
 			}
 			opts.IncludeOpenCodeBackgroundPolicy = s.backgroundPolicy && adapter.Agent() == model.AgentOpenCode
 			inject := sdd.Inject

@@ -87,10 +87,14 @@ const (
 type ComponentID string
 
 const (
-	ComponentEngram             ComponentID = "engram"
-	ComponentSDD                ComponentID = "sdd"
-	ComponentSkills             ComponentID = "skills"
-	ComponentContext7           ComponentID = "context7"
+	ComponentEngram   ComponentID = "engram"
+	ComponentSDD      ComponentID = "sdd"
+	ComponentSkills   ComponentID = "skills"
+	ComponentContext7 ComponentID = "context7"
+	// ComponentCodeGraph is the first-class CodeGraph lifecycle integration.
+	// CommunityToolCodeGraph remains as a state compatibility value while
+	// legacy selections are migrated.
+	ComponentCodeGraph          ComponentID = "codegraph"
 	ComponentPersona            ComponentID = "persona"
 	ComponentPermission         ComponentID = "permissions"
 	ComponentGGA                ComponentID = "gga"
