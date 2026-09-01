@@ -22,24 +22,11 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
 
-var defaultAgentIDs = []model.AgentID{
-	model.AgentClaudeCode,
-	model.AgentOpenCode,
-	model.AgentKilocode,
-	model.AgentGeminiCLI,
-	model.AgentCursor,
-	model.AgentVSCodeCopilot,
-	model.AgentCodex,
-	model.AgentAntigravity,
-	model.AgentWindsurf,
-	model.AgentKimi,
-	model.AgentQwenCode,
-	model.AgentKiroIDE,
-	model.AgentOpenClaw,
-	model.AgentPi,
-	model.AgentTrae,
-	model.AgentHermes,
-}
+// defaultAgentIDs is derived from the one canonical personal-client
+// definition list. NewAdapter intentionally retains legacy constructors for
+// migration/rollback readers, but they are never reachable from the current
+// runtime registry.
+var defaultAgentIDs = model.PersonalClientIDs()
 
 func NewAdapter(agent model.AgentID) (Adapter, error) {
 	switch agent {

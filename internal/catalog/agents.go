@@ -7,61 +7,32 @@ type Agent struct {
 	Name       string
 	Tier       model.SupportTier
 	ConfigPath string
+	Binary     string
 }
 
-var allAgents = []Agent{
-	{ID: model.AgentClaudeCode, Name: "Claude Code", Tier: model.TierFull, ConfigPath: "~/.claude"},
-	{ID: model.AgentOpenCode, Name: "OpenCode", Tier: model.TierFull, ConfigPath: "~/.config/opencode"},
-	{ID: model.AgentKilocode, Name: "Kilo Code", Tier: model.TierFull, ConfigPath: "~/.config/kilo"},
-	{ID: model.AgentGeminiCLI, Name: "Gemini CLI", Tier: model.TierFull, ConfigPath: "~/.gemini"},
-	{ID: model.AgentCodex, Name: "Codex", Tier: model.TierFull, ConfigPath: "~/.codex"},
-	{ID: model.AgentCursor, Name: "Cursor", Tier: model.TierFull, ConfigPath: "~/.cursor"},
-	{ID: model.AgentVSCodeCopilot, Name: "VS Code Copilot", Tier: model.TierFull, ConfigPath: "~/.copilot"},
-	{ID: model.AgentAntigravity, Name: "Google Antigravity", Tier: model.TierFull, ConfigPath: "~/.gemini/antigravity-cli"},
-	{ID: model.AgentWindsurf, Name: "Windsurf", Tier: model.TierFull, ConfigPath: "~/.codeium/windsurf"},
-	{ID: model.AgentKimi, Name: "Kimi Code", Tier: model.TierFull, ConfigPath: "~/.kimi"},
-	{ID: model.AgentQwenCode, Name: "Qwen Code", Tier: model.TierFull, ConfigPath: "~/.qwen"},
-	{ID: model.AgentKiroIDE, Name: "Kiro IDE", Tier: model.TierFull, ConfigPath: "~/.kiro"},
-	{ID: model.AgentOpenClaw, Name: "OpenClaw", Tier: model.TierFull, ConfigPath: "~/.openclaw"},
-	{ID: model.AgentPi, Name: "Pi", Tier: model.TierFull, ConfigPath: "~/.pi"},
-	{ID: model.AgentTrae, Name: "Trae IDE", Tier: model.TierFull, ConfigPath: "~/.trae"},
-	{ID: model.AgentHermes, Name: "Hermes", Tier: model.TierFull, ConfigPath: "~/.hermes"},
-}
-
-// mvpAgents are the original MVP agents (Claude Code, OpenCode).
-var mvpAgents = []Agent{
-	{ID: model.AgentClaudeCode, Name: "Claude Code", Tier: model.TierFull, ConfigPath: "~/.claude"},
-	{ID: model.AgentOpenCode, Name: "OpenCode", Tier: model.TierFull, ConfigPath: "~/.config/opencode"},
-}
-
+// AllAgents projects the canonical personal-client registry for display and
+// selection. The model definitions are the single source of identity metadata;
+// this package deliberately has no second runtime allowlist.
 func AllAgents() []Agent {
-	agents := make([]Agent, len(allAgents))
-	copy(agents, allAgents)
+	definitions := model.PersonalClientDefinitions()
+	agents := make([]Agent, 0, len(definitions))
+	for _, definition := range definitions {
+		agents = append(agents, Agent{
+			ID:         definition.ID,
+			Name:       definition.Name,
+			Tier:       definition.Tier,
+			ConfigPath: definition.ConfigPath,
+			Binary:     definition.Binary,
+		})
+	}
 	return agents
 }
 
-func MVPAgents() []Agent {
-	agents := make([]Agent, len(mvpAgents))
-	copy(agents, mvpAgents)
-	return agents
-}
+// MVPAgents is retained as a source-compatible name for callers that used the
+// former MVP catalog. The personal stack now has one canonical five-client
+// selection surface, so it returns the same projection as AllAgents.
+func MVPAgents() []Agent { return AllAgents() }
 
-func IsMVPAgent(agent model.AgentID) bool {
-	for _, current := range mvpAgents {
-		if current.ID == agent {
-			return true
-		}
-	}
+func IsMVPAgent(agent model.AgentID) bool { return IsSupportedAgent(agent) }
 
-	return false
-}
-
-func IsSupportedAgent(agent model.AgentID) bool {
-	for _, current := range allAgents {
-		if current.ID == agent {
-			return true
-		}
-	}
-
-	return false
-}
+func IsSupportedAgent(agent model.AgentID) bool { return model.IsPersonalClient(agent) }

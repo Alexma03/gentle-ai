@@ -3,8 +3,22 @@ package system
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
+
+	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
+
+func TestScanConfigsUsesCanonicalPersonalClientSet(t *testing.T) {
+	configs := ScanConfigs(t.TempDir())
+	got := make([]model.AgentID, 0, len(configs))
+	for _, config := range configs {
+		got = append(got, model.AgentID(config.Agent))
+	}
+	if !reflect.DeepEqual(got, model.PersonalClientIDs()) {
+		t.Fatalf("ScanConfigs() agents = %v, want canonical set %v", got, model.PersonalClientIDs())
+	}
+}
 
 // TestScanConfigs_ReturnsAllKnownAgentsWithExistsFlag verifies the canonical
 // ScanConfigs contract: ALL known registry agents are returned, with Exists=true
