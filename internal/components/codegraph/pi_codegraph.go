@@ -468,10 +468,6 @@ func verifyPiCodeGraphWithProbe(mcpPath string, children []PiCodeGraphChild, pro
 	return nil
 }
 
-func verifyPiMCP(mcpPath string) (PiCodeGraphMCPVerification, error) {
-	return verifyPiMCPWithProbe(mcpPath, piCodeGraphEffectiveMCPProbe)
-}
-
 func verifyPiMCPWithProbe(mcpPath string, probe PiCodeGraphEffectiveMCPProbe) (PiCodeGraphMCPVerification, error) {
 	data, err := os.ReadFile(mcpPath)
 	root := map[string]any{}

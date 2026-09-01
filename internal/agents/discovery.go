@@ -27,7 +27,7 @@ func DiscoverInstalled(reg *Registry, homeDir string) []InstalledAgent {
 	var out []InstalledAgent
 
 	for _, id := range reg.SupportedAgents() {
-		adapter, ok := reg.Get(id)
+		adapter, ok := reg.Adapter(id)
 		if !ok {
 			continue
 		}

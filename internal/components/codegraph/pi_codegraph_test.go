@@ -414,7 +414,7 @@ func TestVerifyPiMCPFailsClosedWithoutAdapterOrProcess(t *testing.T) {
 	piCodeGraphEffectiveMCPProbe = probePiCodeGraphMCP
 	t.Cleanup(func() { piCodeGraphEffectiveMCPProbe = previous })
 
-	if _, err := verifyPiMCP(mcpPath); err == nil {
+	if _, err := verifyPiMCPWithProbe(mcpPath, piCodeGraphEffectiveMCPProbe); err == nil {
 		t.Fatal("verifyPiMCP() succeeded without a Pi MCP adapter or MCP process")
 	}
 }
@@ -479,7 +479,7 @@ func TestVerifyPiMCPUsesInjectedEffectiveProbe(t *testing.T) {
 			piCodeGraphEffectiveMCPProbe = func(string) (PiCodeGraphMCPProbeResult, error) { return tt.probe, tt.probeErr }
 			t.Cleanup(func() { piCodeGraphEffectiveMCPProbe = previous })
 
-			verification, err := verifyPiMCP(mcpPath)
+			verification, err := verifyPiMCPWithProbe(mcpPath, piCodeGraphEffectiveMCPProbe)
 			if tt.wantPending {
 				if !errors.Is(err, ErrPiCodeGraphAdapterHealthUnavailable) {
 					t.Fatalf("verifyPiMCP() error = %v, want pending adapter health", err)

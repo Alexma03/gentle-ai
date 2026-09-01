@@ -95,12 +95,12 @@ func RunDoctor(ctx context.Context, w io.Writer) error {
 	// behaviour where the user has not yet selected any agents (#709).
 
 	pathDirs := pathDirsFn()
-	requiredTools := requiredDoctorTools(installedAgents)
-	checks := make([]doctor.Check, 0, len(requiredTools)+3)
-	for _, tool := range requiredTools {
-		tool := tool
-		checks = append(checks, doctor.Check{ID: doctor.ToolCheckID(tool), Run: func(context.Context) doctor.Result {
-			return checkOneTool(tool, pathDirs)
+	toolResults := checkToolBinaries(pathDirs, installedAgents)
+	checks := make([]doctor.Check, 0, len(toolResults)+3)
+	for _, result := range toolResults {
+		result := result
+		checks = append(checks, doctor.Check{ID: result.Name, Run: func(context.Context) doctor.Result {
+			return result
 		}})
 	}
 	checks = append(checks,
@@ -169,18 +169,6 @@ func checkCodeGraph(homeDir string) CheckResult {
 		Status: CheckStatusPass,
 		Detail: fmt.Sprintf("CodeGraph available; parity evidence: %d detected retained clients, %d configured; retained clients are unchanged", detected, configured),
 	}
-}
-
-// readDoctorInstalledAgents returns the agent IDs persisted in state.json.
-// An unreadable or absent state file yields a nil slice — callers must treat
-// nil/empty as "no agents selected" rather than a hard error so first-time
-// installs do not surface phantom agent-missing failures.
-func readDoctorInstalledAgents(homeDir string) ([]string, error) {
-	s, err := state.Read(homeDir)
-	if err != nil {
-		return nil, err
-	}
-	return s.InstalledAgents, nil
 }
 
 // checkToolBinaries checks each required tool for PATH resolution and

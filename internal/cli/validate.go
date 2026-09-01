@@ -225,9 +225,10 @@ func asAgentIDs(values []string) ([]model.AgentID, error) {
 		ids = append(ids, model.AgentID(value))
 	}
 	if err := registry.Validate(ids); err != nil {
-		names := make([]string, 0, len(registry.SupportedAgents()))
-		for _, agent := range registry.SupportedAgents() {
-			names = append(names, string(agent))
+		definitions := registry.Definitions()
+		names := make([]string, 0, len(definitions))
+		for _, definition := range definitions {
+			names = append(names, string(definition.ID))
 		}
 		sort.Strings(names)
 		return nil, fmt.Errorf("unsupported agent %q (valid: %s)", unsupportedAgentName(ids, values), strings.Join(names, ", "))

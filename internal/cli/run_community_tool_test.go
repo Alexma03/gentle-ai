@@ -416,7 +416,7 @@ func TestRenderInstallManualActionsIncludesPiCodeGraphDrift(t *testing.T) {
 	}
 }
 
-func TestCodeGraphGuidanceMarkdownForSDDOnlyWhenSelected(t *testing.T) {
+func TestCodeGraphGuidanceMarkdownForSelectionOnlyWhenSelected(t *testing.T) {
 	tests := []struct {
 		name      string
 		setupHome func(t *testing.T, home string)
@@ -486,7 +486,7 @@ func TestCodeGraphGuidanceMarkdownForSDDOnlyWhenSelected(t *testing.T) {
 				tc.setupHome(t, home)
 			}
 
-			got := codeGraphGuidanceMarkdownForSDD(home, tc.selected)
+			got := codeGraphGuidanceMarkdownForSelection(home, model.Selection{CommunityTools: tc.selected})
 			if !tc.want {
 				if got != "" {
 					t.Fatalf("guidance = %q, want empty", got)

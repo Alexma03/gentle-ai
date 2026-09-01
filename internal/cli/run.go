@@ -1298,7 +1298,7 @@ func (s agentInstallStep) Run() error {
 
 	piAdapter, ok := adapter.(*piagent.Adapter)
 	if !ok {
-		return fmt.Errorf("adapter for %q does not expose the Pi subagents RPC acceptance boundary", s.agent)
+		return fmt.Errorf("adapter for %q does not expose the Pi subagents RPC acceptance boundary", s.agent) // refusal:by-design operator-knowledge: Pi's registry entry must remain the concrete adapter that owns the canonical runtime boundary
 	}
 	response, probeErr := probePiSubagentsRPC(context.Background(), s.homeDir, s.workspaceDir)
 	if _, validationErr := piAdapter.AcceptSubagentsRPCResponse(response); validationErr != nil {
@@ -2458,27 +2458,11 @@ func piPersonaConfigPaths(homeDir, workspaceDir string, scope InstallScope) []st
 	return paths
 }
 
-func codeGraphGuidanceMarkdownForSDD(homeDir string, selected []model.CommunityToolID) string {
-	if !shouldInjectCodeGraphGuidanceForSDD(homeDir, selected) {
-		return ""
-	}
-	return codegraph.CodeGraphGuidanceMarkdown()
-}
-
 func codeGraphGuidanceMarkdownForSelection(homeDir string, selection model.Selection) string {
 	if !selection.HasCodeGraph() {
 		return ""
 	}
 	return codegraph.CodeGraphGuidanceMarkdown()
-}
-
-func shouldInjectCodeGraphGuidanceForSDD(homeDir string, selected []model.CommunityToolID) bool {
-	for _, tool := range selected {
-		if tool == model.CommunityToolCodeGraph {
-			return true
-		}
-	}
-	return false
 }
 
 func communityToolIDsToStrings(tools []model.CommunityToolID) []string {
