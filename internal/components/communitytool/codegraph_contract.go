@@ -30,25 +30,15 @@ type codeGraphCompatibility struct {
 	Postcondition func(string, agents.Adapter) (string, bool)
 }
 
-// codeGraphCompatibilityTable is deliberately exhaustive. Tests compare its
-// keys with the registry so a newly added agent cannot silently enter setup.
+// codeGraphCompatibilityTable is deliberately exhaustive for the canonical
+// personal registry. Legacy adapters remain constructible for migration, but
+// they cannot silently re-enter CodeGraph setup through this runtime table.
 var codeGraphCompatibilityTable = map[model.AgentID]codeGraphCompatibility{
-	model.AgentClaudeCode:    nativeCompatibility(model.AgentClaudeCode, "claude"),
-	model.AgentOpenCode:      reconciledCompatibility(model.AgentOpenCode, "opencode"),
-	model.AgentKilocode:      excludedCompatibility(model.AgentKilocode),
-	model.AgentGeminiCLI:     nativeCompatibility(model.AgentGeminiCLI, "gemini"),
-	model.AgentCursor:        nativeCompatibility(model.AgentCursor, "cursor"),
-	model.AgentVSCodeCopilot: excludedCompatibility(model.AgentVSCodeCopilot),
-	model.AgentCodex:         nativeCompatibility(model.AgentCodex, "codex"),
-	model.AgentAntigravity:   nativeCompatibility(model.AgentAntigravity, "antigravity"),
-	model.AgentWindsurf:      excludedCompatibility(model.AgentWindsurf),
-	model.AgentKimi:          excludedCompatibility(model.AgentKimi),
-	model.AgentQwenCode:      excludedCompatibility(model.AgentQwenCode),
-	model.AgentKiroIDE:       nativeCompatibility(model.AgentKiroIDE, "kiro"),
-	model.AgentOpenClaw:      excludedCompatibility(model.AgentOpenClaw),
-	model.AgentPi:            reconciledCompatibility(model.AgentPi, ""),
-	model.AgentTrae:          excludedCompatibility(model.AgentTrae),
-	model.AgentHermes:        nativeCompatibility(model.AgentHermes, "hermes"),
+	model.AgentClaudeCode:  nativeCompatibility(model.AgentClaudeCode, "claude"),
+	model.AgentCodex:       nativeCompatibility(model.AgentCodex, "codex"),
+	model.AgentCursor:      nativeCompatibility(model.AgentCursor, "cursor"),
+	model.AgentAntigravity: nativeCompatibility(model.AgentAntigravity, "antigravity"),
+	model.AgentPi:          reconciledCompatibility(model.AgentPi, ""),
 }
 
 func nativeCompatibility(id model.AgentID, target string) codeGraphCompatibility {

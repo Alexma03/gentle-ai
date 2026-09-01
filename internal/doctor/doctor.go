@@ -10,6 +10,7 @@ const (
 	CheckStateJSON             CheckID = "state:json"
 	CheckInstalledAssetVersion CheckID = "installed:asset_version"
 	CheckEngramReachable       CheckID = "engram:reachable"
+	CheckCodeGraph             CheckID = "codegraph:parity"
 	CheckDiskSpace             CheckID = "disk:space"
 )
 
@@ -36,6 +37,7 @@ const (
 	RemedySync             RemedyID = "sync"
 	RemedyStartEngram      RemedyID = "start-engram"
 	RemedyInspectEngram    RemedyID = "inspect-engram"
+	RemedyInspectCodeGraph RemedyID = "inspect-codegraph"
 	RemedyFreeDiskSpace    RemedyID = "free-disk-space"
 )
 
@@ -95,6 +97,8 @@ func NewRemedy(id RemedyID, description string) *Remedy {
 		r.EligibilityReason = "requires managed state and existing sync safeguards"
 	case RemedyStartEngram, RemedyInspectEngram:
 		r.Category, r.EligibilityReason = RemedyCategoryService, "external process and log ownership is unknown"
+	case RemedyInspectCodeGraph:
+		r.Category, r.EligibilityReason = RemedyCategoryConfiguration, "CodeGraph ownership and client wiring require user inspection"
 	case RemedyFreeDiskSpace:
 		r.Category, r.EligibilityReason = RemedyCategoryStorage, "disk cleanup is user-owned"
 	default:

@@ -13,8 +13,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/engram"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/doctor"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/state"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/storage"
 )
@@ -35,28 +37,16 @@ const (
 // only reports missing agents the user actually selected.
 var coreTools = []string{"gentle-ai", "gga", "engram"}
 
-// agentToolBinaries maps an agent ID from state.json's InstalledAgents to the
-// CLI binary name exec.LookPath should resolve. An empty string means "no CLI
-// binary to check" — typically IDE-only agents like cursor, windsurf, or
-// antigravity that do not ship a standalone executable on PATH.
-//
-// Keep this map in sync with the agentID → binary convention used by the
-// adapters under internal/agents/*/adapter.go. Unknown agent IDs are ignored
-// by the doctor so legacy or custom state files do not cause spurious
-// failures.
-var agentToolBinaries = map[string]string{
-	"claude-code":    "claude",
-	"opencode":       "opencode",
-	"codex":          "codex",
-	"pi":             "pi",
-	"gemini-cli":     "gemini",
-	"kilocode":       "kilo",
-	"kiro-ide":       "kiro",
-	"kimi":           "kimi",
-	"qwen-code":      "qwen",
-	"vscode-copilot": "code",
-	"openclaw":       "openclaw",
-	"hermes":         "hermes",
+// personalClientBinary resolves the canonical runtime binary metadata. Empty
+// binaries are intentional for IDE clients whose config is the only managed
+// presence signal; unknown/retired state values are ignored until migration
+// explicitly resolves them.
+func personalClientBinary(agentID string) (string, bool) {
+	definition, ok := model.PersonalClientDefinitionFor(model.AgentID(agentID))
+	if !ok {
+		return "", false
+	}
+	return definition.Binary, true
 }
 
 const (
@@ -94,7 +84,11 @@ func RunDoctor(ctx context.Context, w io.Writer) error {
 		return fmt.Errorf("resolve home directory: %w", err)
 	}
 
-	installedAgents, _ := readDoctorInstalledAgents(homeDir)
+	persistedState, stateErr := state.Read(homeDir)
+	installedAgents := persistedState.InstalledAgents
+	if stateErr != nil {
+		installedAgents = nil
+	}
 	// A state read failure (missing/malformed file) is surfaced separately by
 	// checkStateJSON. Here we fall back to an empty list so the doctor only
 	// reports the always-required core tools — preserving the first-time-install
@@ -115,10 +109,66 @@ func RunDoctor(ctx context.Context, w io.Writer) error {
 		doctor.Check{ID: doctor.CheckEngramReachable, Run: func(ctx context.Context) doctor.Result { return checkEngramReachable(ctx, homeDir, installedAgents) }},
 		doctor.Check{ID: doctor.CheckDiskSpace, Run: func(context.Context) doctor.Result { return checkDiskSpace(homeDir) }},
 	)
+	if stateErr == nil && codeGraphEnabled(persistedState) {
+		// CodeGraph health is diagnostic only. It never invokes sync or mutates
+		// retained-client state; parity evidence is reported as a warning when
+		// the CLI or an installed client's wiring is unavailable.
+		checks = append(checks, doctor.Check{ID: doctor.CheckCodeGraph, Run: func(context.Context) doctor.Result {
+			return checkCodeGraph(homeDir)
+		}})
+	}
 	report := (doctor.Runner{Checks: checks}).Run(ctx)
 
 	renderDoctorReport(w, report)
 	return nil
+}
+
+func codeGraphEnabled(s state.InstallState) bool {
+	for _, component := range s.Components {
+		if component == model.ComponentCodeGraph {
+			return true
+		}
+	}
+	for _, tool := range s.CommunityTools {
+		if tool == string(model.CommunityToolCodeGraph) {
+			return true
+		}
+	}
+	return false
+}
+
+func checkCodeGraph(homeDir string) CheckResult {
+	status := codegraph.DetectStatus(homeDir, codegraph.DetectorFunc(lookPathFn))
+	if status.CLI != codegraph.AvailabilityAvailable {
+		return CheckResult{
+			Name:   doctor.CheckCodeGraph,
+			Status: CheckStatusWarn,
+			Detail: "CodeGraph unavailable; parity evidence is unavailable and retained clients are unchanged",
+			Remedy: doctor.NewRemedy(doctor.RemedyInspectCodeGraph, "Inspect CodeGraph installation and client wiring before syncing"),
+		}
+	}
+
+	detected, configured, missing := status.DetectedConfiguredMissingCounts()
+	if missing > 0 {
+		missingAgents := make([]string, 0, missing)
+		for _, agent := range status.Agents {
+			if agent.Detected && !agent.Configured {
+				missingAgents = append(missingAgents, agent.Name+": "+agent.Reason)
+			}
+		}
+		return CheckResult{
+			Name:   doctor.CheckCodeGraph,
+			Status: CheckStatusWarn,
+			Detail: fmt.Sprintf("CodeGraph parity degraded: %d of %d detected retained clients configured (%s); retained clients are unchanged", configured, detected, strings.Join(missingAgents, "; ")),
+			Remedy: doctor.NewRemedy(doctor.RemedyInspectCodeGraph, "Inspect CodeGraph client wiring and run sync explicitly when ready"),
+		}
+	}
+
+	return CheckResult{
+		Name:   doctor.CheckCodeGraph,
+		Status: CheckStatusPass,
+		Detail: fmt.Sprintf("CodeGraph available; parity evidence: %d detected retained clients, %d configured; retained clients are unchanged", detected, configured),
+	}
 }
 
 // readDoctorInstalledAgents returns the agent IDs persisted in state.json.
@@ -145,7 +195,7 @@ func requiredDoctorTools(installedAgents []string) []string {
 		seen[tool] = struct{}{}
 	}
 	for _, agentID := range installedAgents {
-		bin, ok := agentToolBinaries[agentID]
+		bin, ok := personalClientBinary(agentID)
 		if !ok || bin == "" {
 			continue
 		}

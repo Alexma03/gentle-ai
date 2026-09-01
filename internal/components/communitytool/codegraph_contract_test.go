@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"runtime"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
@@ -50,9 +49,8 @@ func TestCodeGraphCompatibilityStrategies(t *testing.T) {
 		strategy codeGraphStrategy
 		agents   []model.AgentID
 	}{
-		{codeGraphNative, []model.AgentID{model.AgentClaudeCode, model.AgentCursor, model.AgentCodex, model.AgentGeminiCLI, model.AgentHermes, model.AgentAntigravity, model.AgentKiroIDE}},
-		{codeGraphReconciled, []model.AgentID{model.AgentOpenCode, model.AgentPi}},
-		{codeGraphExcluded, []model.AgentID{model.AgentKilocode, model.AgentVSCodeCopilot, model.AgentWindsurf, model.AgentKimi, model.AgentQwenCode, model.AgentOpenClaw, model.AgentTrae}},
+		{codeGraphNative, []model.AgentID{model.AgentClaudeCode, model.AgentCursor, model.AgentCodex, model.AgentAntigravity}},
+		{codeGraphReconciled, []model.AgentID{model.AgentPi}},
 	}
 	for _, tt := range tests {
 		for _, id := range tt.agents {
@@ -68,36 +66,18 @@ func TestExcludedAgentsNeverEnterCodeGraphSurfaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, id := range []model.AgentID{model.AgentKilocode, model.AgentVSCodeCopilot, model.AgentWindsurf, model.AgentKimi, model.AgentQwenCode, model.AgentOpenClaw, model.AgentTrae} {
+	for _, id := range []model.AgentID{model.AgentOpenCode, model.AgentKilocode, model.AgentGeminiCLI, model.AgentVSCodeCopilot, model.AgentWindsurf, model.AgentKimi, model.AgentQwenCode, model.AgentKiroIDE, model.AgentOpenClaw, model.AgentTrae, model.AgentHermes} {
 		t.Run(string(id), func(t *testing.T) {
 			home := t.TempDir()
-			adapter, ok := reg.Get(id)
-			if !ok {
-				t.Fatal("adapter missing")
+			if _, ok := reg.Get(id); ok {
+				t.Fatalf("retired adapter %q entered default registry", id)
 			}
-			root := adapter.GlobalConfigDir(home)
-			if err := os.MkdirAll(root, 0o755); err != nil {
-				t.Fatal(err)
-			}
-			before, _ := filesBelow(root)
 			status := DetectStatus(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) { return "/bin/codegraph", nil }))
 			if slices.ContainsFunc(status.Agents, func(agent AgentStatus) bool { return agent.Agent == id }) {
 				t.Fatalf("excluded agent entered status: %#v", status.Agents)
 			}
-			if slices.Contains(detectedCodeGraphTargets(home), codeGraphCompatibilityTable[id].Target) && codeGraphCompatibilityTable[id].Target != "" {
-				t.Fatal("excluded agent entered targets")
-			}
-			if _, err := InjectCodeGraphGuidance(home); err != nil {
-				t.Fatal(err)
-			}
-			after, _ := filesBelow(root)
-			if !reflect.DeepEqual(before, after) {
-				t.Fatalf("excluded root changed: before=%v after=%v", before, after)
-			}
-			for _, path := range CodeGraphManagedPaths(home) {
-				if path == root || strings.HasPrefix(path, root+string(os.PathSeparator)) {
-					t.Fatalf("excluded path became candidate-owned: %s", path)
-				}
+			if _, ok := codeGraphCompatibilityFor(id); ok {
+				t.Fatalf("retired agent %q entered CodeGraph compatibility table", id)
 			}
 		})
 	}
@@ -168,7 +148,6 @@ func TestCodeGraphNativeOwnedPaths(t *testing.T) {
 	tests := map[model.AgentID][]string{
 		model.AgentClaudeCode:  {filepath.Join(home, ".claude.json")},
 		model.AgentAntigravity: {filepath.Join(home, ".gemini", "config", "mcp_config.json"), filepath.Join(home, ".gemini", "antigravity", "mcp_config.json")},
-		model.AgentKiroIDE:     {filepath.Join(home, ".kiro", "settings", "mcp.json")},
 	}
 	for id, want := range tests {
 		adapter, _ := reg.Get(id)
