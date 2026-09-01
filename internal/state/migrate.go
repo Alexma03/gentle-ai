@@ -158,7 +158,10 @@ func Migrate(homeDir string, managedPaths []string) (MigrationResult, error) {
 		return MigrationResult{}, fmt.Errorf("decode state for migration: %w", err)
 	}
 	fromVersion := persistedSchemaVersion(raw)
-	if fromVersion >= CurrentSchemaVersion && !legacyCodeGraphPresent(current) {
+	if fromVersion > CurrentSchemaVersion {
+		return MigrationResult{}, fmt.Errorf("unsupported install state schema version %d (current %d)", fromVersion, CurrentSchemaVersion)
+	}
+	if fromVersion == CurrentSchemaVersion && !legacyCodeGraphPresent(current) {
 		return MigrationResult{State: current, Report: MigrationReport{
 			Schema: MigrationReportSchema, FromVersion: fromVersion, ToVersion: fromVersion,
 			RawStateDigest: digestBytes(raw), SelectionResolved: true,
@@ -200,6 +203,10 @@ func Migrate(homeDir string, managedPaths []string) (MigrationResult, error) {
 		})
 	}
 	canonical.Components = dedupComponents(canonical.Components)
+	// CodeGraph is represented by the canonical component after migration. The
+	// old community-tools value is retained only in the raw backup/report so a
+	// second runtime allowlist cannot remain active in the migrated state.
+	canonical.CommunityTools = slicesWithoutCodeGraph(current.CommunityTools)
 	for _, id := range canonical.InstalledAgents {
 		if !model.IsPersonalClient(model.AgentID(id)) {
 			report.Retired = appendUnique(report.Retired, id)
@@ -308,7 +315,7 @@ func ResolveSelectionWithLock(homeDir string, replacements map[string]model.Agen
 // backup. It is deliberately explicit and idempotent; the report remains as
 // an audit record and is marked restored after the raw state is back.
 func RestoreMigration(homeDir string, report MigrationReport) error {
-	if report.Schema != MigrationReportSchema || strings.TrimSpace(report.BackupID) == "" {
+	if report.Schema != MigrationReportSchema || !validMigrationBackupID(report.BackupID) {
 		return errors.New("invalid migration report")
 	}
 	if err := restoreRawStateAndPaths(homeDir, report); err != nil {
@@ -453,7 +460,6 @@ func removeMigrationTarget(path string, previouslyExists bool) error {
 	if err := os.Remove(path); err != nil {
 		return fmt.Errorf("remove current migration path %q: %w", path, err)
 	}
-	_ = previouslyExists
 	return nil
 }
 
@@ -561,6 +567,28 @@ func migrationBackupID(raw []byte, paths []string) string {
 		_, _ = hash.Write([]byte(path))
 	}
 	return hex.EncodeToString(hash.Sum(nil))[:24]
+}
+
+func validMigrationBackupID(id string) bool {
+	if len(id) != 24 {
+		return false
+	}
+	for _, r := range id {
+		if !(r >= '0' && r <= '9' || r >= 'a' && r <= 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+func slicesWithoutCodeGraph(values []string) []string {
+	filtered := make([]string, 0, len(values))
+	for _, value := range values {
+		if value != string(model.CommunityToolCodeGraph) {
+			filtered = append(filtered, value)
+		}
+	}
+	return filtered
 }
 
 func digestBytes(data []byte) string {

@@ -46,6 +46,9 @@ func TestMigrateReportsRetiredValuesAndMapsCodeGraph(t *testing.T) {
 	if !containsComponent(result.State.Components, model.ComponentCodeGraph) || result.State.SchemaVersion != CurrentSchemaVersion {
 		t.Fatalf("migrated state = %#v, want schema and CodeGraph component", result.State)
 	}
+	if len(result.State.CommunityTools) != 0 {
+		t.Fatalf("migrated state retained legacy CodeGraph tools = %#v", result.State.CommunityTools)
+	}
 	if _, err := os.Stat(MigrationReportPath(home)); err != nil {
 		t.Fatalf("migration report not persisted: %v", err)
 	}
@@ -58,6 +61,41 @@ func TestMigrateReportsRetiredValuesAndMapsCodeGraph(t *testing.T) {
 	}
 	if len(result.Report.RollbackManifest) != 1 || result.Report.RollbackManifest[0].Digest == "" {
 		t.Fatalf("rollback manifest = %#v", result.Report.RollbackManifest)
+	}
+}
+
+func TestMigrateRejectsFutureStateSchema(t *testing.T) {
+	home := t.TempDir()
+	if err := Write(home, InstallState{SchemaVersion: CurrentSchemaVersion + 1, InstalledAgents: []string{"claude-code"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Migrate(home, nil); err == nil || !strings.Contains(err.Error(), "unsupported install state schema") {
+		t.Fatalf("Migrate() error = %v, want future-schema refusal", err)
+	}
+}
+
+func TestRequireMigrationResolvedBlocksOnlyPendingReports(t *testing.T) {
+	home := t.TempDir()
+	if err := Write(home, InstallState{InstalledAgents: []string{"opencode"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Migrate(home, nil); !errors.Is(err, ErrMigrationSelectionRequired) {
+		t.Fatalf("Migrate() error = %v, want selection-required", err)
+	}
+	if err := RequireMigrationResolved(home); !errors.Is(err, ErrMigrationSelectionRequired) {
+		t.Fatalf("RequireMigrationResolved() error = %v, want selection-required", err)
+	}
+	if _, err := ResolveSelection(home, map[string]model.AgentID{"opencode": model.AgentCodex}); err != nil {
+		t.Fatalf("ResolveSelection() error = %v", err)
+	}
+	if err := RequireMigrationResolved(home); err != nil {
+		t.Fatalf("RequireMigrationResolved() after selection = %v", err)
+	}
+}
+
+func TestRestoreMigrationRejectsUntrustedBackupIdentity(t *testing.T) {
+	if err := RestoreMigration(t.TempDir(), MigrationReport{Schema: MigrationReportSchema, BackupID: "../../outside"}); err == nil {
+		t.Fatal("RestoreMigration() accepted path-traversal backup identity")
 	}
 }
 
