@@ -163,3 +163,63 @@ Phase 3 retirement cohorts and Phase 4 contracts/release tasks remain out of sco
 ### Current Next Steps
 
 Parent may proceed to independent SDD verification. Do not infer Phase 3/4 completion from this Phase 2 record.
+
+## PR3 Phase 3: Retirement Cohorts
+
+The PR1 and PR2 records above are preserved unchanged. This cumulative section records completion of Phase 3 tasks 3.1–3.9 only; Phase 4 contracts and release work remains explicitly out of scope.
+
+### Work Unit Evidence
+
+| Evidence | Required value | Result |
+| --- | --- | --- |
+| Work unit | U3 / PR3 Retirement cohorts | Complete for tasks 3.1–3.9. Retained clients are Claude Code, Codex, Cursor, Google Antigravity, and Pi. Engram, Context7, and first-class CodeGraph behavior remain supported. |
+| Focused test command and exact result | Retired-ID rejection, retained behavior, assets, updater, and ratchets | `go test ./internal/retirement ./internal/agents ./internal/catalog ./internal/update ./internal/update/upgrade ./internal/components/codegraph ./internal/components/engram -count=1` — PASS. `go test ./internal/retirement -run 'TestRetiredProductionSurfaceHasNoActiveReferences|TestRetiredAgentDirectoriesAreAbsent' -count=1` — PASS. `go test ./internal/assets -run 'Retir|Embed|Manifest|Index|Asset' -count=1` — PASS. `go test ./internal/app -run 'Retir|Agent|Context7|CodeGraph' -count=1` — PASS. |
+| Root/static verification | Exact repository checks | `go run ./internal/gofmtcheck` — PASS. `go vet ./...` — PASS. `scripts/deadcode-ratchet.sh` — PASS (`no new unreachable functions`). Refusal ratchet focused test — PASS. `go test ./... -count=1` — PASS. |
+| Runtime harness command/scenario and exact result | Real driven bench proof, not declaration-only tests | Bench `go build`, `go vet ./...`, and `go test ./... -count=1` — PASS. Locally built harness against locally built product: `gentle-ai-bench run --binary gentle-ai --out bench-pr3.json` — PASS, **56 completed, 0 unsupported, 0 failed**. The retained Codex validator path was driven with a sandbox-local executable stub; no real model was invoked. |
+| Rollback boundary | Exact independently reversible slice | Revert the PR3 commit range `c37f83d8..aa26b7f0` in reverse order to restore the PR2 boundary. Raw migration identifiers/snapshots remain data-only and preserve state rollback; the immutable RC provenance fixture remains unchanged. Phase 4 is not required for rollback. |
+
+### Completed Tasks
+
+- [x] 3.1 Removed Hermes, KiloCode, and Kimi adapters, registrations, assets, tests, and user-facing selection surfaces.
+- [x] 3.2 Removed Kiro, OpenClaw, Qwen, Trae, VS Code, and Windsurf adapters, registrations, assets, fixtures, and user-facing selection surfaces.
+- [x] 3.3 Removed OpenCode last: adapter/runtime, SDD/profile assets, command transport, plugin surfaces, goldens, and active CI/bench paths. Production retirement guards reject active references.
+- [x] 3.4 Removed GGA registry/version/doctor/updater/install paths, Windows shim, install-script strategy, tests, and documentation.
+- [x] 3.5 Removed theme, logo, and branding components/assets plus active documentation claims.
+- [x] 3.6 Removed marketplace/community-plugin models, CLI/TUI flows, updater paths, packages, and Tintinweb references.
+- [x] 3.7 Removed stale embedded client/plugin/theme manifests and indexes; retained asset/embed tests pass.
+- [x] 3.8 Removed retired updater package-manager/plugin routing and obsolete release/runtime metadata; updater suites pass.
+- [x] 3.9 Aligned README/docs, issue templates, CI, E2E fixtures, goldens, recovery ledgers, and bench corpus. Full root and driven bench proof pass.
+
+### Strict TDD and Correction Evidence
+
+The slice used failing retirement guards and stale-suite failures as RED evidence before each removal boundary. OpenCode was intentionally removed after cohorts, GGA/themes, updater plugins, SDD fallback replacement, and marketplace UI cleanup. During final verification, the first exact root run failed only because the CI formatter-ordering test still required the deleted organic-runtime job; `912d77ca` updated that assertion and the exact root command passed. The first driven bench run exposed eight stale OpenCode-relay/config journeys; the retained Codex capture path and corpus were corrected until the driven summary reached 56/0/0.
+
+### Reference and Preservation Evidence
+
+- `internal/retirement` scans production files in agent, catalog, component, CLI, planner, TUI, updater, asset, install, and version owners for every retired identifier and verifies retired agent directories are absent.
+- Raw legacy selections in `internal/model/types.go` and `internal/state/state.go` are intentionally retained only for reversible migration/rollback. They are not selectable or executable.
+- `bench/testdata/consecutive-rescope-rc1/` retains its immutable historical `/tmp/opencode/...` provenance value; changing it would invalidate the recorded hash. It is data-only and not an active client path.
+- Antigravity continues to own `.gemini/GEMINI.md`; Gemini CLI selection remains absent. Pi still accepts only canonical `npm:pi-subagents` RPC v1 with no fallback. Context7 and CodeGraph focused suites pass.
+- Worktree-local `codegraph status` reported 1,122 indexed files and an up-to-date index after implementation.
+
+### Commits
+
+- `c37f83d8` — `refactor(retirement): remove legacy clients and visual integrations`
+- `55702d42` — `test(retirement): align retained integration coverage`
+- `fc59056e` — `refactor(sdd): use retained command assets`
+- `7c71ec54` — `refactor(update): retire community plugin updater`
+- `0633e835` — `refactor(plugins): remove legacy marketplace surfaces`
+- `fed84294` — `refactor(agents): retire OpenCode runtime adapter`
+- `320e303e` — `refactor(retirement): remove remaining legacy runtime surfaces`
+- `3f526061` — `test(review): restore retained lifecycle coverage`
+- `e71a1c7b` — `test(retirement): align documentation and bench corpus`
+- `912d77ca` — `test(ci): retire organic runtime job guard`
+- `aa26b7f0` — `fix(retirement): remove stale active references`
+
+### Independent Audit
+
+A fresh bounded audit inspected only tasks 3.1–3.9, their acceptance criteria, and the PR3 diff. Its first pass found stale active issue-template, documentation, codebase-map, and executable-test references. Commit `aa26b7f0` corrected those findings; the same bounded auditor rechecked the correction and final OpenSpec evidence before terminal handoff. No Phase 4 production-scope leakage was found.
+
+### Next Steps
+
+Proceed to parent-owned SDD verification for the cumulative change. Phase 4 tasks 4.1–4.5 remain unchecked and must not be inferred complete from this PR3 evidence.

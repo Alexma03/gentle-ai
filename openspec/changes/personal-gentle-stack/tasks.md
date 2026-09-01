@@ -31,15 +31,15 @@ Bases: PR1 base=feature/tracker branch; PR2 base=PR1 branch; PR3 base=PR2; PR4 b
 - [x] 2.5 Remove old generic CodeGraph framework after parity (`internal/components/communitytool/`; D:1.7; P:ratchets).
 
 ## Phase 3: Retirement Cohorts
-- [ ] 3.1 Remove cohort A adapters/tests: Hermes, KiloCode, Kimi (`internal/agents/`; D:2.5; P:IDs rejected).
-- [ ] 3.2 Remove cohort B adapters/tests: Kiro, OpenClaw, Qwen, Trae, VS Code, Windsurf (`internal/agents/`; D:3.1; P:rejected).
-- [ ] 3.3 Remove OpenCode last (`internal/agents/opencode`, `internal/opencode`; D:3.2; P:no refs).
-- [ ] 3.4 Remove GGA, Windows shim, install/update paths (`internal/components/gga`, `internal/assets/gga`; D:3.1; P:ratchets).
-- [ ] 3.5 Remove themes, logos, branding (`internal/components/theme`, `internal/assets/`; D:3.4; P:asset scan).
-- [ ] 3.6 Remove marketplace/plugins and Tintinweb references (catalog/update/docs; D:3.5; P:scan).
-- [ ] 3.7 Remove stale embed manifests/indexes (`internal/assets/`; D:3.6; P:embed tests).
-- [ ] 3.8 Remove retired updater/release metadata (`internal/update/upgrade/`, release files; D:3.7; P:updater tests).
-- [ ] 3.9 Update docs, fixtures, goldens, bench journeys (`README.md`, `docs/`, `bench/`; D:3.8; P:root/bench tests).
+- [x] 3.1 Remove cohort A adapters/tests: Hermes, KiloCode, Kimi (`internal/agents/`; D:2.5; P:IDs rejected).
+- [x] 3.2 Remove cohort B adapters/tests: Kiro, OpenClaw, Qwen, Trae, VS Code, Windsurf (`internal/agents/`; D:3.1; P:rejected).
+- [x] 3.3 Remove OpenCode last (`internal/agents/opencode`, `internal/opencode`; D:3.2; P:no refs).
+- [x] 3.4 Remove GGA, Windows shim, install/update paths (`internal/components/gga`, `internal/assets/gga`; D:3.1; P:ratchets).
+- [x] 3.5 Remove themes, logos, branding (`internal/components/theme`, `internal/assets/`; D:3.4; P:asset scan).
+- [x] 3.6 Remove marketplace/plugins and Tintinweb references (catalog/update/docs; D:3.5; P:scan).
+- [x] 3.7 Remove stale embed manifests/indexes (`internal/assets/`; D:3.6; P:embed tests).
+- [x] 3.8 Remove retired updater/release metadata (`internal/update/upgrade/`, release files; D:3.7; P:updater tests).
+- [x] 3.9 Update docs, fixtures, goldens, bench journeys (`README.md`, `docs/`, `bench/`; D:3.8; P:root/bench tests).
 
 ## Phase 4: Contracts and Release
 - [ ] 4.1 Update five retained SDD templates/assets; remove task authority/budget (`internal/assets/`, SDD tests; D:2.2; P:parity).
