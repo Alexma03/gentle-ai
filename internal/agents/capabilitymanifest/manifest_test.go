@@ -258,14 +258,13 @@ func TestEveryManifestDigestStaysByteStable(t *testing.T) {
 }
 
 func TestReviewTransportAdvertisementIsClosedCatalogSet(t *testing.T) {
-	const wantExposed = 4
+	const wantExposed = 3
 
 	exposed := 0
 	for _, agent := range catalog.AllAgents() {
 		t.Run(string(agent.ID), func(t *testing.T) {
 			manifest := MustForAgent(agent.ID)
 			want := agent.ID == model.AgentClaudeCode ||
-				agent.ID == model.AgentOpenCode ||
 				agent.ID == model.AgentCodex ||
 				agent.ID == model.AgentPi
 			if got := manifest.Advertises(ContractReviewTransportV1); got != want {
@@ -278,6 +277,27 @@ func TestReviewTransportAdvertisementIsClosedCatalogSet(t *testing.T) {
 	}
 	if exposed != wantExposed {
 		t.Fatalf("advertised review transport runtimes = %d, want %d", exposed, wantExposed)
+	}
+}
+
+func TestCanonicalFeatureClaimsCoverOnlyPersonalClients(t *testing.T) {
+	want := map[model.AgentID]bool{
+		model.AgentClaudeCode:  true,
+		model.AgentCodex:       true,
+		model.AgentCursor:      true,
+		model.AgentAntigravity: true,
+		model.AgentPi:          true,
+	}
+	if len(featureClaimsByAgent) != len(want) {
+		t.Fatalf("canonical feature claim count = %d, want %d", len(featureClaimsByAgent), len(want))
+	}
+	for agent := range featureClaimsByAgent {
+		if !want[agent] {
+			t.Fatalf("retired agent %q entered canonical feature claims", agent)
+		}
+	}
+	if len(legacyFeatureClaimsByAgent) == 0 {
+		t.Fatal("legacy feature claims disappeared; migration adapters need a compatibility projection")
 	}
 }
 

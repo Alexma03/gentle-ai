@@ -116,6 +116,12 @@ type ContractClaim struct {
 func ForAgent(agent model.AgentID) (AgentCapabilityManifest, error) {
 	features, ok := featureClaimsByAgent[agent]
 	if !ok {
+		// Legacy adapter constructors remain available only so migration and
+		// rollback can inspect old persisted identities. They are not included
+		// in the canonical registry or selection surfaces.
+		features, ok = legacyFeatureClaimsByAgent[agent]
+	}
+	if !ok {
 		return AgentCapabilityManifest{}, fmt.Errorf("%w: %q", ErrUnsupportedAgent, agent)
 	}
 
@@ -147,8 +153,11 @@ func ForAgent(agent model.AgentID) (AgentCapabilityManifest, error) {
 // immutable reviewer boundary advertise receipt-driven review. A map miss
 // (an unknown agent) remains fail-closed.
 var reviewTransportExposureByAgent = func() map[model.AgentID]ContractExposure {
-	exposure := make(map[model.AgentID]ContractExposure, len(featureClaimsByAgent))
+	exposure := make(map[model.AgentID]ContractExposure, len(featureClaimsByAgent)+len(legacyFeatureClaimsByAgent))
 	for agent := range featureClaimsByAgent {
+		exposure[agent] = ContractExposureDormant
+	}
+	for agent := range legacyFeatureClaimsByAgent {
 		exposure[agent] = ContractExposureDormant
 	}
 	exposure[model.AgentClaudeCode] = ContractExposureAdvertised
@@ -175,8 +184,11 @@ var reviewTransportExposureByAgent = func() map[model.AgentID]ContractExposure {
 // Kilo and every other runtime remain explicitly dormant until they own an
 // equivalent native boundary.
 var immutableReviewExecutorExposureByAgent = func() map[model.AgentID]ContractExposure {
-	exposure := make(map[model.AgentID]ContractExposure, len(featureClaimsByAgent))
+	exposure := make(map[model.AgentID]ContractExposure, len(featureClaimsByAgent)+len(legacyFeatureClaimsByAgent))
 	for agent := range featureClaimsByAgent {
+		exposure[agent] = ContractExposureDormant
+	}
+	for agent := range legacyFeatureClaimsByAgent {
 		exposure[agent] = ContractExposureDormant
 	}
 	exposure[model.AgentClaudeCode] = ContractExposureAdvertised
@@ -301,6 +313,15 @@ var featureClaimsByAgent = map[model.AgentID]AgentFeatureClaims{
 	model.AgentCursor: {
 		FileSubAgents: true, Skills: true, SystemPrompt: true, MCP: true,
 	},
+	model.AgentPi: {
+		SystemPrompt: false, MCP: true,
+	},
+}
+
+// legacyFeatureClaimsByAgent is intentionally isolated from the canonical map.
+// It exists only for NewAdapter compatibility while state migration can read
+// old installations; no current catalog or registry consumer enumerates it.
+var legacyFeatureClaimsByAgent = map[model.AgentID]AgentFeatureClaims{
 	model.AgentGeminiCLI: {
 		Skills: true, SystemPrompt: true, MCP: true,
 	},
@@ -321,9 +342,6 @@ var featureClaimsByAgent = map[model.AgentID]AgentFeatureClaims{
 	},
 	model.AgentOpenCode: {
 		SlashCommands: true, Skills: true, SystemPrompt: true, MCP: true,
-	},
-	model.AgentPi: {
-		SystemPrompt: false, MCP: true,
 	},
 	model.AgentQwenCode: {
 		SlashCommands: true, Skills: true, SystemPrompt: true, MCP: true,
