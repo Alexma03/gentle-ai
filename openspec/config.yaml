@@ -1,80 +1,143 @@
-# openspec/config.yaml
+# OpenSpec configuration for the current Gentle AI checkout.
 schema: spec-driven
+artifact_store: hybrid
 
 context: |
-  Tech stack: Go 1.25.10, Bubbletea TUI (charmbracelet/bubbletea v1.3.10), lipgloss v1.1.0
-  Architecture: cmd/ entrypoints, internal/ packages (agents, tui, model, pipeline, catalog, system, planner, verify, update, opencode, installcmd, cli, app, components, state, backup, assets, agentbuilder)
-  Feature branch: feat/claude-contextual-skill-loading — contextual skill loading from Claude Code
-  Agents: multi-agent support (claude, opencode, cursor, codex, gemini, vscode, windsurf, antigravity)
-  Skills catalog: internal/catalog/skills.go — known skill registry; project skills in skills/
-  Build: goreleaser (.goreleaser.yaml), CI: GitHub Actions (ci.yml, pr-check.yml, release.yml)
-  Style: gofmt (standard), go vet, no golangci-lint config found
+  Stack: Go 1.25.10 with Bubble Tea, Bubbles, and Lip Gloss; a non-runtime Node manifest is retained at the root.
+  Architecture: cmd/gentle-ai is the executable boundary; internal/ contains CLI/TUI, agent adapters, installation, assets, state, update, SDD status, and native review subsystems.
+  Modules: the product module is rooted at .; bench/ is an intentionally isolated Go module for executable journey evidence.
+  Assets: agent instructions, skills, templates, and golden fixtures are embedded or projected by installer and sync pipelines.
+  Testing: Go standard testing across both modules, plus opt-in real-agent and container E2E lanes and driven benchmark journeys.
+  Delivery: GitHub Actions validates formatting, product tests, the bench module, platform-specific suites, and signed GoReleaser publication.
+  Style: gofmt via internal/gofmtcheck; go vet is the static-analysis baseline; tests favor direct state/behavior assertions and isolated temporary filesystems.
 
-strict_tdd: true
+# No single repository-root command currently covers both Go modules. The prior
+# strict=true declaration only exercised the root module, so initialization must
+# fail closed until a workspace-wide test target is added.
+strict_tdd: false
+
+projects:
+  - path: "."
+    stack: "Go 1.25.10; Bubble Tea TUI; root package.json has no usable test runner"
+    test_command: "go test ./..."
+    framework: "Go standard testing"
+    coverage_command: "go test -cover ./..."
+    build_command: "go build ./..."
+    vet_command: "go vet ./..."
+    format_check_command: "go run ./internal/gofmtcheck"
+  - path: "bench"
+    stack: "Go 1.25.10 executable journey harness"
+    test_command: "go test ./..."
+    framework: "Go standard testing"
+    coverage_command: "go test -cover ./..."
+    build_command: "go build ./..."
+    vet_command: "go vet ./..."
+    format_check_command: "gofmt -l ."
 
 rules:
   proposal:
-    - Include rollback plan for risky changes
-    - Identify affected internal/ packages
+    - State the affected package and runtime boundaries.
+    - Include migration and rollback plans for cross-client, persistence, installer, or review-lifecycle changes.
   specs:
-    - Use Given/When/Then format for scenarios
-    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+    - Use RFC 2119 keywords for normative behavior.
+    - Express observable scenarios with Given/When/Then.
+    - Separate product behavior from provider- or client-specific transport behavior.
   design:
-    - Include sequence diagrams for complex TUI flows
-    - Document architecture decisions with rationale
+    - Keep policy in shared core packages and client details behind adapters or capability manifests.
+    - Document state ownership, failure recovery, compatibility impact, and immutable review boundaries where applicable.
+    - Include sequence diagrams only when concurrency or lifecycle ordering would otherwise be ambiguous.
   tasks:
-    - Group tasks by phase (infrastructure, implementation, testing)
-    - Use hierarchical numbering (1.1, 1.2, etc.)
-    - Keep tasks small enough to complete in one session
+    - Produce atomic, dependency-aware work units with explicit file scopes and completion evidence.
+    - Keep product, benchmark, documentation, and generated/golden updates in coherent reviewable units.
+    - Mark whether each unit affects the root module, the bench module, or both.
   apply:
-    - Load gentleman-bubbletea skill for TUI work (internal/tui/)
-    - Load gentleman-installer skill for installation steps
-    - Load gentleman-system skill for OS/system detection
-    - Load go-testing skill when writing tests
-    - Follow existing code patterns in internal/ packages
+    guidelines:
+      - Load the exact project skills matched by .atl/skill-registry.md before editing.
+      - Follow existing internal/ package seams and use t.TempDir() for filesystem tests.
+      - Run focused package tests before broader applicable checks.
+    tdd: false
+    test_command: ""
+    note: "Strict TDD is disabled only because no explicit workspace-wide test command covers both Go modules. Preserve project-local RED/GREEN discipline where applicable."
   verify:
-    - Run: go test ./...
-    - Run: go vet ./...
-    - Compare implementation against every spec scenario
+    test_command: ""
+    build_command: ""
+    coverage_threshold: 0
+    required_checks:
+      - "From repository root: go run ./internal/gofmtcheck"
+      - "From repository root: go vet ./..."
+      - "From repository root: go test ./..."
+      - "From bench/: go build ./..."
+      - "From bench/: go vet ./..."
+      - "From bench/: go test ./..."
+      - "Run opt-in E2E or driven benchmark journeys when the changed behavior makes them applicable."
   archive:
-    - Warn before merging destructive deltas (large removals)
+    - Preserve archived changes as immutable audit history.
+    - Record final verification evidence and unresolved platform or opt-in E2E limitations.
 
 testing:
-  strict_tdd: true
-  detected: "2026-05-05"
+  strict_tdd: false
+  detected: "2026-09-01"
+  workspace_test_command: ""
+  workspace_test_command_note: "No explicit repository-root command covers both . and bench/."
 
-  runner:
-    command: "go test ./..."
-    framework: "Go standard testing"
-
-  layers:
-    unit:
-      available: true
-      tool: "go test"
-      note: "132 test files across internal/ packages"
-    integration:
-      available: true
-      tool: "net/http/httptest (built-in)"
-    e2e:
-      available: true
-      tool: "Docker-based E2E (e2e/docker-test.sh)"
-      note: "Dockerfile.ubuntu, Dockerfile.fedora, Dockerfile.arch — triggered by RUN_FULL_E2E=1"
-    tui:
-      available: true
-      tool: "bubbletea tea.KeyMsg simulation (no teatest — direct model.Update() testing)"
-      note: "TUI tests use direct Bubbletea model updates, not teatest library"
-
-  coverage:
-    available: true
-    command: "go test -cover ./..."
-
-  quality:
-    linter:
-      available: false
-      note: "No golangci-lint config found; go vet is available"
-    type_checker:
-      available: true
-      command: "go vet ./..."
-    formatter:
-      available: true
-      command: "gofmt"
+  projects:
+    - path: "."
+      stack: "Go product module with Bubble Tea TUI"
+      test_command: "go test ./..."
+      framework: "Go standard testing"
+      test_files: 687
+      layers:
+        unit:
+          available: true
+          tool: "testing"
+        integration:
+          available: true
+          tool: "testing, net/http/httptest, subprocess and filesystem fixtures"
+        e2e:
+          available: true
+          tool: "e2e/organicruntime, e2e/docker-test.sh, and real_agent_e2e build tag"
+          note: "External-agent and container lanes are opt-in and environment-dependent."
+      coverage:
+        available: true
+        command: "go test -cover ./..."
+      quality:
+        linter:
+          available: false
+          command: ""
+          note: "No golangci-lint configuration is present."
+        type_checker:
+          available: true
+          command: "go vet ./..."
+        formatter:
+          available: true
+          command: "go run ./internal/gofmtcheck"
+    - path: "bench"
+      stack: "Standalone Go executable journey harness"
+      test_command: "go test ./..."
+      framework: "Go standard testing"
+      test_files: 19
+      layers:
+        unit:
+          available: true
+          tool: "testing"
+        integration:
+          available: true
+          tool: "subprocess and temporary-repository journey fixtures"
+        e2e:
+          available: true
+          tool: "gentle-ai-bench run --binary <path>"
+          note: "Driven journeys require a separately built Gentle AI binary."
+      coverage:
+        available: true
+        command: "go test -cover ./..."
+      quality:
+        linter:
+          available: false
+          command: ""
+          note: "No dedicated linter configuration is present."
+        type_checker:
+          available: true
+          command: "go vet ./..."
+        formatter:
+          available: true
+          command: "gofmt -l ."
