@@ -19,6 +19,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/claude"
 	codexagent "github.com/gentleman-programming/gentle-ai/v2/internal/agents/codex"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/kimi"
+	piagent "github.com/gentleman-programming/gentle-ai/v2/internal/agents/pi"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/assets"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/backup"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/agentguidance"
@@ -84,6 +85,9 @@ var (
 	ensureUserPathFirst  = system.PrioritizeUserPath
 	userPathEntries      = system.UserPathEntries
 	cleanupGGAInstallDir = gga.CleanupInstallDir
+	probePiSubagentsRPC  = func(ctx context.Context, homeDir, workspaceDir string) (piagent.PiSubagentsRPCProviderResponse, error) {
+		return piagent.NewAdapter().ProbeSubagentsRPC(ctx, homeDir, workspaceDir)
+	}
 
 	// ggaAvailableCheck is an optional override for ggaAvailable behavior.
 	// When set, it is called instead of the default filesystem check.
@@ -775,11 +779,12 @@ func (r *installRuntime) stagePlan() pipeline.StagePlan {
 
 	for _, agent := range r.resolved.Agents {
 		apply = append(apply, agentInstallStep{
-			id:       "agent:" + string(agent),
-			agent:    agent,
-			homeDir:  r.homeDir,
-			profile:  r.profile,
-			progress: r.progress,
+			id:           "agent:" + string(agent),
+			agent:        agent,
+			homeDir:      r.homeDir,
+			workspaceDir: r.workspaceDir,
+			profile:      r.profile,
+			progress:     r.progress,
 		})
 	}
 
@@ -1229,11 +1234,12 @@ func rollbackRoots(homeDir, workspaceDir string) []string {
 }
 
 type agentInstallStep struct {
-	id       string
-	agent    model.AgentID
-	homeDir  string
-	profile  system.PlatformProfile
-	progress pipeline.ProgressFunc
+	id           string
+	agent        model.AgentID
+	homeDir      string
+	workspaceDir string
+	profile      system.PlatformProfile
+	progress     pipeline.ProgressFunc
 }
 
 type openCodePluginInstallStep struct {
@@ -1286,7 +1292,25 @@ func (s agentInstallStep) Run() error {
 		return fmt.Errorf("install command for %q resolved to an empty sequence (unsupported platform or resolver misconfiguration)", s.agent)
 	}
 
-	return runCommandSequenceWithProgress(commands, s.progress, s.id)
+	if err := runCommandSequenceWithProgress(commands, s.progress, s.id); err != nil {
+		return err
+	}
+
+	piAdapter, ok := adapter.(*piagent.Adapter)
+	if !ok {
+		return fmt.Errorf("adapter for %q does not expose the Pi subagents RPC acceptance boundary", s.agent)
+	}
+	response, probeErr := probePiSubagentsRPC(context.Background(), s.homeDir, s.workspaceDir)
+	if _, validationErr := piAdapter.AcceptSubagentsRPCResponse(response); validationErr != nil {
+		if probeErr != nil {
+			return fmt.Errorf("validate Pi subagents RPC readiness: %w (probe: %v)", validationErr, probeErr)
+		}
+		return fmt.Errorf("validate Pi subagents RPC readiness: %w", validationErr)
+	}
+	if probeErr != nil {
+		return fmt.Errorf("probe Pi subagents RPC readiness: %w", probeErr)
+	}
+	return nil
 }
 
 type kimiSystemPromptHubStep struct {

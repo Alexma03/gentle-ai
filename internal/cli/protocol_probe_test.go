@@ -11,6 +11,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/kilocode"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/openclaw"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
+	piagent "github.com/gentleman-programming/gentle-ai/v2/internal/agents/pi"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/qwen"
 )
 
@@ -64,6 +65,12 @@ func TestMain(m *testing.M) {
 	}
 	probeEngramProtocolFlag = func(context.Context) (string, error) {
 		return "", errors.New("engram setup --help not available in tests")
+	}
+	probePiSubagentsRPC = func(context.Context, string, string) (piagent.PiSubagentsRPCProviderResponse, error) {
+		return piagent.PiSubagentsRPCProviderResponse{
+			Package: "npm:pi-subagents",
+			Ready:   []byte(canonicalPiSubagentsReadyForCLI),
+		}, nil
 	}
 
 	agentPresent := func(name string) (string, error) { return "/usr/local/bin/" + name, nil }
