@@ -55,6 +55,10 @@ PASS — no whitespace errors.
 
 The baseline focused run also passed except the pre-existing environment-dependent `TestEngramPathGuidanceDefault` because `go/bin` was absent. A full CLI package run remains unsuitable as PR1 evidence because it includes legacy identity tests and long external-runtime cases; it was not used to claim a terminal full-suite result.
 
+### Correction RED evidence
+
+Before the production corrections, the newly added regression commands failed as required: the two CLI integration cases returned nil instead of migrating and gating; the state rollback cases accepted an outside manifest path, removed a managed path before rejecting a traversed snapshot, and partially restored an earlier entry; and component/community-tool resolution left the report pending. These failures were observed before `2e535426` and `1fb2ad7b`; the same commands are green in the table above after correction.
+
 ## Known Cross-Slice Failures / Blockers
 
 The full `go test ./internal/components/communitytool -count=1` package is **not green** after the exact-five registry and CodeGraph compatibility contract. It still contains stale tests for OpenCode, Gemini CLI, Kiro, Hermes, and other retired/default-registry identities, including `TestCodeGraphGuidanceInjectsForRepresentativeAgents`, three OpenCode `DetectStatus` tests, three OpenCode reconciliation tests, and targeted OpenCode/Gemini install assertions. These failures are deferred to PR2 task 2.5 and related retirement updates; this PR does not reintroduce legacy runtime behavior or expand into retirement cleanup.
