@@ -41,6 +41,9 @@ type ClaudePhaseAssignmentState struct {
 
 // InstallState holds the persisted user selections from the last install run.
 type InstallState struct {
+	// SchemaVersion is zero for legacy state files and set by the reversible
+	// migration transaction once the canonical personal-stack shape is written.
+	SchemaVersion          int                 `json:"schema_version,omitempty"`
 	InstalledAgents        []string            `json:"installed_agents"`
 	InstalledBinaryVersion string              `json:"installed_binary_version,omitempty"`
 	ManagedAssetDigest     string              `json:"managed_asset_digest,omitempty"`
@@ -226,6 +229,7 @@ func MergeAgents(existing InstallState, newAgents []string) InstallState {
 	}
 
 	return InstallState{
+		SchemaVersion:               existing.SchemaVersion,
 		InstalledAgents:             merged,
 		InstalledBinaryVersion:      existing.InstalledBinaryVersion,
 		ManagedAssetDigest:          existing.ManagedAssetDigest,

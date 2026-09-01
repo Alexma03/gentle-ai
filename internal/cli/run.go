@@ -137,16 +137,20 @@ func RunInstall(args []string, detection system.DetectionResult) (InstallResult,
 		return InstallResult{}, err
 	}
 
+	homeDir, err := osUserHomeDir()
+	if err != nil {
+		return InstallResult{}, fmt.Errorf("resolve user home directory: %w", err)
+	}
+	if err := requireInstallStateMigrationResolved(homeDir); err != nil {
+		return InstallResult{}, fmt.Errorf("state migration: %w", err)
+	}
+
 	resolved, err := planner.NewResolver(planner.MVPGraph()).Resolve(input.Selection)
 	if err != nil {
 		return InstallResult{}, err
 	}
 	profile := ResolveInstallProfile(detection)
 	resolved.PlatformDecision = planner.PlatformDecisionFromProfile(profile)
-	homeDir, err := osUserHomeDir()
-	if err != nil {
-		return InstallResult{}, fmt.Errorf("resolve user home directory: %w", err)
-	}
 	persistedState, stateErr := state.Read(homeDir)
 	if errors.Is(stateErr, os.ErrNotExist) {
 		persistedState = state.InstallState{}
