@@ -99,6 +99,154 @@ func TestRestoreMigrationRejectsUntrustedBackupIdentity(t *testing.T) {
 	}
 }
 
+func TestRestoreMigrationRejectsManifestPathsOutsideAuthorizedRoot(t *testing.T) {
+	home := t.TempDir()
+	managed := filepath.Join(home, ".claude", "CLAUDE.md")
+	if err := os.MkdirAll(filepath.Dir(managed), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(managed, []byte("original\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Write(home, InstallState{InstalledAgents: []string{"opencode"}}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := Migrate(home, []string{managed})
+	if !errors.Is(err, ErrMigrationSelectionRequired) {
+		t.Fatalf("Migrate() error = %v, want selection-required", err)
+	}
+
+	outside := filepath.Join(t.TempDir(), "outside.txt")
+	if err := os.WriteFile(outside, []byte("must remain\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	tampered := result.Report
+	tampered.RollbackManifest[0].Path = outside
+	if err := RestoreMigration(home, tampered); err == nil {
+		t.Fatal("RestoreMigration() accepted manifest path outside authorized root")
+	}
+	content, readErr := os.ReadFile(outside)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if string(content) != "must remain\n" {
+		t.Fatalf("outside path changed after rejected restore: %q", content)
+	}
+}
+
+func TestRestoreMigrationRejectsManifestSnapshotTraversal(t *testing.T) {
+	home := t.TempDir()
+	managed := filepath.Join(home, ".codex", "AGENTS.md")
+	if err := os.MkdirAll(filepath.Dir(managed), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(managed, []byte("original\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Write(home, InstallState{InstalledAgents: []string{"opencode"}}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := Migrate(home, []string{managed})
+	if !errors.Is(err, ErrMigrationSelectionRequired) {
+		t.Fatalf("Migrate() error = %v, want selection-required", err)
+	}
+
+	tampered := result.Report
+	tampered.RollbackManifest[0].Snapshot = filepath.Join("..", "outside")
+	if err := RestoreMigration(home, tampered); err == nil {
+		t.Fatal("RestoreMigration() accepted traversal in manifest snapshot")
+	}
+	content, readErr := os.ReadFile(managed)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if string(content) != "original\n" {
+		t.Fatalf("managed path changed after rejected restore: %q", content)
+	}
+}
+
+func TestRestoreMigrationValidatesAllEntriesBeforeMutating(t *testing.T) {
+	home := t.TempDir()
+	first := filepath.Join(home, ".claude", "CLAUDE.md")
+	second := filepath.Join(home, ".codex", "AGENTS.md")
+	for _, path := range []string{first, second} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("original\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := Write(home, InstallState{InstalledAgents: []string{"opencode"}}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := Migrate(home, []string{first, second})
+	if !errors.Is(err, ErrMigrationSelectionRequired) {
+		t.Fatalf("Migrate() error = %v, want selection-required", err)
+	}
+	if err := os.WriteFile(first, []byte("changed first\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(second, []byte("changed second\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	tampered := result.Report
+	tampered.RollbackManifest[1].Snapshot = filepath.Join("paths", "missing")
+	if err := RestoreMigration(home, tampered); err == nil {
+		t.Fatal("RestoreMigration() succeeded with an invalid later snapshot")
+	}
+	for _, tc := range []struct {
+		path string
+		want string
+	}{
+		{path: first, want: "changed first\n"},
+		{path: second, want: "changed second\n"},
+	} {
+		content, readErr := os.ReadFile(tc.path)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		if string(content) != tc.want {
+			t.Fatalf("%s changed before atomic restore validation: %q", tc.path, content)
+		}
+	}
+}
+
+func TestResolveSelectionHandlesComponentAndCommunityToolValues(t *testing.T) {
+	home := t.TempDir()
+	if err := Write(home, InstallState{
+		InstalledAgents: []string{"claude-code"},
+		Components:      []model.ComponentID{"retired-component"},
+		CommunityTools:  []string{"retired-tool"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := Migrate(home, nil)
+	if !errors.Is(err, ErrMigrationSelectionRequired) {
+		t.Fatalf("Migrate() error = %v, want selection-required", err)
+	}
+	if !reflect.DeepEqual(result.Report.Unresolved, []string{"community_tool:retired-tool", "component:retired-component"}) {
+		t.Fatalf("unresolved values = %#v", result.Report.Unresolved)
+	}
+
+	resolved, err := ResolveSelection(home, map[string]model.AgentID{
+		"component:retired-component": model.AgentID(model.ComponentSDD),
+		"community_tool:retired-tool": model.AgentID(model.CommunityToolCodeGraph),
+	})
+	if err != nil {
+		t.Fatalf("ResolveSelection() error = %v", err)
+	}
+	if resolved.NeedsSelection() {
+		t.Fatalf("resolved migration still needs selection: %#v", resolved.Report)
+	}
+	if !containsComponent(resolved.State.Components, model.ComponentSDD) ||
+		!reflect.DeepEqual(resolved.State.CommunityTools, []string{string(model.CommunityToolCodeGraph)}) {
+		t.Fatalf("resolved state = %#v", resolved.State)
+	}
+}
+
 func TestResolveSelectionAndRestoreMigrationAreReversible(t *testing.T) {
 	home := t.TempDir()
 	managed := filepath.Join(home, ".codex", "AGENTS.md")
