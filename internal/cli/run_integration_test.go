@@ -96,7 +96,11 @@ func TestPiAgentInstallRejectsUnvalidatedSubagentsRPCAtProductionBoundary(t *tes
 	t.Cleanup(restorePreflightLookPath)
 
 	restoreCommand := runCommand
-	runCommand = func(string, ...string) error { return nil }
+	var commands []string
+	runCommand = func(name string, args ...string) error {
+		commands = append(commands, strings.Join(append([]string{name}, args...), " "))
+		return nil
+	}
 	t.Cleanup(func() { runCommand = restoreCommand })
 
 	restoreProbe := probePiSubagentsRPC
@@ -145,12 +149,21 @@ func TestPiAgentInstallRejectsUnvalidatedSubagentsRPCAtProductionBoundary(t *tes
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			commands = nil
 			probePiSubagentsRPC = func(context.Context, string, string) (piagent.PiSubagentsRPCProviderResponse, error) {
 				return tt.response, nil
 			}
 			step := agentInstallStep{id: "agent:pi", agent: model.AgentPi, homeDir: t.TempDir()}
 			if err := step.Run(); err == nil || !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(tt.want)) {
 				t.Fatalf("agentInstallStep.Run() error = %v, want rejection containing %q", err, tt.want)
+			}
+			if got := countString(commands, "pi install npm:pi-subagents"); got != 1 {
+				t.Fatalf("canonical package install count = %d in %v, want exactly one", got, commands)
+			}
+			for _, command := range commands {
+				if strings.Contains(command, "pi-subagents-j0k3r") || strings.Contains(command, "@tintinweb/pi-subagents") {
+					t.Fatalf("retired subagents fallback command = %q", command)
+				}
 			}
 		})
 	}
@@ -177,6 +190,16 @@ func TestPiAgentInstallAcceptsCanonicalSubagentsRPCAtProductionBoundary(t *testi
 	if err := step.Run(); err != nil {
 		t.Fatalf("agentInstallStep.Run() error = %v, want canonical readiness accepted", err)
 	}
+}
+
+func countString(items []string, want string) int {
+	count := 0
+	for _, item := range items {
+		if item == want {
+			count++
+		}
+	}
+	return count
 }
 
 func TestRunInstallAppliesFilesystemChanges(t *testing.T) {
