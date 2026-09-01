@@ -10,16 +10,16 @@ import (
 // ─── WelcomeOptions ──────────────────────────────────────────────────────────
 
 // TestWelcomeOptions_WithoutProfiles verifies that when showProfiles is false,
-// the "OpenCode SDD Profiles" option is NOT present.
+// the profile option is not present and retired marketplace entries stay gone.
 func TestWelcomeOptions_WithoutProfiles(t *testing.T) {
 	opts := screens.WelcomeOptions(nil, true, false, 0, true)
-	if !containsOption(opts, "OpenCode Community Plugins") {
-		t.Fatalf("expected dedicated OpenCode Community Plugins option; got: %v", opts)
-	}
 	for _, opt := range opts {
 		if strings.Contains(opt, "OpenCode SDD Profiles") {
 			t.Errorf("expected no 'OpenCode SDD Profiles' option when showProfiles=false; got: %v", opts)
 			break
+		}
+		if strings.Contains(opt, "Community Plugins") || strings.Contains(opt, "Uninstall OpenCode") {
+			t.Errorf("retired marketplace option still present: %q", opt)
 		}
 	}
 }
@@ -69,23 +69,23 @@ func TestWelcomeOptions_WithProfiles_CountOne(t *testing.T) {
 	}
 }
 
-// TestWelcomeOptions_OptionCount_WithoutProfiles verifies 14 options when showProfiles=false
+// TestWelcomeOptions_OptionCount_WithoutProfiles verifies 12 options when showProfiles=false
 // and hasEngines=true.
 func TestWelcomeOptions_OptionCount_WithoutProfiles(t *testing.T) {
 	opts := screens.WelcomeOptions(nil, true, false, 0, true)
 	// Includes the Receipt-Driven Development entry.
-	want := 14
+	want := 12
 	if len(opts) != want {
 		t.Errorf("WelcomeOptions(showProfiles=false, hasEngines=true) = %d options, want %d; opts: %v", len(opts), want, opts)
 	}
 }
 
-// TestWelcomeOptions_OptionCount_WithProfiles verifies 15 options when showProfiles=true
+// TestWelcomeOptions_OptionCount_WithProfiles verifies 13 options when showProfiles=true
 // and hasEngines=true.
 func TestWelcomeOptions_OptionCount_WithProfiles(t *testing.T) {
 	opts := screens.WelcomeOptions(nil, true, true, 2, true)
 	// Includes the Receipt-Driven Development entry.
-	want := 15
+	want := 13
 	if len(opts) != want {
 		t.Errorf("WelcomeOptions(showProfiles=true, hasEngines=true) = %d options, want %d; opts: %v", len(opts), want, opts)
 	}
@@ -107,26 +107,16 @@ func TestWelcomeOptions_NoEngines_ShowsDisabledLabel(t *testing.T) {
 }
 
 // TestWelcomeOptions_ProfilesInsertedBeforeManageBackups verifies the ordering:
-// profiles option sits between "OpenCode Community Plugins" / "Uninstall OpenCode
-// Plugin" and "Manage backups". Slice 3b inserts the uninstall shortcut between
-// the plugins entry and the profiles entry.
+// the retained profiles option sits immediately before "Manage backups".
 func TestWelcomeOptions_ProfilesInsertedBeforeManageBackups(t *testing.T) {
 	opts := screens.WelcomeOptions(nil, true, true, 1, true)
 
 	agentIdx := -1
-	pluginsIdx := -1
-	uninstallIdx := -1
 	profilesIdx := -1
 	manageBackupsIdx := -1
 	for i, opt := range opts {
 		if strings.HasPrefix(opt, "Create your own Agent") {
 			agentIdx = i
-		}
-		if opt == "OpenCode Community Plugins" {
-			pluginsIdx = i
-		}
-		if opt == "Uninstall OpenCode Plugin" {
-			uninstallIdx = i
 		}
 		if strings.HasPrefix(opt, "OpenCode SDD Profiles") {
 			profilesIdx = i
@@ -139,12 +129,6 @@ func TestWelcomeOptions_ProfilesInsertedBeforeManageBackups(t *testing.T) {
 	if agentIdx < 0 {
 		t.Fatal("option 'Create your own Agent' not found")
 	}
-	if pluginsIdx < 0 {
-		t.Fatal("option 'OpenCode Community Plugins' not found")
-	}
-	if uninstallIdx < 0 {
-		t.Fatal("option 'Uninstall OpenCode Plugin' not found")
-	}
 	if profilesIdx < 0 {
 		t.Fatal("option 'OpenCode SDD Profiles' not found")
 	}
@@ -152,21 +136,12 @@ func TestWelcomeOptions_ProfilesInsertedBeforeManageBackups(t *testing.T) {
 		t.Fatal("option 'Manage backups' not found")
 	}
 
-	if pluginsIdx != agentIdx+1 {
-		t.Errorf("plugins option at index %d, expected %d (right after 'Create your own Agent' at %d)",
-			pluginsIdx, agentIdx+1, agentIdx)
-	}
-	if uninstallIdx != pluginsIdx+1 {
-		t.Errorf("'Uninstall OpenCode Plugin' at index %d, expected %d (right after plugins at %d)",
-			uninstallIdx, pluginsIdx+1, pluginsIdx)
-	}
-	if profilesIdx != uninstallIdx+1 {
-		t.Errorf("profiles option at index %d, expected %d (right after uninstall at %d)",
-			profilesIdx, uninstallIdx+1, uninstallIdx)
+	if profilesIdx != agentIdx+1 {
+		t.Errorf("profiles option at index %d, expected %d (right after 'Create your own Agent' at %d)",
+			profilesIdx, agentIdx+1, agentIdx)
 	}
 	if manageBackupsIdx != profilesIdx+1 {
-		t.Errorf("'Manage backups' at index %d, expected %d (right after profiles at %d)",
-			manageBackupsIdx, profilesIdx+1, profilesIdx)
+		t.Errorf("'Manage backups' at index %d, expected %d (right after profiles at %d)", manageBackupsIdx, profilesIdx+1, profilesIdx)
 	}
 }
 

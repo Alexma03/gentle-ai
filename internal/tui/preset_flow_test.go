@@ -30,56 +30,28 @@ func TestPresetSelectionNextScreenFlowMatrix(t *testing.T) {
 		golden     string
 	}{
 		{
-			name:       "full gentleman with opencode enters SDD mode before plugins",
-			agents:     []model.AgentID{model.AgentOpenCode},
-			preset:     model.PresetFullGentleman,
-			wantScreen: ScreenSDDMode,
-			golden:     "preset-full-gentleman-opencode-next.golden",
-		},
-		{
-			name:       "ecosystem only with opencode enters SDD mode before plugins",
-			agents:     []model.AgentID{model.AgentOpenCode},
-			preset:     model.PresetEcosystemOnly,
-			wantScreen: ScreenSDDMode,
-			golden:     "preset-ecosystem-only-opencode-next.golden",
-		},
-		{
-			name:       "minimal with opencode enters plugin selection",
-			agents:     []model.AgentID{model.AgentOpenCode},
-			preset:     model.PresetMinimal,
-			wantScreen: ScreenOpenCodePlugins,
-			golden:     "preset-minimal-opencode-next.golden",
-		},
-		{
-			name:       "custom with opencode enters component selection before plugins",
-			agents:     []model.AgentID{model.AgentOpenCode},
-			preset:     model.PresetCustom,
-			wantScreen: ScreenDependencyTree,
-			golden:     "preset-custom-opencode-next.golden",
-		},
-		{
-			name:       "full gentleman without opencode enters strict TDD",
+			name:       "full gentleman with retained agent enters strict TDD",
 			agents:     []model.AgentID{model.AgentCursor},
 			preset:     model.PresetFullGentleman,
 			wantScreen: ScreenStrictTDD,
 			golden:     "preset-full-gentleman-no-opencode-next.golden",
 		},
 		{
-			name:       "ecosystem only without opencode enters strict TDD",
+			name:       "ecosystem only with retained agent enters strict TDD",
 			agents:     []model.AgentID{model.AgentCursor},
 			preset:     model.PresetEcosystemOnly,
 			wantScreen: ScreenStrictTDD,
 			golden:     "preset-ecosystem-only-no-opencode-next.golden",
 		},
 		{
-			name:       "minimal without opencode enters dependency plan",
+			name:       "minimal with retained agent enters dependency plan",
 			agents:     []model.AgentID{model.AgentCursor},
 			preset:     model.PresetMinimal,
 			wantScreen: ScreenDependencyTree,
 			golden:     "preset-minimal-no-opencode-next.golden",
 		},
 		{
-			name:       "custom without opencode enters component selection",
+			name:       "custom with retained agent enters component selection",
 			agents:     []model.AgentID{model.AgentCursor},
 			preset:     model.PresetCustom,
 			wantScreen: ScreenDependencyTree,
@@ -115,40 +87,7 @@ func TestCustomPresetPostComponentFlowMatrix(t *testing.T) {
 		golden     string
 	}{
 		{
-			name:       "opencode with Engram only shows plugins after component selection",
-			agents:     []model.AgentID{model.AgentOpenCode},
-			components: []model.ComponentID{model.ComponentEngram},
-			actions:    []flowAction{{key: tea.KeyMsg{Type: tea.KeyEnter}}},
-			wantScreen: ScreenOpenCodePlugins,
-			golden:     "custom-opencode-engram-next.golden",
-		},
-		{
-			name:       "opencode with SDD reaches plugins after SDD and strict TDD stages",
-			agents:     []model.AgentID{model.AgentOpenCode},
-			components: []model.ComponentID{model.ComponentSDD},
-			actions: []flowAction{
-				{key: tea.KeyMsg{Type: tea.KeyEnter}}, // DependencyTree Continue -> SDDMode
-				{key: tea.KeyMsg{Type: tea.KeyEnter}}, // SDDMode single -> StrictTDD
-				{key: tea.KeyMsg{Type: tea.KeyEnter}}, // StrictTDD enable -> OpenCode plugins
-			},
-			wantScreen: ScreenOpenCodePlugins,
-			golden:     "custom-opencode-sdd-after-strict-next.golden",
-		},
-		{
-			name:       "opencode with SDD and Skills reaches skill picker after plugins",
-			agents:     []model.AgentID{model.AgentOpenCode},
-			components: []model.ComponentID{model.ComponentSDD, model.ComponentSkills},
-			actions: []flowAction{
-				{key: tea.KeyMsg{Type: tea.KeyEnter}}, // DependencyTree Continue -> SDDMode
-				{key: tea.KeyMsg{Type: tea.KeyEnter}}, // SDDMode single -> StrictTDD
-				{key: tea.KeyMsg{Type: tea.KeyEnter}}, // StrictTDD enable -> OpenCode plugins
-				{key: tea.KeyMsg{Type: tea.KeyEnter}, cursor: len(opencodepluginDefinitions()) * 2, setCursor: true}, // OpenCode plugins Continue -> SkillPicker
-			},
-			wantScreen: ScreenSkillPicker,
-			golden:     "custom-opencode-sdd-skills-after-plugins-next.golden",
-		},
-		{
-			name:       "no opencode with SDD and Skills reaches skill picker after strict TDD",
+			name:       "with retained agent with SDD and Skills reaches skill picker after strict TDD",
 			agents:     []model.AgentID{model.AgentCursor},
 			components: []model.ComponentID{model.ComponentSDD, model.ComponentSkills},
 			actions: []flowAction{
@@ -159,7 +98,7 @@ func TestCustomPresetPostComponentFlowMatrix(t *testing.T) {
 			golden:     "custom-no-opencode-sdd-skills-next.golden",
 		},
 		{
-			name:       "no opencode with Engram only reaches review",
+			name:       "with retained agent with Engram only reaches review",
 			agents:     []model.AgentID{model.AgentCursor},
 			components: []model.ComponentID{model.ComponentEngram},
 			actions:    []flowAction{{key: tea.KeyMsg{Type: tea.KeyEnter}}},

@@ -27,7 +27,6 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/filemerge"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/mcp"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/opencodedefault"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/opencodeplugin"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/permissions"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/persona"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/sdd"
@@ -768,12 +767,6 @@ func (r *installRuntime) stagePlan() pipeline.StagePlan {
 		apply = append(apply, communityToolInstallStep{id: "community-tool:" + string(tool), tool: tool, workspaceDir: r.workspaceDir, homeDir: r.homeDir, state: r.state})
 	}
 
-	if containsAgent(r.resolved.Agents, model.AgentOpenCode) {
-		for _, plugin := range r.selection.OpenCodePlugins {
-			apply = append(apply, openCodePluginInstallStep{id: "opencode-plugin:" + string(plugin), plugin: plugin, homeDir: r.homeDir})
-		}
-	}
-
 	for _, component := range r.resolved.OrderedComponents {
 		step := componentApplyStep{
 			id:           "component:" + string(component),
@@ -1196,19 +1189,6 @@ type agentInstallStep struct {
 	workspaceDir string
 	profile      system.PlatformProfile
 	progress     pipeline.ProgressFunc
-}
-
-type openCodePluginInstallStep struct {
-	id      string
-	plugin  model.OpenCodeCommunityPluginID
-	homeDir string
-}
-
-func (s openCodePluginInstallStep) ID() string { return s.id }
-
-func (s openCodePluginInstallStep) Run() error {
-	_, err := opencodeplugin.Install(s.homeDir, s.plugin)
-	return err
 }
 
 func (s agentInstallStep) ID() string {
@@ -1837,10 +1817,8 @@ func selectedSkillIDs(selection model.Selection) []model.SkillID {
 func backupTargets(homeDir, workspaceDir string, scope InstallScope, selection model.Selection, resolved planner.ResolvedPlan) ([]string, error) {
 	paths := map[string]struct{}{}
 	adapters := resolveAdapters(resolved.Agents)
-	managesSDDPlugins := false
 
 	for _, component := range resolved.OrderedComponents {
-		managesSDDPlugins = managesSDDPlugins || component == model.ComponentSDD
 		for _, path := range componentPathsWithWorkspaceScoped(homeDir, workspaceDir, scope, selection, adapters, component) {
 			paths[path] = struct{}{}
 		}
@@ -1876,17 +1854,6 @@ func backupTargets(homeDir, workspaceDir string, scope InstallScope, selection m
 				for _, path := range plan.OutputStylePaths(adapter.OutputStyleDir(componentPathDirScoped(homeDir, workspaceDir, scope, adapter, model.ComponentPersona))).Backup {
 					paths[path] = struct{}{}
 				}
-			}
-		}
-	}
-	if managesSDDPlugins {
-		for _, adapter := range adapters {
-			if !sdd.AgentReceivesManagedOpenCodePlugins(adapter.Agent()) {
-				continue
-			}
-			pluginsDir := filepath.Join(adapter.GlobalConfigDir(componentPathDirScoped(homeDir, workspaceDir, scope, adapter, model.ComponentSDD)), "plugins")
-			for _, name := range sdd.OpenCodePluginLifecycleNames(adapter.Agent()) {
-				paths[filepath.Join(pluginsDir, name)] = struct{}{}
 			}
 		}
 	}
@@ -1927,13 +1894,6 @@ func backupTargets(homeDir, workspaceDir string, scope InstallScope, selection m
 		for _, path := range codegraph.CodeGraphManagedPaths(homeDir) {
 			paths[path] = struct{}{}
 		}
-	}
-	pluginPaths, err := opencodeplugin.InstallPaths(homeDir, selection.OpenCodePlugins)
-	if err != nil {
-		return nil, err
-	}
-	for _, path := range pluginPaths {
-		paths[path] = struct{}{}
 	}
 	if containsAgent(resolved.Agents, model.AgentOpenCode) {
 		for _, path := range opencodeactivation.LauncherPaths(homeDir, runtime.GOOS) {
@@ -2086,7 +2046,6 @@ func componentPathsWithWorkspaceScoped(homeDir, workspaceDir string, scope Insta
 				if p := adapter.SettingsPath(targetDir); p != "" {
 					paths = append(paths, p, opencodedefault.OwnershipPath(p))
 				}
-				paths = append(paths, openCodeSDDPluginPaths(targetDir)...)
 				// Shared prompt files in the selected OpenCode config scope — back these up
 				// so a sync does not silently overwrite user-customized prompt content.
 				// These files are only written for multi-mode (SDDModeMulti), so we only
@@ -2306,17 +2265,6 @@ func sddSubAgentPaths(homeDir string, adapter agents.Adapter) []string {
 		paths = append(paths, filepath.Join(adapter.SubAgentsDir(homeDir), entry.Name()))
 	}
 
-	return paths
-}
-
-func openCodeSDDPluginPaths(targetDir string) []string {
-	// Legacy background-agents is removed during installation and therefore has
-	// an absence check. The retired reviewer plugin is part of the rollback
-	// snapshot but not post-apply verification because migration removes it.
-	paths := []string{filepath.Join(targetDir, ".config", "opencode", "plugins", "background-agents.ts")}
-	for _, name := range sdd.ManagedOpenCodePluginNames() {
-		paths = append(paths, filepath.Join(targetDir, ".config", "opencode", "plugins", name))
-	}
 	return paths
 }
 

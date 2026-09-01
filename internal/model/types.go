@@ -216,14 +216,6 @@ const (
 	SDDProfileStrategyExternalSingleActive SDDProfileStrategyID = "external-single-active"
 )
 
-type OpenCodeCommunityPluginID string
-
-const (
-	OpenCodePluginSubAgentStatusline OpenCodeCommunityPluginID = "sub-agent-statusline"
-	OpenCodePluginSDDEngramManage    OpenCodeCommunityPluginID = "sdd-engram-plugin"
-	OpenCodePluginGentleLogo         OpenCodeCommunityPluginID = "gentle-logo"
-)
-
 type CommunityToolID string
 
 const (
