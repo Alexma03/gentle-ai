@@ -85,6 +85,8 @@ The full root suite is therefore a known cross-slice blocker, not evidence that 
 - `1fb2ad7b` — `fix(state): secure migration restore and selection resolution`
 - `8b76266e` — `fix(state): anchor raw migration snapshots`
 - `0ff03225` — `docs(sdd): document migration correction evidence`
+- `c0805976` — `docs(sdd): complete PR1 correction commit ledger`
+- `441509ed` — `docs(sdd): record correction red evidence`
 
 ## Rollback Boundary
 
