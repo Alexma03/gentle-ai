@@ -4,6 +4,8 @@ import (
 	"io/fs"
 	"strings"
 	"testing"
+
+	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
 
 func TestEmbeddedAssetsExcludeRetiredClientRoots(t *testing.T) {
@@ -11,6 +13,12 @@ func TestEmbeddedAssetsExcludeRetiredClientRoots(t *testing.T) {
 		if isRetiredAssetRoot(entry.Name()) {
 			t.Fatalf("embedded assets exposed retired client root %q", entry.Name())
 		}
+	}
+}
+
+func TestSDDCommandsAssetDirUsesRetainedFallback(t *testing.T) {
+	if got := SDDCommandsAssetDir(model.AgentCursor); got != "claude/commands" {
+		t.Fatalf("SDDCommandsAssetDir(cursor) = %q, want retained Claude-compatible commands", got)
 	}
 }
 
