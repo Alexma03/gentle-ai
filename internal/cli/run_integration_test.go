@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/kimi"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/backup"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/installcmd"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
@@ -46,6 +45,27 @@ func stringSliceContains(items []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// assertRunInstallRejectsRetiredSelector verifies the production install
+// boundary refuses a legacy client before it can build or execute a plan.
+func assertRunInstallRejectsRetiredSelector(t *testing.T, raw string, args ...string) {
+	t.Helper()
+	home := t.TempDir()
+	previousHome := osUserHomeDir
+	osUserHomeDir = func() (string, error) { return home, nil }
+	t.Cleanup(func() { osUserHomeDir = previousHome })
+
+	result, err := RunInstall(args, system.DetectionResult{})
+	if err == nil {
+		t.Fatalf("RunInstall(%v) error = nil, want retired selector %q rejected", args, raw)
+	}
+	if !strings.Contains(err.Error(), "unsupported agent") || !strings.Contains(err.Error(), raw) {
+		t.Fatalf("RunInstall(%v) error = %q, want unsupported agent %q", args, err.Error(), raw)
+	}
+	if result.Resolved.Agents != nil || result.Execution.Apply.Steps != nil || result.Execution.Prepare.Steps != nil {
+		t.Fatalf("rejected selector produced a plan or execution result: %#v", result)
+	}
 }
 
 const engramInitCommandForTest = "npm exec --yes --package gentle-engram@latest -- pi-engram init"
@@ -768,55 +788,9 @@ func TestRunInstallWorkspaceScopeRollback_SurfacesRealError(t *testing.T) {
 	}
 }
 
-func TestRunInstallFedoraQwenEngramSkipsUnsupportedSetupAndWritesSettings(t *testing.T) {
-	t.Skip("Qwen is a retired selector")
-
-	home := t.TempDir()
-	restoreHome := osUserHomeDir
-	restoreCommand := runCommand
-	restoreLookPath := cmdLookPath
-	t.Cleanup(func() {
-		osUserHomeDir = restoreHome
-		runCommand = restoreCommand
-		cmdLookPath = restoreLookPath
-	})
-
-	osUserHomeDir = func() (string, error) { return home, nil }
-	cmdLookPath = missingBinaryLookPath
-	recorder := &commandRecorder{}
-	runCommand = recorder.record
-
-	origDownloadFn := engramDownloadFn
-	engramDownloadFn = func(profile system.PlatformProfile) (string, error) {
-		return filepath.Join(home, "bin", "engram"), nil
-	}
-	t.Cleanup(func() { engramDownloadFn = origDownloadFn })
-
-	detection := linuxDetectionResult(system.LinuxDistroFedora, "dnf")
-	result, err := RunInstall(
-		[]string{"--agent", "qwen-code", "--component", "engram"},
-		detection,
-	)
-	if err != nil {
-		t.Fatalf("RunInstall() error = %v", err)
-	}
-	if !result.Verify.Ready {
-		t.Fatalf("verification ready = false, report = %#v", result.Verify)
-	}
-
-	settingsPath := filepath.Join(home, ".qwen", "settings.json")
-	if _, err := os.Stat(settingsPath); err != nil {
-		t.Fatalf("expected qwen settings at %q: %v", settingsPath, err)
-	}
-
-	for _, cmd := range recorder.get() {
-		if strings.Contains(cmd, "engram setup qwen-code") {
-			t.Fatalf("unexpected unsupported setup command: %s", cmd)
-		}
-	}
+func TestRunInstallRejectsRetiredQwenSelector(t *testing.T) {
+	assertRunInstallRejectsRetiredSelector(t, "qwen-code", "--agent", "qwen-code", "--component", "engram")
 }
-
-// --- Batch E: Linux verification and macOS parity matrix ---
 
 func TestRunInstallLinuxVerificationReportsReadyOnSuccess(t *testing.T) {
 	home := t.TempDir()
@@ -1733,78 +1707,8 @@ func TestRunInstallDryRunMatchesActualInstall(t *testing.T) {
 	}
 }
 
-func TestRunInstallDryRunMatchesActualInstallOpenCodeSDDMulti(t *testing.T) {
-	t.Skip("OpenCode SDD multi-mode is a legacy compatibility surface and is not selectable in the retained-client registry")
-	installArgs := []string{"--agent", "opencode", "--component", "sdd", "--sdd-mode", "multi"}
-	dryRunArgs := append([]string{"--dry-run"}, installArgs...)
-	dryResult, err := RunInstall(dryRunArgs, system.DetectionResult{})
-	if err != nil {
-		t.Fatalf("dry-run RunInstall() error = %v", err)
-	}
-	if !dryResult.DryRun {
-		t.Fatalf("expected DryRun=true in result, got false")
-	}
-
-	home := t.TempDir()
-	adapters := resolveAdapters(dryResult.Resolved.Agents)
-	var expectedPaths []string
-	for _, component := range dryResult.Resolved.OrderedComponents {
-		expectedPaths = append(expectedPaths, componentPaths(home, dryResult.Selection, adapters, component)...)
-	}
-	pluginPaths := []string{
-		filepath.Join(home, ".config", "opencode", "plugins", "background-agents.ts"),
-		filepath.Join(home, ".config", "opencode", "plugins", "model-variants.ts"),
-		filepath.Join(home, ".config", "opencode", "plugins", "skill-registry.ts"),
-	}
-	for _, pluginPath := range pluginPaths {
-		if !containsPath(expectedPaths, pluginPath) {
-			t.Fatalf("dry-run expected paths missing multi-mode plugin %q\npaths=%v", pluginPath, expectedPaths)
-		}
-	}
-
-	restoreHome := osUserHomeDir
-	restoreCommand := runCommand
-	restoreLookPath := cmdLookPath
-	t.Cleanup(func() {
-		osUserHomeDir = restoreHome
-		runCommand = restoreCommand
-		cmdLookPath = restoreLookPath
-	})
-
-	osUserHomeDir = func() (string, error) { return home, nil }
-	runCommand = func(string, ...string) error { return nil }
-	cmdLookPath = missingBinaryLookPath
-
-	realResult, err := RunInstall(installArgs, system.DetectionResult{})
-	if err != nil {
-		t.Fatalf("real RunInstall() error = %v", err)
-	}
-	if !realResult.Verify.Ready {
-		t.Fatalf("post-apply verification not ready: %#v", realResult.Verify)
-	}
-
-	for _, path := range expectedPaths {
-		if isLegacyOpenCodeBackgroundAgentsPlugin(path) {
-			if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
-				t.Fatalf("expected legacy OpenCode SDD plugin %q to be removed after install; stat err = %v", path, statErr)
-			}
-			continue
-		}
-		if _, statErr := os.Stat(path); statErr != nil {
-			t.Fatalf("expected dry-run path %q to exist after install: %v", path, statErr)
-		}
-	}
-	for _, pluginPath := range pluginPaths {
-		if isLegacyOpenCodeBackgroundAgentsPlugin(pluginPath) {
-			if _, statErr := os.Stat(pluginPath); !os.IsNotExist(statErr) {
-				t.Fatalf("expected legacy OpenCode SDD plugin %q to be removed after install; stat err = %v", pluginPath, statErr)
-			}
-			continue
-		}
-		if _, statErr := os.Stat(pluginPath); statErr != nil {
-			t.Fatalf("expected OpenCode SDD plugin %q to exist after install: %v", pluginPath, statErr)
-		}
-	}
+func TestRunInstallRejectsRetiredOpenCodeSDDSelector(t *testing.T) {
+	assertRunInstallRejectsRetiredSelector(t, "opencode", "--dry-run", "--agent", "opencode", "--component", "sdd", "--sdd-mode", "multi")
 }
 
 func TestEnsureGoAvailableAfterInstallWindowsRefreshesPath(t *testing.T) {
@@ -2203,210 +2107,21 @@ func TestRunInstallCustomPresetExplicitComponentsResolveCorrectly(t *testing.T) 
 	}
 }
 
-// TestOpenCodePersonaBeforeSDDPreservesAllSections is the regression test for
-// issue #121: on StrategyFileReplace agents, if Persona ran after SDD it would
-// overwrite the entire AGENTS.md, destroying the SDD orchestrator section.
-//
-// This test exercises the full install pipeline for OpenCode with Persona +
-// Engram + SDD selected together and verifies that the final AGENTS.md
-// contains all three sections with no duplicates.
-func TestOpenCodePersonaBeforeSDDPreservesAllSections(t *testing.T) {
-	t.Skip("OpenCode is a retired selector; retained-client persona/SDD projections are covered by adapter-specific tests")
-	home := t.TempDir()
-	restoreHome := osUserHomeDir
-	restoreCommand := runCommand
-	restoreLookPath := cmdLookPath
-	t.Cleanup(func() {
-		osUserHomeDir = restoreHome
-		runCommand = restoreCommand
-		cmdLookPath = restoreLookPath
-	})
-
-	osUserHomeDir = func() (string, error) { return home, nil }
-	runCommand = func(string, ...string) error { return nil }
-	cmdLookPath = missingBinaryLookPath
-
-	_, err := RunInstall(
-		[]string{
-			"--agent", "opencode",
-			"--component", "persona",
-			"--component", "engram",
-			"--component", "sdd",
-			"--persona", "gentleman",
-		},
-		system.DetectionResult{},
-	)
-	if err != nil {
-		t.Fatalf("RunInstall() error = %v", err)
-	}
-
-	agentsMD := filepath.Join(home, ".config", "opencode", "AGENTS.md")
-	content, err := os.ReadFile(agentsMD)
-	if err != nil {
-		t.Fatalf("ReadFile(AGENTS.md) error = %v", err)
-	}
-	text := string(content)
-
-	// Persona content must be present
-	if !strings.Contains(text, "Senior Architect") {
-		t.Error("AGENTS.md missing Gentleman persona content (persona not written)")
-	}
-
-	// For OpenCode, the SDD orchestrator goes into opencode.json (agent overlay),
-	// NOT AGENTS.md. AGENTS.md only contains persona and engram sections.
-	// The issue #121 regression was that Persona would overwrite AGENTS.md
-	// AFTER engram had already injected the engram-protocol marker, destroying
-	// the engram section. We verify persona + engram coexist.
-
-	// Engram protocol section must be present
-	if !strings.Contains(text, "<!-- gentle-ai:engram-protocol -->") {
-		t.Error("AGENTS.md missing engram-protocol open marker (issue #121 regression: persona may have overwritten engram section)")
-	}
-	if !strings.Contains(text, "<!-- /gentle-ai:engram-protocol -->") {
-		t.Error("AGENTS.md missing engram-protocol close marker")
-	}
-
-	// Engram section must not be duplicated
-	marker := "<!-- gentle-ai:engram-protocol -->"
-	if count := strings.Count(text, marker); count != 1 {
-		t.Errorf("AGENTS.md contains %d occurrences of %q, want exactly 1 (no duplicates)", count, marker)
-	}
-
-	// AGENTS.md must NOT have sdd-orchestrator markers — OpenCode uses opencode.json overlay
-	if strings.Contains(text, "<!-- gentle-ai:sdd-orchestrator -->") {
-		t.Error("AGENTS.md should NOT have sdd-orchestrator marker — OpenCode uses opencode.json agent overlay")
-	}
-
-	// SDD orchestrator for OpenCode lives in opencode.json agent overlay under
-	// the canonical gentle-orchestrator key. Legacy sdd-orchestrator should be
-	// migrated away during injection.
-	opencodeJSON := filepath.Join(home, ".config", "opencode", "opencode.json")
-	jsonContent, err := os.ReadFile(opencodeJSON)
-	if err != nil {
-		t.Fatalf("ReadFile(opencode.json) error = %v", err)
-	}
-	jsonText := string(jsonContent)
-	if !strings.Contains(jsonText, "gentle-orchestrator") {
-		t.Error("opencode.json missing gentle-orchestrator agent entry (SDD not injected)")
-	}
-	if strings.Contains(jsonText, `"sdd-orchestrator"`) {
-		t.Error("opencode.json should not contain legacy sdd-orchestrator agent entry")
-	}
-}
-func TestRunInstallKimiBootstrapsHub(t *testing.T) {
-	t.Skip("Kimi is a retired selector")
-	home := t.TempDir()
-	restoreHome := osUserHomeDir
-	restoreCommand := runCommand
-	restoreLookPath := cmdLookPath
-	t.Cleanup(func() {
-		osUserHomeDir = restoreHome
-		runCommand = restoreCommand
-		cmdLookPath = restoreLookPath
-	})
-	osUserHomeDir = func() (string, error) { return home, nil }
-	runCommand = func(string, ...string) error { return nil }
-	cmdLookPath = missingBinaryLookPath
-	restoreInstallcmdLookPath := installcmd.OverrideLookPath(func(name string) (string, error) {
-		if name == "uv" {
-			return "/usr/bin/uv", nil
-		}
-		return "", exec.ErrNotFound
-	})
-	t.Cleanup(restoreInstallcmdLookPath)
-
-	// This test targets kimiSystemPromptHubStep bootstrap content, not agent
-	// install behavior, so simulate Kimi as already installed — otherwise
-	// gentle-ai correctly refuses to proceed for an undetected runtime.
-	restoreKimiLookPath := kimi.LookPathOverride
-	kimi.LookPathOverride = func(string) (string, error) { return "/usr/local/bin/kimi", nil }
-	t.Cleanup(func() { kimi.LookPathOverride = restoreKimiLookPath })
-
-	// Install Kimi with minimalist component (e.g., permissions only, NO persona).
-	_, err := RunInstall(
-		[]string{"--agent", "kimi", "--component", "permissions"},
-		system.DetectionResult{},
-	)
-	if err != nil {
-		t.Fatalf("RunInstall() error = %v", err)
-	}
-
-	// Verify that KIMI.md was created in the agent's config dir.
-	hubPath := filepath.Join(home, ".kimi", "KIMI.md")
-	if _, err := os.Stat(hubPath); err != nil {
-		t.Fatalf("expected Kimi prompt hub file %q to be bootstrapped: %v", hubPath, err)
-	}
-
-	// Verify content includes sub-modules (basic check).
-	content, err := os.ReadFile(hubPath)
-	if err != nil {
-		t.Fatalf("failed to read bootstrapped hub: %v", err)
-	}
-	if !strings.Contains(string(content), "{% include \"persona.md\" ignore missing %}") {
-		t.Errorf("bootstrapped hub missing modular include: %s", string(content))
-	}
+// OpenCode remains represented only by an explicit retired-selector refusal;
+// its old Persona/SDD integration cannot be reached through the canonical
+// install planner.
+func TestRunInstallRejectsRetiredOpenCodePersonaSDDSelector(t *testing.T) {
+	assertRunInstallRejectsRetiredSelector(t, "opencode", "--agent", "opencode", "--component", "persona", "--component", "engram", "--component", "sdd", "--persona", "gentleman")
 }
 
-func TestRunInstallKimiAlreadyInstalledDoesNotRequireUV(t *testing.T) {
-	t.Skip("Kimi is a retired selector")
-	home := t.TempDir()
-	restoreHome := osUserHomeDir
-	restoreCommand := runCommand
-	restoreLookPath := cmdLookPath
-	t.Cleanup(func() {
-		osUserHomeDir = restoreHome
-		runCommand = restoreCommand
-		cmdLookPath = restoreLookPath
-	})
-
-	osUserHomeDir = func() (string, error) { return home, nil }
-	cmdLookPath = missingBinaryLookPath
-	recorder := &commandRecorder{}
-	runCommand = recorder.record
-
-	originalKimiLookPath := kimi.LookPathOverride
-	kimi.LookPathOverride = func(name string) (string, error) {
-		if name == "kimi" {
-			return "/usr/local/bin/kimi", nil
-		}
-		return "", exec.ErrNotFound
-	}
-	t.Cleanup(func() { kimi.LookPathOverride = originalKimiLookPath })
-
-	restoreInstallcmdLookPath := installcmd.OverrideLookPath(func(name string) (string, error) {
-		if name == "uv" {
-			return "", exec.ErrNotFound
-		}
-		return "/usr/bin/" + name, nil
-	})
-	t.Cleanup(restoreInstallcmdLookPath)
-
-	result, err := RunInstall(
-		[]string{"--agent", "kimi", "--component", "permissions"},
-		macOSDetectionResult(),
-	)
-	if err != nil {
-		t.Fatalf("RunInstall() error = %v", err)
-	}
-
-	if !result.Verify.Ready {
-		t.Fatalf("verification ready = false, report = %#v", result.Verify)
-	}
-
-	hubPath := filepath.Join(home, ".kimi", "KIMI.md")
-	if _, err := os.Stat(hubPath); err != nil {
-		t.Fatalf("expected Kimi prompt hub file %q to be bootstrapped: %v", hubPath, err)
-	}
-
-	if got := recorder.get(); len(got) != 0 {
-		t.Fatalf("expected no install commands when Kimi is already installed, got: %v", got)
-	}
+func TestRunInstallRejectsRetiredKimiSelector(t *testing.T) {
+	assertRunInstallRejectsRetiredSelector(t, "kimi", "--agent", "kimi", "--component", "permissions")
 }
 
-// TestRunInstallWorkspaceScopeVerification verifies the user-visible 'install --scope=workspace'
-// behavior from issue #785. It ensures that when installing with workspace scope:
-// 1. Verification files are written to the workspace directory, NOT the home directory.
-// 2. Post-apply verification succeeds because it checks the workspace skill paths.
+func TestRunInstallRejectsRetiredKimiSelectorWithoutRuntimeFallback(t *testing.T) {
+	assertRunInstallRejectsRetiredSelector(t, "kimi", "--agent", "kimi", "--component", "permissions")
+}
+
 func TestRunInstallWorkspaceScopeVerification(t *testing.T) {
 	home := t.TempDir()
 	workspace := t.TempDir()

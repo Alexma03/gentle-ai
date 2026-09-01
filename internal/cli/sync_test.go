@@ -16,7 +16,6 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/claude"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/codex"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/assets"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/backup"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/agentguidance"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
@@ -86,6 +85,33 @@ func TestParseSyncFlagsAgentsRepeated(t *testing.T) {
 // believed they synced, but asAgentIDs silently converted the typo into an
 // AgentID nothing ever matches, so DiscoverAgents-equivalent resolution
 // produced a no-op instead of an error.
+
+// assertRunSyncRejectsRetiredSelector verifies sync applies the canonical
+// client allowlist before discovering or mutating any legacy client assets.
+func assertRunSyncRejectsRetiredSelector(t *testing.T, raw string) {
+	t.Helper()
+	home := t.TempDir()
+	previousHome := osUserHomeDir
+	previousBackupHome := backup.UserHomeDirFn
+	osUserHomeDir = func() (string, error) { return home, nil }
+	backup.UserHomeDirFn = func() (string, error) { return home, nil }
+	t.Cleanup(func() {
+		osUserHomeDir = previousHome
+		backup.UserHomeDirFn = previousBackupHome
+	})
+
+	result, err := RunSync([]string{"--agents", raw})
+	if err == nil {
+		t.Fatalf("RunSync(%q) error = nil, want retired selector rejected", raw)
+	}
+	if !strings.Contains(err.Error(), "unsupported agent") || !strings.Contains(err.Error(), raw) {
+		t.Fatalf("RunSync(%q) error = %q, want unsupported agent %q", raw, err.Error(), raw)
+	}
+	if result.Execution.Apply.Steps != nil || result.Execution.Prepare.Steps != nil || result.ChangedFiles != nil {
+		t.Fatalf("rejected selector produced sync execution or changed files: %#v", result)
+	}
+}
+
 func TestRunSyncRejectsUnsupportedAgent(t *testing.T) {
 	home := t.TempDir()
 	original := osUserHomeDir
@@ -1047,149 +1073,21 @@ func TestRunSyncRefreshesPersistedVisualComponents(t *testing.T) {
 	}
 }
 
-// TestRunSyncRefreshesInstalledOpenCodeReviewPluginWithoutSDDComponent
-// reproduces issue #1440: when the persisted selection lacks the SDD component
-// but managed OpenCode plugins are already installed on disk, `gentle-ai sync`
-// must refresh them to the embedded assets of the running binary.
-func TestRunSyncRefreshesInstalledOpenCodeReviewPluginWithoutSDDComponent(t *testing.T) {
-	t.Skip("OpenCode is a compatibility-only adapter and is not part of canonical sync")
-	home := t.TempDir()
-	if err := state.Write(home, state.InstallState{
-		InstalledAgents:     []string{"opencode"},
-		SelectionConfigured: true,
-		Components:          []model.ComponentID{model.ComponentEngram},
-		Persona:             "neutral",
-	}); err != nil {
-		t.Fatalf("state.Write() error = %v", err)
-	}
-
-	pluginsDir := filepath.Join(home, ".config", "opencode", "plugins")
-	stalePlugins := map[string]string{
-		"opencode-review-transport.ts": filepath.Join(pluginsDir, "opencode-review-transport.ts"),
-		"model-variants.ts":            filepath.Join(pluginsDir, "model-variants.ts"),
-	}
-	for name, path := range stalePlugins {
-		mustWriteFile(t, path, []byte("// stale v2.1.7 managed plugin "+name))
-	}
-
-	restoreHome := osUserHomeDir
-	restoreBackupHome := backup.UserHomeDirFn
-	osUserHomeDir = func() (string, error) { return home, nil }
-	backup.UserHomeDirFn = func() (string, error) { return home, nil }
-	t.Cleanup(func() {
-		osUserHomeDir = restoreHome
-		backup.UserHomeDirFn = restoreBackupHome
-	})
-
-	result, err := RunSync(nil)
-	if err != nil {
-		t.Fatalf("RunSync() error = %v", err)
-	}
-
-	for name, path := range stalePlugins {
-		got, readErr := os.ReadFile(path)
-		if readErr != nil {
-			t.Fatalf("ReadFile(%q) error = %v", path, readErr)
-		}
-		want := assets.MustRead("opencode/plugins/" + name)
-		if string(got) != want {
-			t.Errorf("sync left installed managed OpenCode plugin %s stale; content must be byte-equal to the embedded asset", name)
-		}
-		if !containsPath(result.ChangedFiles, path) {
-			t.Errorf("ChangedFiles missing refreshed plugin path %q\nchanged = %#v", path, result.ChangedFiles)
-		}
-	}
-
-	// skill-registry.ts was never installed — sync must not create it.
-	skillRegistry := filepath.Join(pluginsDir, "skill-registry.ts")
-	if _, err := os.Stat(skillRegistry); !os.IsNotExist(err) {
-		t.Errorf("sync must not create never-installed plugin %q; stat err = %v", skillRegistry, err)
-	}
+// Retired OpenCode selections are rejected before compatibility-only plugin
+// refresh code can be reached. The old plugin scenario remains represented by
+// an explicit refusal test rather than a misleading skipped integration test.
+func TestRunSyncRejectsRetiredOpenCodePersistedReviewSelector(t *testing.T) {
+	assertRunSyncRejectsRetiredSelector(t, "opencode")
 }
 
-// TestRunSyncRemovesOpenCodeOnlyReviewPluginFromKilocode ensures a stale
-// OpenCode review interception plugin cannot keep affecting Kilo after sync.
-func TestRunSyncRemovesOpenCodeOnlyReviewPluginFromKilocode(t *testing.T) {
-	t.Skip("OpenCode and Kilocode plugin refresh is outside the canonical client set")
-	home := t.TempDir()
-	if err := state.Write(home, state.InstallState{
-		InstalledAgents:     []string{"kilocode"},
-		SelectionConfigured: true,
-		Components:          []model.ComponentID{model.ComponentEngram},
-		Persona:             "neutral",
-	}); err != nil {
-		t.Fatalf("state.Write() error = %v", err)
-	}
-
-	pluginsDir := filepath.Join(home, ".config", "kilo", "plugins")
-	reviewPlugin := filepath.Join(pluginsDir, "review-result-artifacts.ts")
-	mustWriteFile(t, reviewPlugin, []byte("// stale v2.1.7 managed plugin"))
-
-	restoreHome := osUserHomeDir
-	restoreBackupHome := backup.UserHomeDirFn
-	osUserHomeDir = func() (string, error) { return home, nil }
-	backup.UserHomeDirFn = func() (string, error) { return home, nil }
-	t.Cleanup(func() {
-		osUserHomeDir = restoreHome
-		backup.UserHomeDirFn = restoreBackupHome
-	})
-
-	result, err := RunSync(nil)
-	if err != nil {
-		t.Fatalf("RunSync() error = %v", err)
-	}
-
-	if _, statErr := os.Stat(reviewPlugin); !os.IsNotExist(statErr) {
-		t.Fatalf("sync left OpenCode-only review plugin installed for Kilo: %v", statErr)
-	}
-	if !containsPath(result.ChangedFiles, reviewPlugin) {
-		t.Errorf("ChangedFiles missing removed Kilocode plugin path %q\nchanged = %#v", reviewPlugin, result.ChangedFiles)
-	}
-
-	// skill-registry.ts was never installed — sync must not create it.
-	skillRegistry := filepath.Join(pluginsDir, "skill-registry.ts")
-	if _, err := os.Stat(skillRegistry); !os.IsNotExist(err) {
-		t.Errorf("sync must not create never-installed plugin %q; stat err = %v", skillRegistry, err)
-	}
+func TestRunSyncRejectsRetiredKilocodePersistedReviewSelector(t *testing.T) {
+	assertRunSyncRejectsRetiredSelector(t, "kilocode")
 }
 
-// TestRunSyncDoesNotCreateOpenCodeReviewPluginWhenNeverInstalled guards the
-// refresh behavior for issue #1440: users who never had the SDD/OpenCode
-// plugins installed must not receive them from a plain sync.
-func TestRunSyncDoesNotCreateOpenCodeReviewPluginWhenNeverInstalled(t *testing.T) {
-	t.Skip("OpenCode plugin refresh is outside the canonical client set")
-	home := t.TempDir()
-	if err := state.Write(home, state.InstallState{
-		InstalledAgents:     []string{"opencode"},
-		SelectionConfigured: true,
-		Components:          []model.ComponentID{model.ComponentEngram},
-		Persona:             "neutral",
-	}); err != nil {
-		t.Fatalf("state.Write() error = %v", err)
-	}
-
-	restoreHome := osUserHomeDir
-	restoreBackupHome := backup.UserHomeDirFn
-	osUserHomeDir = func() (string, error) { return home, nil }
-	backup.UserHomeDirFn = func() (string, error) { return home, nil }
-	t.Cleanup(func() {
-		osUserHomeDir = restoreHome
-		backup.UserHomeDirFn = restoreBackupHome
-	})
-
-	if _, err := RunSync(nil); err != nil {
-		t.Fatalf("RunSync() error = %v", err)
-	}
-
-	pluginPath := filepath.Join(home, ".config", "opencode", "plugins", "opencode-review-transport.ts")
-	if _, err := os.Stat(pluginPath); !os.IsNotExist(err) {
-		t.Errorf("sync must not install %q for users who never had it; stat err = %v", pluginPath, err)
-	}
+func TestRunSyncRejectsRetiredOpenCodeWithoutPluginSelector(t *testing.T) {
+	assertRunSyncRejectsRetiredSelector(t, "opencode")
 }
 
-// TestSyncBackupTargetsIncludeManagedOpenCodePluginsWithoutSDD verifies that
-// managed OpenCode plugin paths are part of sync's backup/snapshot contract
-// even when the selection lacks the SDD component (issue #1440).
 func TestSyncBackupTargetsIncludeManagedOpenCodePluginsWithoutSDD(t *testing.T) {
 	home := t.TempDir()
 	sel := model.Selection{
@@ -2178,88 +2076,8 @@ func mustWriteFile(t *testing.T, path string, data []byte) {
 
 // ─── Phase 4: RunSync integration tests ───────────────────────────────────
 
-func TestRunSyncAppliesManagedFilesystemChanges(t *testing.T) {
-	t.Skip("OpenCode-specific filesystem and plugin assertions are outside the canonical client set")
-	home := t.TempDir()
-	pluginsDir := filepath.Join(home, ".config", "opencode", "plugins")
-	if err := os.MkdirAll(pluginsDir, 0o755); err != nil {
-		t.Fatalf("MkdirAll(plugins) error = %v", err)
-	}
-	legacyPluginPath := filepath.Join(pluginsDir, "background-agents.ts")
-	if err := os.WriteFile(legacyPluginPath, []byte("legacy background agents plugin"), 0o644); err != nil {
-		t.Fatalf("WriteFile(background-agents.ts) error = %v", err)
-	}
-	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
-	seed := `{"theme":"user-theme","agent":{"user-helper":{"mode":"subagent","description":"preserve me"}}}`
-	if err := os.WriteFile(settingsPath, []byte(seed), 0o644); err != nil {
-		t.Fatalf("WriteFile(opencode.json) error = %v", err)
-	}
-
-	restoreHome := osUserHomeDir
-	restoreBackupHome := backup.UserHomeDirFn
-	restoreCommand := runCommand
-	restoreLookPath := cmdLookPath
-	t.Cleanup(func() {
-		osUserHomeDir = restoreHome
-		backup.UserHomeDirFn = restoreBackupHome
-		runCommand = restoreCommand
-		cmdLookPath = restoreLookPath
-	})
-
-	osUserHomeDir = func() (string, error) { return home, nil }
-	backup.UserHomeDirFn = func() (string, error) { return home, nil }
-	runCommand = func(string, ...string) error { return nil }
-	cmdLookPath = func(name string) (string, error) { return "/usr/local/bin/" + name, nil }
-
-	result, err := RunSync([]string{"--agents", "opencode", "--sdd-mode", "single"})
-	if err != nil {
-		t.Fatalf("RunSync() error = %v", err)
-	}
-
-	if !result.Verify.Ready {
-		t.Fatalf("Verify.Ready = false, report = %#v", result.Verify)
-	}
-
-	// SDD assets should exist.
-	if _, err := os.Stat(settingsPath); err != nil {
-		t.Errorf("expected SDD inject to create %q: %v", settingsPath, err)
-	}
-	content, err := os.ReadFile(settingsPath)
-	if err != nil {
-		t.Fatalf("ReadFile(opencode.json) error = %v", err)
-	}
-	var root map[string]any
-	if err := json.Unmarshal(content, &root); err != nil {
-		t.Fatalf("Unmarshal(opencode.json) error = %v", err)
-	}
-	if root["theme"] != "user-theme" {
-		t.Fatalf("sync discarded unrelated theme: %#v", root["theme"])
-	}
-	agentsMap := root["agent"].(map[string]any)
-	if helper, ok := agentsMap["user-helper"].(map[string]any); !ok || helper["description"] != "preserve me" {
-		t.Fatalf("sync discarded unrelated user agent: %#v", agentsMap["user-helper"])
-	}
-	if _, ok := agentsMap["review-validator"].(map[string]any); !ok {
-		t.Fatalf("sync did not add review-validator: %#v", agentsMap)
-	}
-	orchestrator := agentsMap["gentle-orchestrator"].(map[string]any)
-	permission := orchestrator["permission"].(map[string]any)
-	allowlist := permission["task"].(map[string]any)
-	if replacement, ok := allowlist["__replace__"].(map[string]any); ok {
-		allowlist = replacement
-	}
-	if allowlist["review-validator"] != "allow" {
-		t.Fatalf("sync did not authorize gentle-orchestrator -> review-validator: %#v", allowlist)
-	}
-	if _, err := os.Stat(legacyPluginPath); !os.IsNotExist(err) {
-		t.Errorf("expected sync to remove legacy OpenCode plugin %q; stat err = %v", legacyPluginPath, err)
-	}
-	for _, plugin := range []string{"model-variants.ts", "skill-registry.ts"} {
-		pluginPath := filepath.Join(pluginsDir, plugin)
-		if _, err := os.Stat(pluginPath); err != nil {
-			t.Errorf("expected sync to keep OpenCode support plugin %q: %v", pluginPath, err)
-		}
-	}
+func TestRunSyncRejectsRetiredOpenCodeFilesystemSelector(t *testing.T) {
+	assertRunSyncRejectsRetiredSelector(t, "opencode")
 }
 
 func TestRunSyncDoesNotInvokeEngramSetup(t *testing.T) {

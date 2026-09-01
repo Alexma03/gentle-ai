@@ -2316,8 +2316,7 @@ func TestUninstallModeScreen_CleanInstallNavigatesToConfirm(t *testing.T) {
 	}
 }
 
-func TestUninstallModeScreen_FullWithProfilesNavigatesToProfileSelection(t *testing.T) {
-	t.Skip("OpenCode profile selection is retired from the canonical client flow")
+func TestUninstallModeScreen_FullSkipsRetiredOpenCodeProfiles(t *testing.T) {
 	orig := readProfilesFn
 	readProfilesFn = func(_ string) ([]model.Profile, error) {
 		return []model.Profile{{Name: "cheap"}, {Name: "fast"}}, nil
@@ -2331,11 +2330,19 @@ func TestUninstallModeScreen_FullWithProfilesNavigatesToProfileSelection(t *test
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	state := updated.(Model)
 
-	if state.Screen != ScreenUninstallProfiles {
-		t.Fatalf("screen = %v, want %v", state.Screen, ScreenUninstallProfiles)
+	if state.Screen != ScreenUninstallConfirm {
+		t.Fatalf("screen = %v, want %v", state.Screen, ScreenUninstallConfirm)
 	}
-	if !reflect.DeepEqual(state.UninstallProfilesToRemove, []string{"cheap", "fast"}) {
-		t.Fatalf("UninstallProfilesToRemove = %v, want [cheap fast]", state.UninstallProfilesToRemove)
+	if state.UninstallProfileSelection {
+		t.Fatal("retired OpenCode profiles must not enter profile selection")
+	}
+	if len(state.UninstallProfilesToRemove) != 0 {
+		t.Fatalf("UninstallProfilesToRemove = %v, want empty for retired OpenCode", state.UninstallProfilesToRemove)
+	}
+	for _, agent := range state.UninstallAgents {
+		if agent == model.AgentOpenCode {
+			t.Fatal("retired OpenCode unexpectedly appeared in canonical uninstall agents")
+		}
 	}
 }
 
