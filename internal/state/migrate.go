@@ -179,7 +179,7 @@ func Migrate(homeDir string, managedPaths []string) (MigrationResult, error) {
 		ToVersion:        CurrentSchemaVersion,
 		CreatedAt:        time.Now().UTC(),
 		RawStateDigest:   digestBytes(raw),
-		RawStateSnapshot: "state.json",
+		RawStateSnapshot: filepath.ToSlash(filepath.Join(backupID, "state.json")),
 		BackupID:         backupID,
 		BackupPath:       filepath.ToSlash(filepath.Join(migrationBackupRoot, backupID)),
 	}
@@ -473,9 +473,13 @@ func validateMigrationReport(homeDir string, report MigrationReport) ([]string, 
 	} else if !errors.Is(statErr, os.ErrNotExist) {
 		return nil, "", "", fmt.Errorf("inspect migration backup path %q: %w", backupDir, statErr)
 	}
-	stateSnapshot, err := validateMigrationSnapshotPath(backupDir, report.RawStateSnapshot)
+	backupRoot := filepath.Dir(backupDir)
+	stateSnapshot, err := validateMigrationSnapshotPath(backupRoot, report.RawStateSnapshot)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("validate raw state snapshot: %w", err)
+	}
+	if report.RawStateSnapshot != filepath.ToSlash(filepath.Join(report.BackupID, "state.json")) {
+		return nil, "", "", fmt.Errorf("raw state snapshot %q is not authorized", report.RawStateSnapshot)
 	}
 	seenTargets := make(map[string]struct{}, len(report.RollbackManifest))
 	for _, entry := range report.RollbackManifest {
