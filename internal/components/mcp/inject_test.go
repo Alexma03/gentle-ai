@@ -15,12 +15,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/antigravity"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/claude"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/codex"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/hermes"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/kilocode"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/kimi"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/openclaw"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/vscode"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/versions"
 )
 
@@ -35,11 +30,8 @@ func cursorAdapter(t *testing.T) agents.Adapter {
 
 func antigravityAdapter() agents.Adapter { return antigravity.NewAdapter() }
 func claudeAdapter() agents.Adapter      { return claude.NewAdapter() }
-func hermesAdapter() agents.Adapter      { return hermes.NewAdapter() }
-func kilocodeAdapter() agents.Adapter    { return kilocode.NewAdapter() }
-func kimiAdapter() agents.Adapter        { return kimi.NewAdapter() }
-func openclawAdapter() agents.Adapter    { return openclaw.NewAdapter() }
-func opencodeAdapter() agents.Adapter    { return opencode.NewAdapter() }
+
+func opencodeAdapter() agents.Adapter { return opencode.NewAdapter() }
 
 func assertOnlyKeys(t *testing.T, path string, object map[string]any, keys ...string) {
 	t.Helper()
@@ -158,20 +150,6 @@ func assertAntigravityContext7Schema(t *testing.T, path string) {
 
 // assertKimiContext7Schema asserts the mcpServers.context7 entry in a Kimi
 // mcp.json is the documented remote HTTP config with no legacy local keys.
-func assertKimiContext7Schema(t *testing.T, path string) {
-	t.Helper()
-
-	context7 := readMCPServersContext7Entry(t, path)
-
-	if got := context7["transport"]; got != "http" {
-		t.Fatalf("%q mcpServers.context7.transport = %#v; want %q", path, got, "http")
-	}
-	if got := context7["url"]; got != "https://mcp.context7.com/mcp" {
-		t.Fatalf("%q mcpServers.context7.url = %#v; want context7 remote URL", path, got)
-	}
-
-	assertOnlyKeys(t, path, context7, "transport", "url")
-}
 
 func TestInjectOpenCodeMergesContext7AndIsIdempotent(t *testing.T) {
 	home := t.TempDir()
@@ -213,208 +191,6 @@ func TestInjectOpenCodeMergesContext7AndIsIdempotent(t *testing.T) {
 	}
 	if strings.Contains(text, `"mcpServers"`) {
 		t.Fatal("opencode.json should use 'mcp' key, not 'mcpServers'")
-	}
-}
-
-func TestInjectOpenClawMergesContext7UnderMCPDotServersAndMigratesLegacyMCPServers(t *testing.T) {
-	home := t.TempDir()
-	adapter := openclawAdapter()
-	configPath := adapter.SettingsPath(home)
-	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll(openclaw config dir) error = %v", err)
-	}
-
-	existing := `{
-  "mcpServers": {
-    "legacyDocs": {
-      "command": "legacy-docs"
-    },
-    "context7": {
-      "command": "old-context7"
-    }
-  },
-  "mcp": {
-    "sessionIdleTtlMs": 120000,
-    "servers": {
-      "context7": {
-        "command": "npx",
-        "args": ["-y", "@upstash/context7-mcp"]
-      }
-    }
-  },
-  "theme": "kanagawa"
-}`
-	if err := os.WriteFile(configPath, []byte(existing), 0o644); err != nil {
-		t.Fatalf("WriteFile(openclaw.json) error = %v", err)
-	}
-
-	first, err := Inject(home, home, adapter)
-	if err != nil {
-		t.Fatalf("Inject(openclaw) first error = %v", err)
-	}
-	if !first.Changed {
-		t.Fatalf("Inject(openclaw) first changed = false")
-	}
-
-	second, err := Inject(home, home, adapter)
-	if err != nil {
-		t.Fatalf("Inject(openclaw) second error = %v", err)
-	}
-	if second.Changed {
-		t.Fatalf("Inject(openclaw) second changed = true")
-	}
-
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		t.Fatalf("ReadFile(openclaw.json) error = %v", err)
-	}
-	text := string(content)
-	if strings.Contains(text, `"mcpServers"`) {
-		t.Fatalf("openclaw.json must use mcp.servers, not root mcpServers; got:\n%s", text)
-	}
-	if !strings.Contains(text, `"mcp"`) || !strings.Contains(text, `"servers"`) {
-		t.Fatalf("openclaw.json missing mcp.servers; got:\n%s", text)
-	}
-	if !strings.Contains(text, `"legacyDocs"`) {
-		t.Fatalf("openclaw.json should migrate legacy mcpServers entries into mcp.servers; got:\n%s", text)
-	}
-	if !strings.Contains(text, `"sessionIdleTtlMs": 120000`) {
-		t.Fatalf("openclaw.json should preserve existing mcp fields; got:\n%s", text)
-	}
-	if !strings.Contains(text, `"context7"`) || !strings.Contains(text, `@upstash/context7-mcp@`) {
-		t.Fatalf("openclaw.json missing context7 under mcp.servers; got:\n%s", text)
-	}
-}
-
-func TestInjectOpenCodeAndKilocodePreserveContext7Headers(t *testing.T) {
-	tests := []struct {
-		name    string
-		adapter agents.Adapter
-	}{
-		{name: "OpenCode", adapter: opencodeAdapter()},
-		{name: "KiloCode", adapter: kilocodeAdapter()},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			home := t.TempDir()
-			configPath := tt.adapter.SettingsPath(home)
-			if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
-				t.Fatalf("MkdirAll error = %v", err)
-			}
-
-			existing := `{
-	  "mcp": {
-	    "context7": {
-	      "type": "local",
-	      "command": ["npx", "-y", "@upstash/context7-mcp"],
-	      "args": ["legacy"],
-	      "env": {"TOKEN": "x"},
-	      "environment": {"TOKEN": "y"},
-	      "headers": {
-	        "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}",
-	        "number": 42,
-	        "nested": {"secret": "value"},
-	        "list": ["secret"]
-	      },
-	      "enabled": false
-	    },
-	    "engram": {
-	      "type": "local",
-	      "command": ["engram-server"]
-	    }
-	  }
-	}`
-			if err := os.WriteFile(configPath, []byte(existing), 0o644); err != nil {
-				t.Fatalf("WriteFile(opencode.json) error = %v", err)
-			}
-
-			first, err := Inject(home, home, tt.adapter)
-			if err != nil {
-				t.Fatalf("Inject() first error = %v", err)
-			}
-			if !first.Changed {
-				t.Fatal("Inject() first changed = false")
-			}
-
-			assertOpenCodeRemoteContext7Schema(t, configPath)
-			context7 := readOpenCodeContext7Entry(t, configPath)
-			headers, ok := context7["headers"].(map[string]any)
-			if !ok || headers["CONTEXT7_API_KEY"] != "{env:CONTEXT7_API_KEY}" {
-				t.Fatalf("mcp.context7.headers = %#v; want existing API key header", context7["headers"])
-			}
-			for _, key := range []string{"number", "nested", "list"} {
-				if _, exists := headers[key]; exists {
-					t.Fatalf("mcp.context7.headers[%q] = %#v; want invalid value discarded", key, headers[key])
-				}
-			}
-
-			content, err := os.ReadFile(configPath)
-			if err != nil {
-				t.Fatalf("ReadFile(opencode.json) error = %v", err)
-			}
-			if !strings.Contains(string(content), `"engram"`) {
-				t.Fatal("opencode.json missing existing mcp.engram entry")
-			}
-
-			second, err := Inject(home, home, tt.adapter)
-			if err != nil {
-				t.Fatalf("Inject() second error = %v", err)
-			}
-			if second.Changed {
-				t.Fatal("Inject() second changed = true")
-			}
-		})
-	}
-}
-
-func TestInjectOpenCodeAndKilocodeRecoverMalformedSettingsAndDiscardInvalidHeaders(t *testing.T) {
-	tests := []struct {
-		name     string
-		adapter  agents.Adapter
-		existing string
-	}{
-		{name: "OpenCode malformed settings", adapter: opencodeAdapter(), existing: `{malformed`},
-		{name: "KiloCode malformed settings", adapter: kilocodeAdapter(), existing: `{malformed`},
-		{name: "OpenCode malformed headers", adapter: opencodeAdapter(), existing: `{"mcp":{"context7":{"headers":`},
-		{name: "KiloCode malformed headers", adapter: kilocodeAdapter(), existing: `{"mcp":{"context7":{"headers":`},
-		{name: "OpenCode non-object headers", adapter: opencodeAdapter(), existing: `{"mcp":{"context7":{"headers":["secret"]}}}`},
-		{name: "KiloCode non-object headers", adapter: kilocodeAdapter(), existing: `{"mcp":{"context7":{"headers":"secret"}}}`},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			home := t.TempDir()
-			configPath := tt.adapter.SettingsPath(home)
-			if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
-				t.Fatalf("MkdirAll error = %v", err)
-			}
-			if err := os.WriteFile(configPath, []byte(tt.existing), 0o644); err != nil {
-				t.Fatalf("WriteFile(opencode.json) error = %v", err)
-			}
-
-			first, err := Inject(home, home, tt.adapter)
-			if err != nil {
-				t.Fatalf("Inject() first error = %v", err)
-			}
-			if !first.Changed {
-				t.Fatal("Inject() first changed = false")
-			}
-
-			assertOpenCodeRemoteContext7Schema(t, configPath)
-			context7 := readOpenCodeContext7Entry(t, configPath)
-			if _, exists := context7["headers"]; exists {
-				t.Fatalf("mcp.context7.headers = %#v; want invalid headers discarded", context7["headers"])
-			}
-
-			second, err := Inject(home, home, tt.adapter)
-			if err != nil {
-				t.Fatalf("Inject() second error = %v", err)
-			}
-			if second.Changed {
-				t.Fatal("Inject() second changed = true")
-			}
-		})
 	}
 }
 
@@ -1022,46 +798,6 @@ args = ["mcp", "--tools=agent"]
 	}
 }
 
-func TestInjectVSCodeWritesContext7ToMCPConfigFile(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
-	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
-	adapter := vscode.NewAdapter()
-
-	first, err := Inject(home, home, adapter)
-	if err != nil {
-		t.Fatalf("Inject() first error = %v", err)
-	}
-	if !first.Changed {
-		t.Fatalf("Inject() first changed = false")
-	}
-
-	second, err := Inject(home, home, adapter)
-	if err != nil {
-		t.Fatalf("Inject() second error = %v", err)
-	}
-	if second.Changed {
-		t.Fatalf("Inject() second changed = true")
-	}
-
-	path := adapter.MCPConfigPath(home, "context7")
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile(mcp.json) error = %v", err)
-	}
-
-	text := string(content)
-	if !strings.Contains(text, `"servers"`) {
-		t.Fatal("mcp.json missing servers key")
-	}
-	if !strings.Contains(text, `"context7"`) {
-		t.Fatal("mcp.json missing context7 server")
-	}
-	if strings.Contains(text, `"mcpServers"`) {
-		t.Fatal("mcp.json should use 'servers' key, not 'mcpServers'")
-	}
-}
-
 func TestInjectAntigravityReplacesLegacyContext7LocalConfig(t *testing.T) {
 	home := t.TempDir()
 	adapter := antigravityAdapter()
@@ -1104,232 +840,17 @@ func TestInjectAntigravityReplacesLegacyContext7LocalConfig(t *testing.T) {
 	assertAntigravityContext7Schema(t, configPath)
 }
 
-func TestInjectKimiWritesContext7ToMCPConfigFile(t *testing.T) {
-	home := t.TempDir()
-
-	first, err := Inject(home, home, kimiAdapter())
-	if err != nil {
-		t.Fatalf("Inject(kimi) first error = %v", err)
-	}
-	if !first.Changed {
-		t.Fatalf("Inject(kimi) first changed = false")
-	}
-
-	second, err := Inject(home, home, kimiAdapter())
-	if err != nil {
-		t.Fatalf("Inject(kimi) second error = %v", err)
-	}
-	if second.Changed {
-		t.Fatalf("Inject(kimi) second changed = true")
-	}
-
-	path := filepath.Join(home, ".kimi", "mcp.json")
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile(kimi mcp.json) error = %v", err)
-	}
-
-	text := string(content)
-	if !strings.Contains(text, `"mcpServers"`) {
-		t.Fatal("kimi mcp.json missing mcpServers key")
-	}
-	if !strings.Contains(text, `"context7"`) {
-		t.Fatal("kimi mcp.json missing context7 server")
-	}
-	if !strings.Contains(text, `"transport": "http"`) {
-		t.Fatal("kimi mcp.json should set transport=http for documented remote MCP configuration")
-	}
-	if !strings.Contains(text, `"url": "https://mcp.context7.com/mcp"`) {
-		t.Fatal("kimi mcp.json should use the documented remote MCP URL for context7")
-	}
-}
-
-func TestInjectKimiReplacesLegacyContext7LocalConfig(t *testing.T) {
-	home := t.TempDir()
-	adapter := kimiAdapter()
-	configPath := adapter.MCPConfigPath(home, "context7")
-	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll error = %v", err)
-	}
-
-	legacy := `{
-	  "mcpServers": {
-	    "context7": {
-	      "command": "npx",
-	      "args": ["-y", "@upstash/context7-mcp"],
-	      "env": {"TOKEN": "x"}
-	    }
-	  }
-	}`
-	if err := os.WriteFile(configPath, []byte(legacy), 0o644); err != nil {
-		t.Fatalf("WriteFile(kimi mcp.json) error = %v", err)
-	}
-
-	first, err := Inject(home, home, adapter)
-	if err != nil {
-		t.Fatalf("Inject(kimi) first error = %v", err)
-	}
-	if !first.Changed {
-		t.Fatalf("Inject(kimi) first changed = false; expected migration to rewrite legacy context7")
-	}
-
-	assertKimiContext7Schema(t, configPath)
-
-	second, err := Inject(home, home, adapter)
-	if err != nil {
-		t.Fatalf("Inject(kimi) second error = %v", err)
-	}
-	if second.Changed {
-		t.Fatalf("Inject(kimi) second changed = true; expected idempotent context7 rewrite")
-	}
-
-	assertKimiContext7Schema(t, configPath)
-}
-
 // TestInjectHermesContext7IntoYAML verifies that Inject(hermes) writes context7
 // under mcp_servers: in ~/.hermes/config.yaml (StrategyMergeIntoYAML).
-func TestInjectHermesContext7IntoYAML(t *testing.T) {
-	home := t.TempDir()
-
-	result, err := Inject(home, home, hermesAdapter())
-	if err != nil {
-		t.Fatalf("Inject(hermes) error = %v", err)
-	}
-	if !result.Changed {
-		t.Fatal("Inject(hermes) changed = false")
-	}
-
-	configPath := filepath.Join(home, ".hermes", "config.yaml")
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		t.Fatalf("ReadFile(config.yaml) error = %v", err)
-	}
-	text := string(content)
-
-	if !strings.Contains(text, "mcp_servers:") {
-		t.Fatal("config.yaml missing mcp_servers: key")
-	}
-	if !strings.Contains(text, "context7:") {
-		t.Fatal("config.yaml missing context7: entry under mcp_servers:")
-	}
-	if !strings.Contains(text, "context7-mcp") {
-		t.Fatal("config.yaml missing context7-mcp in args")
-	}
-	if result.Files[0] != configPath {
-		t.Fatalf("result.Files[0] = %q, want %q", result.Files[0], configPath)
-	}
-}
 
 // TestInjectHermesContext7Idempotent verifies calling Inject twice yields exactly
 // one context7: entry (idempotent upsert), and Changed=false on the second call.
-func TestInjectHermesContext7Idempotent(t *testing.T) {
-	home := t.TempDir()
-
-	first, err := Inject(home, home, hermesAdapter())
-	if err != nil {
-		t.Fatalf("Inject(hermes) first error = %v", err)
-	}
-	if !first.Changed {
-		t.Fatal("Inject(hermes) first changed = false")
-	}
-
-	second, err := Inject(home, home, hermesAdapter())
-	if err != nil {
-		t.Fatalf("Inject(hermes) second error = %v", err)
-	}
-	if second.Changed {
-		t.Fatal("Inject(hermes) second changed = true (not idempotent)")
-	}
-
-	configPath := filepath.Join(home, ".hermes", "config.yaml")
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		t.Fatalf("ReadFile(config.yaml) error = %v", err)
-	}
-	text := string(content)
-
-	// Exactly one context7: entry should be present.
-	count := strings.Count(text, "  context7:")
-	if count != 1 {
-		t.Fatalf("config.yaml has %d context7: entries, want 1:\n%s", count, text)
-	}
-}
 
 // TestInjectHermesStrategyMergeIntoYAMLDispatches verifies that StrategyMergeIntoYAML
 // no longer hits the hard-error default case in the strategy switch.
-func TestInjectHermesStrategyMergeIntoYAMLDispatches(t *testing.T) {
-	home := t.TempDir()
-
-	// Confirm no error is returned (the old code returned an error for strategy 4).
-	result, err := Inject(home, home, hermesAdapter())
-	if err != nil {
-		t.Fatalf("Inject(hermes) with StrategyMergeIntoYAML returned error = %v (expected nil)", err)
-	}
-	if !result.Changed {
-		t.Fatal("Inject(hermes) Changed = false, want true on first run")
-	}
-}
 
 // TestInjectHermesPreservesExistingTopLevelKeys verifies that a full Inject
 // round-trip on a config.yaml that already contains an unrelated top-level key
 // (e.g. "model: claude") preserves that key after context7 injection.
 // This covers the review-flagged coverage gap: existing non-managed content
 // must survive the MCP upsert.
-func TestInjectHermesPreservesExistingTopLevelKeys(t *testing.T) {
-	home := t.TempDir()
-	hermesDir := filepath.Join(home, ".hermes")
-	if err := os.MkdirAll(hermesDir, 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-
-	// Pre-existing config.yaml with an unrelated top-level key.
-	initial := "model: claude\n"
-	configPath := filepath.Join(hermesDir, "config.yaml")
-	if err := os.WriteFile(configPath, []byte(initial), 0o644); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-
-	result, err := Inject(home, home, hermesAdapter())
-	if err != nil {
-		t.Fatalf("Inject(hermes) error = %v", err)
-	}
-	if !result.Changed {
-		t.Fatal("Inject(hermes) changed = false, want true on first run")
-	}
-
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		t.Fatalf("ReadFile(config.yaml) error = %v", err)
-	}
-	text := string(content)
-
-	// The pre-existing key must be preserved verbatim.
-	if !strings.Contains(text, "model: claude") {
-		t.Fatalf("config.yaml lost pre-existing top-level key 'model: claude':\n%s", text)
-	}
-	// The injected context7 entry must also be present.
-	if !strings.Contains(text, "mcp_servers:") {
-		t.Fatal("config.yaml missing mcp_servers: after injection")
-	}
-	if !strings.Contains(text, "context7:") {
-		t.Fatal("config.yaml missing context7: after injection")
-	}
-
-	// Second Inject must be idempotent and still preserve the original key.
-	second, err := Inject(home, home, hermesAdapter())
-	if err != nil {
-		t.Fatalf("Inject(hermes) second error = %v", err)
-	}
-	if second.Changed {
-		t.Fatal("Inject(hermes) second changed = true (not idempotent)")
-	}
-
-	content2, err := os.ReadFile(configPath)
-	if err != nil {
-		t.Fatalf("ReadFile(config.yaml) second error = %v", err)
-	}
-	text2 := string(content2)
-	if !strings.Contains(text2, "model: claude") {
-		t.Fatalf("config.yaml lost pre-existing key on second Inject:\n%s", text2)
-	}
-}

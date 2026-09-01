@@ -72,38 +72,6 @@ func TestProfileSyncActionsEnterRunningState(t *testing.T) {
 	}
 }
 
-func TestConditionalPickerNavigationResetsState(t *testing.T) {
-	t.Run("empty model picker back returns to SDD mode", func(t *testing.T) {
-		m := NewModel(system.DetectionResult{}, "dev")
-		m.Screen, m.Selection.SDDMode, m.Cursor = ScreenModelPicker, model.SDDModeMulti, 1
-		updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-		if got := updated.(Model).Screen; got != ScreenSDDMode {
-			t.Fatalf("screen = %v, want %v", got, ScreenSDDMode)
-		}
-	})
-
-	for _, tc := range []struct {
-		name   string
-		screen Screen
-	}{
-		{"Codex", ScreenCodexModelPicker},
-	} {
-		t.Run(tc.name+" custom starts at first phase", func(t *testing.T) {
-			m := NewModel(system.DetectionResult{}, "dev")
-			m.Screen, m.Cursor = tc.screen, 3
-			if tc.screen == ScreenKiroModelPicker {
-				m.KiroModelPicker = screens.NewKiroModelPickerState()
-			} else {
-				m.CodexModelPicker = screens.NewCodexModelPickerState()
-			}
-			updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-			if got := updated.(Model).Cursor; got != 0 {
-				t.Fatalf("cursor = %d, want 0", got)
-			}
-		})
-	}
-}
-
 func TestBackAndEscShareCleanupContracts(t *testing.T) {
 	for _, key := range []tea.KeyType{tea.KeyEnter, tea.KeyEsc} {
 		t.Run(key.String(), func(t *testing.T) {

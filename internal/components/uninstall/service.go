@@ -20,10 +20,8 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/engram"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/filemerge"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/gga"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/opencodedefault"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/sdd"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/theme"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	opencodeactivation "github.com/gentleman-programming/gentle-ai/v2/internal/opencode"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/state"
@@ -96,10 +94,6 @@ var (
 		model.ComponentPermission,
 		model.ComponentSDD,
 		model.ComponentSkills,
-		model.ComponentTheme,
-		model.ComponentClaudeTheme,
-		model.ComponentOpenCodeGentleLogo,
-		model.ComponentGGA,
 	}
 	fullAgentRemovalComponents = []model.ComponentID{
 		model.ComponentPersona,
@@ -108,9 +102,6 @@ var (
 		model.ComponentPermission,
 		model.ComponentSDD,
 		model.ComponentSkills,
-		model.ComponentTheme,
-		model.ComponentClaudeTheme,
-		model.ComponentOpenCodeGentleLogo,
 	}
 	configuredAgents = []string{
 		"gentle-orchestrator",
@@ -247,7 +238,6 @@ func (s *Service) PartialUninstall(agentIDs []model.AgentID, componentIDs []mode
 	if len(components) == 0 {
 		components = slices.Clone(allManagedComponents)
 	}
-	components = expandVisualPolishUninstallComponents(components)
 
 	plan, err := s.buildPlan(agentIDs, components)
 	if err != nil {
@@ -275,7 +265,6 @@ func (s *Service) PartialUninstallWithProfiles(agentIDs []model.AgentID, compone
 	if len(components) == 0 {
 		components = slices.Clone(allManagedComponents)
 	}
-	components = expandVisualPolishUninstallComponents(components)
 
 	plan, err := s.buildPlan(agentIDs, components)
 	if err != nil {
@@ -284,27 +273,6 @@ func (s *Service) PartialUninstallWithProfiles(agentIDs []model.AgentID, compone
 
 	stateRemovals := stateAgentsToRemove(agentIDs, components)
 	return s.executePlan(plan, stateRemovals)
-}
-
-func expandVisualPolishUninstallComponents(components []model.ComponentID) []model.ComponentID {
-	shouldExpand := false
-	visualPolish := model.VisualPolishComponents()
-	for _, component := range components {
-		if component != model.ComponentClaudeTheme && slices.Contains(visualPolish, component) {
-			shouldExpand = true
-		}
-	}
-	if !shouldExpand {
-		return components
-	}
-
-	expanded := slices.Clone(components)
-	for _, component := range model.VisualPolishComponents() {
-		if !slices.Contains(expanded, component) {
-			expanded = append(expanded, component)
-		}
-	}
-	return expanded
 }
 
 func (s *Service) SetProfileNamesToRemove(profileNames []string) {
@@ -387,16 +355,6 @@ func (s *Service) buildPlan(agentIDs []model.AgentID, componentIDs []model.Compo
 				existing.agents = appendUniqueAgents(existing.agents, op.agents...)
 				operationsByKey[key] = existing
 			}
-		}
-	}
-
-	for _, target := range globalBackupTargets(s.homeDir) {
-		files, err := expandBackupTarget(target)
-		if err != nil {
-			return plan{}, fmt.Errorf("expand backup target %q: %w", target, err)
-		}
-		for _, file := range files {
-			backupTargets[file] = struct{}{}
 		}
 	}
 
@@ -687,29 +645,8 @@ func (s *Service) componentOperations(adapter agents.Adapter, componentID model.
 				ops = append(ops, rewriteJSONFile(path, jsonPath{"permissions"}))
 			case model.AgentOpenCode:
 				ops = append(ops, rewriteJSONFile(path, jsonPath{"permission"}))
-			case model.AgentGeminiCLI:
-				ops = append(ops, rewriteJSONFile(path, jsonPath{"general", "defaultApprovalMode"}))
-			case model.AgentVSCodeCopilot:
-				ops = append(ops, rewriteJSONFile(path, jsonPath{"chat.tools.autoApprove"}))
 			}
 		}
-	case model.ComponentTheme:
-		if path := adapter.SettingsPath(homeDir); path != "" {
-			targets = append(targets, path)
-			ops = append(ops, rewriteJSONFile(path, jsonPath{"theme"}))
-		}
-	case model.ComponentClaudeTheme:
-		for _, path := range theme.VisualThemePaths(homeDir, adapter) {
-			targets = append(targets, path)
-			ops = append(ops, removeFile(path))
-		}
-		if paths := theme.VisualThemePaths(homeDir, adapter); len(paths) > 0 {
-			ops = append(ops, removeDirIfEmpty(filepath.Dir(paths[0])))
-		}
-	case model.ComponentOpenCodeGentleLogo:
-		pluginPath := filepath.Join(homeDir, ".config", "opencode", "tui-plugins", "gentle-logo.tsx")
-		targets = append(targets, pluginPath)
-		ops = append(ops, removeFile(pluginPath), removeDirIfEmpty(filepath.Dir(pluginPath)))
 	case model.ComponentSkills:
 		if !adapter.SupportsSkills() {
 			break
@@ -859,12 +796,6 @@ func (s *Service) componentOperations(adapter agents.Adapter, componentID model.
 			}
 			ops = append(ops, removeDirIfEmpty(agentsDir))
 		}
-	case model.ComponentGGA:
-		for _, path := range globalBackupTargets(homeDir) {
-			targets = append(targets, path)
-			ops = append(ops, removeFile(path))
-		}
-		ops = append(ops, removeDirIfEmpty(filepath.Dir(gga.ConfigPath(homeDir))))
 	default:
 		return nil, nil, fmt.Errorf("unsupported component ID %q", componentID)
 	}
@@ -904,8 +835,6 @@ func context7Operations(adapter agents.Adapter, homeDir string) []operation {
 	case model.StrategyMCPConfigFile:
 		path := adapter.MCPConfigPath(homeDir, "context7")
 		switch adapter.Agent() {
-		case model.AgentVSCodeCopilot:
-			return []operation{rewriteJSONFile(path, jsonPath{"servers", "context7"})}
 		case model.AgentAntigravity:
 			return []operation{rewriteJSONFile(path, jsonPath{"mcpServers", "context7"})}
 		default:
@@ -954,9 +883,6 @@ func engramOperations(adapter agents.Adapter, homeDir string) []operation {
 		return []operation{rewriteJSONFile(path, jsonPath{"mcpServers", "engram"})}
 	case model.StrategyMCPConfigFile:
 		path := adapter.MCPConfigPath(homeDir, "engram")
-		if adapter.Agent() == model.AgentVSCodeCopilot {
-			return []operation{rewriteJSONFile(path, jsonPath{"servers", "engram"})}
-		}
 		return []operation{rewriteJSONFile(path, jsonPath{"mcpServers", "engram"})}
 	case model.StrategyTOMLFile:
 		configPath := adapter.MCPConfigPath(homeDir, "engram")
@@ -1505,13 +1431,6 @@ func removesAllAgentComponents(componentIDs []model.ComponentID) bool {
 		}
 	}
 	return true
-}
-
-func globalBackupTargets(homeDir string) []string {
-	return []string{
-		gga.ConfigPath(homeDir),
-		gga.AgentsTemplatePath(homeDir),
-	}
 }
 
 func removeOwnedOpenCodeLauncher(path string) operation {

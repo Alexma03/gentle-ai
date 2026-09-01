@@ -181,8 +181,8 @@ var reviewTransportExposureByAgent = func() map[model.AgentID]ContractExposure {
 // brand-new print-mode pi subprocess in an empty scratch directory with
 // every discovery surface disabled, forwards the Go-issued opaque prompt
 // untouched, and returns raw final bytes (gentle-pi#311, gentle-ai#3249).
-// Kilo and every other runtime remain explicitly dormant until they own an
-// equivalent native boundary.
+// Unsupported runtimes remain explicitly dormant until they own an equivalent
+// native boundary.
 var immutableReviewExecutorExposureByAgent = func() map[model.AgentID]ContractExposure {
 	exposure := make(map[model.AgentID]ContractExposure, len(featureClaimsByAgent)+len(legacyFeatureClaimsByAgent))
 	for agent := range featureClaimsByAgent {
@@ -322,37 +322,7 @@ var featureClaimsByAgent = map[model.AgentID]AgentFeatureClaims{
 // It exists only for NewAdapter compatibility while state migration can read
 // old installations; no current catalog or registry consumer enumerates it.
 var legacyFeatureClaimsByAgent = map[model.AgentID]AgentFeatureClaims{
-	model.AgentGeminiCLI: {
-		Skills: true, SystemPrompt: true, MCP: true,
-	},
-	model.AgentHermes: {
-		Skills: true, SystemPrompt: true, MCP: true,
-	},
-	model.AgentKilocode: {
-		SlashCommands: true, Skills: true, SystemPrompt: true, MCP: true,
-	},
-	model.AgentKimi: {
-		FileSubAgents: true, Skills: true, SystemPrompt: true, MCP: true,
-	},
-	model.AgentKiroIDE: {
-		FileSubAgents: true, Skills: true, SystemPrompt: true, MCP: true,
-	},
-	model.AgentOpenClaw: {
-		Skills: true, SystemPrompt: true, MCP: true,
-	},
 	model.AgentOpenCode: {
 		SlashCommands: true, Skills: true, SystemPrompt: true, MCP: true,
-	},
-	model.AgentQwenCode: {
-		SlashCommands: true, Skills: true, SystemPrompt: true, MCP: true,
-	},
-	model.AgentTrae: {
-		Skills: true, SystemPrompt: true, MCP: true,
-	},
-	model.AgentVSCodeCopilot: {
-		Skills: true, SystemPrompt: true, MCP: true,
-	},
-	model.AgentWindsurf: {
-		Skills: true, SystemPrompt: true, MCP: true, Workflows: true,
 	},
 }

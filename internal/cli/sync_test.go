@@ -47,9 +47,6 @@ func TestParseSyncFlagsDefaults(t *testing.T) {
 	if flags.IncludePermissions {
 		t.Errorf("IncludePermissions = true, want false")
 	}
-	if flags.IncludeTheme {
-		t.Errorf("IncludeTheme = true, want false")
-	}
 	if flags.SDDMode != "" {
 		t.Errorf("SDDMode = %q, want empty", flags.SDDMode)
 	}
@@ -209,16 +206,16 @@ func TestParseSyncFlagsSDDProfileStrategy(t *testing.T) {
 	}
 }
 
-func TestParseSyncFlagsIncludePermissionsAndTheme(t *testing.T) {
-	flags, err := ParseSyncFlags([]string{"--include-permissions", "--include-theme"})
+func TestParseSyncFlagsIncludePermissionsAndRejectsRetiredThemeFlag(t *testing.T) {
+	flags, err := ParseSyncFlags([]string{"--include-permissions"})
 	if err != nil {
 		t.Fatalf("ParseSyncFlags() error = %v", err)
 	}
 	if !flags.IncludePermissions {
 		t.Errorf("IncludePermissions = false, want true")
 	}
-	if !flags.IncludeTheme {
-		t.Errorf("IncludeTheme = false, want true")
+	if _, err := ParseSyncFlags([]string{"--include-theme"}); err == nil {
+		t.Fatal("ParseSyncFlags() accepted retired --include-theme flag")
 	}
 }
 
@@ -318,7 +315,7 @@ func TestBuildSyncSelectionDefaultScopeIncludesManagedComponents(t *testing.T) {
 
 	sel := BuildSyncSelection(flags, agents)
 
-	// Default sync must include: SDD, Engram, Context7, GGA, Skills, Persona.
+	// Default sync must include: SDD, Engram, Context7, Skills, Persona.
 	// Persona is included because the content between <!-- gentle-ai:persona -->
 	// markers is harness-managed; sync must propagate embedded-asset changes to
 	// users who already have a persona installed. Content outside the markers
@@ -327,7 +324,6 @@ func TestBuildSyncSelectionDefaultScopeIncludesManagedComponents(t *testing.T) {
 		model.ComponentSDD,
 		model.ComponentEngram,
 		model.ComponentContext7,
-		model.ComponentGGA,
 		model.ComponentSkills,
 		model.ComponentPersona,
 	}
@@ -352,10 +348,7 @@ func TestBuildSyncSelectionDefaultExcludesPermissionsTheme(t *testing.T) {
 
 	sel := BuildSyncSelection(flags, agents)
 
-	excluded := []model.ComponentID{
-		model.ComponentPermission,
-		model.ComponentTheme,
-	}
+	excluded := []model.ComponentID{model.ComponentPermission}
 
 	for _, comp := range excluded {
 		for _, got := range sel.Components {
@@ -381,24 +374,6 @@ func TestBuildSyncSelectionIncludePermissionsWhenFlagSet(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("BuildSyncSelection() expected ComponentPermission when --include-permissions is set")
-	}
-}
-
-func TestBuildSyncSelectionIncludeThemeWhenFlagSet(t *testing.T) {
-	agents := []model.AgentID{model.AgentClaudeCode}
-	flags := SyncFlags{IncludeTheme: true}
-
-	sel := BuildSyncSelection(flags, agents)
-
-	found := false
-	for _, comp := range sel.Components {
-		if comp == model.ComponentTheme {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("BuildSyncSelection() expected ComponentTheme when --include-theme is set")
 	}
 }
 
@@ -967,112 +942,6 @@ func TestSyncPersonaOnlyRollbackRestoresOpenCodeSettingsAfterGentlemanCleanup(t 
 	}
 }
 
-func TestComponentSyncStepRunsGGAInjectWithoutBinaryInstall(t *testing.T) {
-	home := t.TempDir()
-	restoreCommand := runCommand
-	restoreLookPath := cmdLookPath
-	t.Cleanup(func() {
-		runCommand = restoreCommand
-		cmdLookPath = restoreLookPath
-	})
-
-	cmdLookPath = func(name string) (string, error) {
-		return "", os.ErrNotExist
-	}
-
-	var commandsCalled []string
-	runCommand = func(name string, args ...string) error {
-		commandsCalled = append(commandsCalled, name+" "+strings.Join(args, " "))
-		return nil
-	}
-
-	step := componentSyncStep{
-		id:        "sync:gga",
-		component: model.ComponentGGA,
-		homeDir:   home,
-		agents:    []model.AgentID{model.AgentOpenCode},
-		selection: model.Selection{},
-	}
-
-	if err := step.Run(); err != nil {
-		t.Fatalf("componentSyncStep.Run() GGA error = %v", err)
-	}
-
-	// No GGA binary install command should have been called.
-	for _, cmd := range commandsCalled {
-		if strings.Contains(cmd, "clone") || strings.Contains(cmd, "install.sh") {
-			t.Errorf("componentSyncStep GGA must not run binary install, got command: %s", cmd)
-		}
-	}
-
-	// GGA runtime asset should be written.
-	prModePath := filepath.Join(home, ".local", "share", "gga", "lib", "pr_mode.sh")
-	if _, err := os.Stat(prModePath); err != nil {
-		t.Errorf("expected GGA runtime asset at %q: %v", prModePath, err)
-	}
-}
-
-func TestRunSyncRefreshesPersistedVisualComponents(t *testing.T) {
-	workspace, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatalf("EvalSymlinks(workspace) error = %v", err)
-	}
-	t.Chdir(workspace)
-	home, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatalf("EvalSymlinks(home) error = %v", err)
-	}
-	if err := state.Write(home, state.InstallState{
-		InstalledAgents:     []string{"claude-code"},
-		SelectionConfigured: true,
-		Components: []model.ComponentID{
-			model.ComponentClaudeTheme,
-		},
-		Persona: "neutral",
-	}); err != nil {
-		t.Fatalf("state.Write() error = %v", err)
-	}
-
-	restoreHome := osUserHomeDir
-	restoreBackupHome := backup.UserHomeDirFn
-	osUserHomeDir = func() (string, error) { return home, nil }
-	backup.UserHomeDirFn = func() (string, error) { return home, nil }
-	t.Cleanup(func() {
-		osUserHomeDir = restoreHome
-		backup.UserHomeDirFn = restoreBackupHome
-	})
-
-	// Routing guidance is written for every configured agent regardless of which
-	// components are persisted, so a first sync of a purely visual selection
-	// still delivers it (issue #1794).
-	wantFiles := []string{
-		filepath.Join(home, ".claude", "themes", "gentleman.json"),
-		filepath.Join(home, ".claude", "themes", "gentleman-cute.json"),
-		filepath.Join(home, ".claude", "CLAUDE.md"),
-	}
-
-	first, err := RunSync([]string{"--agents", "claude-code"})
-	if err != nil {
-		t.Fatalf("RunSync() first error = %v", err)
-	}
-	if !reflect.DeepEqual(first.ChangedFiles, wantFiles) {
-		t.Fatalf("first ChangedFiles = %#v, want %#v", first.ChangedFiles, wantFiles)
-	}
-	for _, path := range wantFiles {
-		if _, err := os.Stat(path); err != nil {
-			t.Fatalf("managed visual component file %q was not refreshed: %v", path, err)
-		}
-	}
-
-	second, err := RunSync([]string{"--agents", "claude-code"})
-	if err != nil {
-		t.Fatalf("RunSync() second error = %v", err)
-	}
-	if !second.NoOp || second.FilesChanged != 0 || len(second.ChangedFiles) != 0 {
-		t.Fatalf("second sync = NoOp %v, FilesChanged %d, ChangedFiles %#v; want idempotent no-op", second.NoOp, second.FilesChanged, second.ChangedFiles)
-	}
-}
-
 // Retired OpenCode selections are rejected before compatibility-only plugin
 // refresh code can be reached. The old plugin scenario remains represented by
 // an explicit refusal test rather than a misleading skipped integration test.
@@ -1249,76 +1118,6 @@ func TestSyncRollbackRestoresLegacyOpenCodePluginAndRemovesReplacement(t *testin
 		if _, statErr := os.Stat(filepath.Join(pluginsDir, plugin)); !os.IsNotExist(statErr) {
 			t.Fatalf("rollback retained replacement plugin %q: %v", plugin, statErr)
 		}
-	}
-}
-
-func TestSyncSkillBackupRollsBackOpenClawWorkspaceSkills(t *testing.T) {
-	home := t.TempDir()
-	workspace := t.TempDir()
-	currentProject := t.TempDir()
-	writeOpenClawConfigWithWorkspace(t, home, workspace)
-	t.Chdir(currentProject)
-	selection := model.Selection{
-		Agents:     []model.AgentID{model.AgentOpenClaw},
-		Components: []model.ComponentID{model.ComponentSkills},
-		Skills:     []model.SkillID{model.SkillGoTesting},
-	}
-
-	openClawGlobalSkills := filepath.Join(home, ".openclaw", "skills")
-	openClawWorkspaceSkills := filepath.Join(workspace, ".openclaw", "skills")
-	workspaceSkill := filepath.Join(openClawWorkspaceSkills, "go-testing", "SKILL.md")
-	workspaceReference := filepath.Join(openClawWorkspaceSkills, "go-testing", "references", "examples.md")
-	writeStale(t, workspaceSkill)
-	writeStale(t, workspaceReference)
-
-	runtime, err := newSyncRuntime(home, selection)
-	if err != nil {
-		t.Fatal(err)
-	}
-	plan := runtime.stagePlan()
-	plan.Apply = append(plan.Apply, failingCompatibilityStep{})
-	result := pipeline.NewOrchestrator(pipeline.DefaultRollbackPolicy()).Execute(plan)
-	if result.Err == nil {
-		t.Fatal("injected later failure did not trigger sync rollback")
-	}
-	for _, path := range []string{workspaceSkill, workspaceReference} {
-		content, readErr := os.ReadFile(path)
-		if readErr != nil || string(content) != "stale" {
-			t.Errorf("sync rollback did not restore %q: content=%q error=%v", path, content, readErr)
-		}
-	}
-	for _, path := range []string{
-		filepath.Join(openClawGlobalSkills, "go-testing", "SKILL.md"),
-		filepath.Join(openClawGlobalSkills, "go-testing", "references", "examples.md"),
-	} {
-		if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
-			t.Errorf("OpenClaw sync must not write global skill path %q: %v", path, statErr)
-		}
-	}
-}
-
-func TestSyncBackupTargetsOpenClawSkillsUseConfiguredWorkspace(t *testing.T) {
-	home := t.TempDir()
-	workspace := t.TempDir()
-	selection := model.Selection{
-		Agents:     []model.AgentID{model.AgentOpenClaw},
-		Components: []model.ComponentID{model.ComponentSkills},
-		Skills:     []model.SkillID{model.SkillGoTesting},
-	}
-
-	targets, err := syncBackupTargets(home, workspace, selection, resolveAdapters(selection.Agents))
-	if err != nil {
-		t.Fatalf("syncBackupTargets() error = %v", err)
-	}
-
-	workspaceReference := filepath.Join(workspace, ".openclaw", "skills", "go-testing", "references", "examples.md")
-	if !containsPath(targets, workspaceReference) {
-		t.Errorf("sync backup targets missing OpenClaw workspace skill path %q\ntargets = %v", workspaceReference, targets)
-	}
-
-	homeReference := filepath.Join(home, ".openclaw", "skills", "go-testing", "references", "examples.md")
-	if containsPath(targets, homeReference) {
-		t.Errorf("sync backup targets must not include OpenClaw home-root skill path %q\ntargets = %v", homeReference, targets)
 	}
 }
 
@@ -2597,7 +2396,6 @@ func TestRunSyncWithProfilesIntegration(t *testing.T) {
 			model.ComponentSDD,
 			model.ComponentEngram,
 			model.ComponentContext7,
-			model.ComponentGGA,
 			model.ComponentSkills,
 		},
 		SDDMode:  model.SDDModeSingle,
@@ -2711,7 +2509,6 @@ func TestRunSyncDetectsExistingProfilesOnRegularSync(t *testing.T) {
 			model.ComponentSDD,
 			model.ComponentEngram,
 			model.ComponentContext7,
-			model.ComponentGGA,
 			model.ComponentSkills,
 		},
 		SDDMode: model.SDDModeSingle,
@@ -2764,7 +2561,6 @@ func TestRunSyncDetectsExistingProfilesOnRegularSync(t *testing.T) {
 			model.ComponentSDD,
 			model.ComponentEngram,
 			model.ComponentContext7,
-			model.ComponentGGA,
 			model.ComponentSkills,
 		},
 		SDDMode: model.SDDModeSingle,
@@ -2932,7 +2728,7 @@ func TestRunSyncWithSelection_WritesExpectedFiles(t *testing.T) {
 
 	sel := model.Selection{
 		Agents:     []model.AgentID{model.AgentOpenCode},
-		Components: []model.ComponentID{model.ComponentSDD, model.ComponentEngram, model.ComponentContext7, model.ComponentGGA, model.ComponentSkills},
+		Components: []model.ComponentID{model.ComponentSDD, model.ComponentEngram, model.ComponentContext7, model.ComponentSkills},
 		SDDMode:    model.SDDModeSingle,
 	}
 
@@ -3042,7 +2838,7 @@ func TestRunSyncWithSelection_FilesChangedOnFreshHome(t *testing.T) {
 
 	sel := model.Selection{
 		Agents:     []model.AgentID{model.AgentOpenCode},
-		Components: []model.ComponentID{model.ComponentSDD, model.ComponentEngram, model.ComponentContext7, model.ComponentGGA, model.ComponentSkills},
+		Components: []model.ComponentID{model.ComponentSDD, model.ComponentEngram, model.ComponentContext7, model.ComponentSkills},
 		SDDMode:    model.SDDModeSingle,
 	}
 
@@ -3072,7 +2868,7 @@ func TestRunSyncWithSelection_IsIdempotent(t *testing.T) {
 
 	sel := model.Selection{
 		Agents:     []model.AgentID{model.AgentOpenCode},
-		Components: []model.ComponentID{model.ComponentSDD, model.ComponentEngram, model.ComponentContext7, model.ComponentGGA, model.ComponentSkills},
+		Components: []model.ComponentID{model.ComponentSDD, model.ComponentEngram, model.ComponentContext7, model.ComponentSkills},
 		SDDMode:    model.SDDModeSingle,
 	}
 	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
@@ -3129,7 +2925,7 @@ func TestRunSyncWithSelection_SelectionAgentsForwarded(t *testing.T) {
 
 	sel := model.Selection{
 		Agents:     []model.AgentID{model.AgentOpenCode},
-		Components: []model.ComponentID{model.ComponentSDD, model.ComponentEngram, model.ComponentContext7, model.ComponentGGA, model.ComponentSkills},
+		Components: []model.ComponentID{model.ComponentSDD, model.ComponentEngram, model.ComponentContext7, model.ComponentSkills},
 	}
 
 	result, err := RunSyncWithSelection(home, sel)
@@ -3625,10 +3421,6 @@ func TestRunSyncLoadsPersistedModelAssignments(t *testing.T) {
 			"orchestrator": "opus",
 			"sdd-apply":    "sonnet",
 		},
-		KiroModelAssignments: map[string]string{
-			"sdd-design": "glm",
-			"default":    "auto",
-		},
 		ModelAssignments: map[string]state.ModelAssignmentState{
 			"sdd-init": {ProviderID: "anthropic", ModelID: "claude-sonnet-4"},
 		},
@@ -3652,14 +3444,7 @@ func TestRunSyncLoadsPersistedModelAssignments(t *testing.T) {
 	if got := result.Selection.ClaudeModelAssignments["sdd-apply"]; got != "sonnet" {
 		t.Errorf("ClaudeModelAssignments[sdd-apply] = %q, want %q", got, "sonnet")
 	}
-	if got := result.Selection.KiroModelAssignments["sdd-design"]; got != model.KiroModelGLM {
-		t.Errorf("KiroModelAssignments[sdd-design] = %q, want %q", got, model.KiroModelGLM)
-	}
-	if got := result.Selection.KiroModelAssignments["default"]; got != model.KiroModelAuto {
-		t.Errorf("KiroModelAssignments[default] = %q, want %q", got, model.KiroModelAuto)
-	}
-
-	// OpenCode assignments must be loaded.
+	// Persisted assignments must be loaded.
 	ma := result.Selection.ModelAssignments["sdd-init"]
 	if ma.ProviderID != "anthropic" || ma.ModelID != "claude-sonnet-4" {
 		t.Errorf("ModelAssignments[sdd-init] = %+v, want anthropic/claude-sonnet-4", ma)

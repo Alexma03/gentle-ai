@@ -75,17 +75,6 @@ func TestDefaultRegistrySupportedAgentsMatchesFactoryAgents(t *testing.T) {
 	}
 }
 
-func TestFactoryResolvesHermesAdapter(t *testing.T) {
-	adapter, err := NewAdapter(model.AgentHermes)
-	if err != nil {
-		t.Fatalf("NewAdapter(%q) returned error: %v", model.AgentHermes, err)
-	}
-
-	if got := adapter.Agent(); got != model.AgentHermes {
-		t.Fatalf("adapter.Agent() = %q, want %q", got, model.AgentHermes)
-	}
-}
-
 func TestDefaultRegistryExcludesHermesUntilMigration(t *testing.T) {
 	registry, err := NewDefaultRegistry()
 	if err != nil {

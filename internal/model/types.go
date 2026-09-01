@@ -94,13 +94,9 @@ const (
 	// ComponentCodeGraph is the first-class CodeGraph lifecycle integration.
 	// CommunityToolCodeGraph remains as a state compatibility value while
 	// legacy selections are migrated.
-	ComponentCodeGraph          ComponentID = "codegraph"
-	ComponentPersona            ComponentID = "persona"
-	ComponentPermission         ComponentID = "permissions"
-	ComponentGGA                ComponentID = "gga"
-	ComponentTheme              ComponentID = "theme"
-	ComponentClaudeTheme        ComponentID = "claude-theme"
-	ComponentOpenCodeGentleLogo ComponentID = "opencode-gentle-logo"
+	ComponentCodeGraph  ComponentID = "codegraph"
+	ComponentPersona    ComponentID = "persona"
+	ComponentPermission ComponentID = "permissions"
 )
 
 type UninstallMode string
@@ -172,13 +168,6 @@ const (
 	StrategyFileReplace
 	// StrategyAppendToFile appends content to an existing system prompt file.
 	StrategyAppendToFile
-	// StrategyInstructionsFile writes a dedicated instructions file (e.g. .instructions.md).
-	StrategyInstructionsFile
-	// StrategyJinjaModules writes separate module files that are included into a
-	// thin Jinja2 template (e.g. Kimi's KIMI.md).
-	StrategyJinjaModules
-	// StrategySteeringFile writes a Kiro steering file with inclusion: always frontmatter.
-	StrategySteeringFile
 )
 
 // MCPStrategy defines how MCP server configs are written for an agent.
@@ -195,9 +184,6 @@ const (
 	StrategyMCPConfigFile
 	// StrategyTOMLFile writes MCP config to a TOML file (e.g., Codex ~/.codex/config.toml).
 	StrategyTOMLFile
-	// StrategyMergeIntoYAML merges MCP server blocks into a YAML config file using
-	// comment-preserving hand-rolled helpers (e.g., Hermes ~/.hermes/config.yaml).
-	StrategyMergeIntoYAML
 )
 
 type PresetID string

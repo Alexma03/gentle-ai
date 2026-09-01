@@ -94,15 +94,6 @@ func TestAssetURLResolution(t *testing.T) {
 			wantSubstr: "arm64",
 		},
 		{
-			name:       "linux amd64",
-			owner:      "Gentleman-Programming",
-			repo:       "gga",
-			version:    "2.0.0",
-			goos:       "linux",
-			goarch:     "amd64",
-			wantSubstr: "linux",
-		},
-		{
 			name:       "contains version",
 			owner:      "Gentleman-Programming",
 			repo:       "gentle-ai",

@@ -78,9 +78,6 @@ func TestNormalizeInstallFlagsDefaults(t *testing.T) {
 			model.ComponentSkills,
 			model.ComponentContext7,
 			model.ComponentPermission,
-			model.ComponentGGA,
-			model.ComponentClaudeTheme,
-			model.ComponentOpenCodeGentleLogo,
 			model.ComponentPersona,
 		},
 	}
@@ -115,53 +112,6 @@ func TestNormalizeInstallFlagsChannelBeta(t *testing.T) {
 	}
 	if input.Channel != ChannelBeta {
 		t.Fatalf("Channel = %q, want %q", input.Channel, ChannelBeta)
-	}
-}
-
-func TestNormalizeInstallFlagsFullPresetCustomPersonaKeepsPresetPolish(t *testing.T) {
-	input, err := NormalizeInstallFlags(InstallFlags{
-		Preset:  string(model.PresetFullGentleman),
-		Persona: string(model.PersonaCustom),
-	}, system.DetectionResult{})
-	if err != nil {
-		t.Fatalf("NormalizeInstallFlags() error = %v", err)
-	}
-
-	for _, got := range input.Selection.Components {
-		if got == model.ComponentPersona {
-			t.Fatalf("components should not include persona for custom persona; got %#v", input.Selection.Components)
-		}
-		if got == model.ComponentTheme {
-			t.Fatalf("components should not include generic theme; got %#v", input.Selection.Components)
-		}
-	}
-
-	for _, want := range []model.ComponentID{model.ComponentClaudeTheme, model.ComponentOpenCodeGentleLogo} {
-		found := false
-		for _, got := range input.Selection.Components {
-			if got == want {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fatalf("components should include preset polish %q; got %#v", want, input.Selection.Components)
-		}
-	}
-}
-
-func TestNormalizeInstallFlagsCustomAcceptsOptionalGentlemanInstallables(t *testing.T) {
-	input, err := NormalizeInstallFlags(InstallFlags{
-		Preset:     string(model.PresetCustom),
-		Components: []string{string(model.ComponentClaudeTheme), string(model.ComponentOpenCodeGentleLogo)},
-	}, system.DetectionResult{})
-	if err != nil {
-		t.Fatalf("NormalizeInstallFlags() error = %v", err)
-	}
-
-	want := []model.ComponentID{model.ComponentClaudeTheme, model.ComponentOpenCodeGentleLogo}
-	if !reflect.DeepEqual(input.Selection.Components, want) {
-		t.Fatalf("components = %#v, want %#v", input.Selection.Components, want)
 	}
 }
 

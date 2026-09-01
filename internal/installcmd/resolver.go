@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/versions"
 )
 
 // cmdLookPath, osStat, osGetenv, and cmdGoVersion are package-level vars for testability.
@@ -44,10 +42,6 @@ func (profileResolver) ResolveAgentInstall(profile system.PlatformProfile, agent
 		return resolveClaudeCodeInstall(profile), nil
 	case model.AgentOpenCode:
 		return resolveOpenCodeInstall(profile)
-	case model.AgentKilocode:
-		return resolveKilocodeInstall(profile), nil
-	case model.AgentKimi:
-		return resolveKimiInstall(profile)
 	default:
 		return nil, fmt.Errorf("install command is not supported for agent %q", agent)
 	}
@@ -73,32 +67,6 @@ func resolveClaudeCodeInstall(profile system.PlatformProfile) CommandSequence {
 	return CommandSequence{{"npm", "install", "-g", "--ignore-scripts", pkg}}
 }
 
-// resolveKilocodeInstall returns the npm install command sequence gentle-ai
-// shows for Kilocode — display text only, never executed by gentle-ai. On
-// Linux with system npm, sudo is required. With nvm/fnm/volta, it is not.
-// On Windows and macOS, sudo is never needed.
-func resolveKilocodeInstall(profile system.PlatformProfile) CommandSequence {
-	const pkg = "@kilocode/cli@latest"
-	if profile.OS == "linux" && !profile.NpmWritable {
-		return CommandSequence{{"sudo", "npm", "install", "-g", "--ignore-scripts", pkg}}
-	}
-	return CommandSequence{{"npm", "install", "-g", "--ignore-scripts", pkg}}
-}
-
-// resolveKimiInstall returns the official Kimi install command sequence.
-// To avoid the security risks of pipe-to-shell patterns (curl | bash),
-// we execute the underlying command that the scripts alias: `uv tool install`.
-func resolveKimiInstall(profile system.PlatformProfile) (CommandSequence, error) {
-	// Kimi CLI is a python-based tool. We use Astral's `uv` as our deterministic
-	// prerequisite manager to ensure secure and isolated installs.
-	if !profile.Supported {
-		return nil, fmt.Errorf("Kimi is not supported on this platform (%s/%s)", profile.OS, profile.LinuxDistro)
-	}
-
-	// We explicitly request python 3.13 as strictly defined by Kimi upstream.
-	return CommandSequence{{"uv", "tool", "install", "--python", "3.13", "kimi-cli"}}, nil
-}
-
 // npmBasedAgents is the set of agents whose auto-install runs npm commands.
 // When any of these agents is selected, npm (and therefore Node.js) must be
 // present before the pipeline reaches the agent install step.
@@ -109,10 +77,7 @@ func resolveKimiInstall(profile system.PlatformProfile) (CommandSequence, error)
 var npmBasedAgents = map[model.AgentID]struct{}{
 	model.AgentClaudeCode: {},
 	model.AgentOpenCode:   {},
-	model.AgentKilocode:   {},
-	model.AgentGeminiCLI:  {},
 	model.AgentCodex:      {},
-	model.AgentQwenCode:   {},
 	model.AgentPi:         {},
 }
 
@@ -125,8 +90,6 @@ func ValidateAgentInstallPreflight(profile system.PlatformProfile, agent model.A
 		}
 	}
 	switch agent {
-	case model.AgentKimi:
-		return validateKimiInstallPreflight(profile)
 	case model.AgentPi:
 		return validatePiInstallPreflight()
 	default:
@@ -159,46 +122,10 @@ func validateNpmInstallPreflight(profile system.PlatformProfile) error {
 	return nil
 }
 
-func validateKimiInstallPreflight(profile system.PlatformProfile) error {
-	if !profile.Supported {
-		return fmt.Errorf("Kimi is not supported on this platform (%s/%s)", profile.OS, profile.LinuxDistro)
-	}
-
-	if _, err := cmdLookPath("uv"); err != nil {
-		return fmt.Errorf(
-			"Kimi requires Astral uv, but `uv` was not found in PATH.\n"+
-				"Install uv and retry:\n"+
-				"  %s",
-			uvInstallHint(profile),
-		)
-	}
-
-	return nil
-}
-
-func uvInstallHint(profile system.PlatformProfile) string {
-	switch profile.PackageManager {
-	case "brew":
-		return "brew install uv"
-	case "apt":
-		return "sudo apt-get install -y uv (or see https://docs.astral.sh/uv/getting-started/installation/)"
-	case "pacman":
-		return "sudo pacman -S --noconfirm uv"
-	case "dnf":
-		return "sudo dnf install -y uv"
-	case "winget":
-		return "winget install --id astral-sh.uv -e --accept-source-agreements --accept-package-agreements"
-	default:
-		return "https://docs.astral.sh/uv/getting-started/installation/"
-	}
-}
-
 func (profileResolver) ResolveComponentInstall(profile system.PlatformProfile, component model.ComponentID) (CommandSequence, error) {
 	switch component {
 	case model.ComponentEngram:
 		return resolveEngramInstall(profile)
-	case model.ComponentGGA:
-		return resolveGGAInstall(profile)
 	default:
 		return nil, fmt.Errorf("install command is not supported for component %q", component)
 	}
@@ -272,107 +199,6 @@ func resolveOpenCodeInstall(profile system.PlatformProfile) (CommandSequence, er
 			profile.OS, profile.LinuxDistro, profile.PackageManager,
 		)
 	}
-}
-
-// resolveGGAInstall returns the correct install command sequence for GGA per platform.
-// - darwin: brew tap + brew install (via Gentleman-Programming/homebrew-tap)
-// - linux: git clone + install.sh (GGA is a pure Bash project, NOT a Go module)
-func resolveGGAInstall(profile system.PlatformProfile) (CommandSequence, error) {
-	switch profile.PackageManager {
-	case "brew":
-		return CommandSequence{
-			{"brew", "tap", "Gentleman-Programming/homebrew-tap"},
-			{"brew", "reinstall", "gga"},
-		}, nil
-	case "winget":
-		// On Windows, use Git Bash explicitly to avoid bare "bash" resolving to
-		// C:\Windows\System32\bash.exe (WSL), which cannot run the script.
-		// Runtime cleanup is handled through system.PowerShellRunner before this
-		// sequence so pwsh launch failures can safely fall back.
-		cloneDst := filepath.Join(os.TempDir(), "gentleman-guardian-angel")
-		bash := gitBashPath()
-		return CommandSequence{
-			{"git", "clone", "--depth=1", "--branch", "v" + versions.GGAVersion, "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", cloneDst},
-			{bash, bashScriptPath(profile, filepath.Join(cloneDst, "install.sh"))},
-		}, nil
-	default:
-		// Any package manager the system probe accepted is enough here: the
-		// Linux install is git clone + install.sh and never touches the
-		// manager, so re-enumerating managers would silently narrow the
-		// probe's list (issue #2499). The gate keeps a probe-rejected Linux
-		// profile (empty PackageManager) on the unsupported arm.
-		if profile.OS == "linux" && profile.PackageManager != "" {
-			const tmpDir = "/tmp/gentleman-guardian-angel"
-			tagRef := "refs/tags/v" + versions.GGAVersion
-			return CommandSequence{
-				{"rm", "-rf", tmpDir},
-				{"mkdir", "-p", tmpDir},
-				{"git", "init", tmpDir},
-				{"git", "-C", tmpDir, "fetch", "--depth=1", "https://github.com/Gentleman-Programming/gentleman-guardian-angel.git", tagRef + ":" + tagRef},
-				{"git", "-C", tmpDir, "checkout", "-f", tagRef},
-				{"bash", tmpDir + "/install.sh"},
-			}, nil
-		}
-		return nil, fmt.Errorf(
-			"unsupported platform for gga: os=%q distro=%q pm=%q",
-			profile.OS, profile.LinuxDistro, profile.PackageManager,
-		)
-	}
-}
-
-func bashScriptPath(profile system.PlatformProfile, path string) string {
-	if profile.OS == "windows" {
-		return strings.ReplaceAll(path, `\`, "/")
-	}
-	return path
-}
-
-// GitBashPath is the exported wrapper so other packages (e.g. cli) can
-// resolve the Git Bash binary without duplicating the detection logic.
-func GitBashPath() string { return gitBashPath() }
-
-// gitBashPath returns the path to Git Bash on Windows.
-// It resolves git on PATH, then finds bash.exe relative to it
-// (Git for Windows always installs both in the same bin/ directory).
-// Falls back to well-known locations, then to bare "bash" as last resort.
-func gitBashPath() string {
-	// Strategy 1: find git on PATH and derive bash.exe from it.
-	if gitPath, err := cmdLookPath("git"); err == nil {
-		// gitPath is e.g. "C:\Program Files\Git\cmd\git.exe"
-		// bash.exe lives in the sibling bin/ directory.
-		gitDir := filepath.Dir(gitPath) // .../cmd or .../bin
-		parent := filepath.Dir(gitDir)  // .../Git
-
-		candidate := filepath.Join(parent, "bin", "bash.exe")
-		if _, err := osStat(candidate); err == nil {
-			return candidate
-		}
-
-		// git might already be in bin/ (not cmd/).
-		candidate = filepath.Join(gitDir, "bash.exe")
-		if _, err := osStat(candidate); err == nil {
-			return candidate
-		}
-	}
-
-	// Strategy 2: well-known locations.
-	candidates := []string{
-		filepath.Join(os.Getenv("ProgramFiles"), "Git", "bin", "bash.exe"),
-		filepath.Join(os.Getenv("ProgramFiles(x86)"), "Git", "bin", "bash.exe"),
-		`C:\Program Files\Git\bin\bash.exe`,
-	}
-
-	for _, c := range candidates {
-		if c == "" {
-			continue
-		}
-		if _, err := osStat(c); err == nil {
-			return c
-		}
-	}
-
-	// Last resort — bare "bash" and hope it's Git Bash, not WSL.
-	return "bash"
 }
 
 // validateGoForModuleInstall checks that Go ≥1.24 is installed and GO111MODULE is not

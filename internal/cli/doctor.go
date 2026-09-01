@@ -35,7 +35,7 @@ const (
 // regardless of which agents the user installed. Agent-specific binaries are
 // derived from state.json's InstalledAgents field (see #709) so the doctor
 // only reports missing agents the user actually selected.
-var coreTools = []string{"gentle-ai", "gga", "engram"}
+var coreTools = []string{"gentle-ai", "engram"}
 
 // personalClientBinary resolves the canonical runtime binary metadata. Empty
 // binaries are intentional for IDE clients whose config is the only managed

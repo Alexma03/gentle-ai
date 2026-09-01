@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
@@ -18,11 +17,6 @@ import (
 // It is deliberately independent of the SDD sections so that installing or
 // removing optional SDD assets can never add or drop routing guidance.
 const RoutingSectionID = "agent-routing"
-
-// routingModuleFile is the include module written for adapters whose system
-// prompt is a Jinja router. It is derived from the section ID so the template
-// include and the managed marker can never drift apart.
-const routingModuleFile = RoutingSectionID + ".md"
 
 // ErrInvalidTarget rejects an unusable installation root before any write, so
 // a caller that lost its resolved home directory fails loudly instead of
@@ -44,14 +38,6 @@ var ErrUnloadableGuidance = errors.New("routing guidance target is not loaded by
 type Result struct {
 	Changed bool
 	Files   []string
-}
-
-// templateBootstrapper is the optional adapter capability that restores a Jinja
-// router template from its embedded asset. Adapters that rewrite their entry
-// template on every install must expose it, because guidance can only survive
-// outside that template.
-type templateBootstrapper interface {
-	BootstrapTemplate(homeDir string) error
 }
 
 // InjectRouting installs the organic routing guidance for one supported agent
@@ -80,8 +66,6 @@ func InjectRouting(targetDir string, agent model.AgentID) (Result, error) {
 	switch delivery.kind {
 	case deliveryOrchestratorPrompt:
 		return injectOrchestratorPrompt(delivery, agent, rendered)
-	case deliveryJinjaModule:
-		return injectJinjaModule(targetDir, delivery, agent, rendered)
 	default:
 		return injectPromptSection(delivery, rendered)
 	}
@@ -112,7 +96,6 @@ type routingDeliveryKind int
 
 const (
 	deliveryPromptSection routingDeliveryKind = iota
-	deliveryJinjaModule
 	deliveryOrchestratorPrompt
 )
 
@@ -122,10 +105,7 @@ const (
 type routingDelivery struct {
 	kind    routingDeliveryKind
 	adapter agents.Adapter
-	// bootstrapper is set only for deliveryJinjaModule, where the router
-	// template must be restored before the module is worth writing.
-	bootstrapper templateBootstrapper
-	paths        []string
+	paths   []string
 }
 
 // resolveRoutingDelivery selects the delivery strategy and its target paths.
@@ -152,22 +132,6 @@ func resolveRoutingDelivery(targetDir string, agent model.AgentID) (routingDeliv
 		}
 		return routingDelivery{kind: deliveryOrchestratorPrompt, adapter: adapter, paths: []string{settingsPath}}, nil
 
-	case adapter.SystemPromptStrategy() == model.StrategyJinjaModules:
-		bootstrapper, ok := adapter.(templateBootstrapper)
-		if !ok {
-			return routingDelivery{}, fmt.Errorf("%w: adapter %q renders Jinja modules but cannot bootstrap its router template", ErrUnloadableGuidance, agent)
-		}
-		configDir := adapter.GlobalConfigDir(targetDir)
-		if strings.TrimSpace(configDir) == "" {
-			return routingDelivery{}, fmt.Errorf("%w: adapter %q exposes no global config dir", ErrInvalidTarget, agent)
-		}
-		return routingDelivery{
-			kind:         deliveryJinjaModule,
-			adapter:      adapter,
-			bootstrapper: bootstrapper,
-			paths:        []string{filepath.Join(configDir, routingModuleFile)},
-		}, nil
-
 	default:
 		promptPath := adapter.SystemPromptFile(targetDir)
 		if strings.TrimSpace(promptPath) == "" {
@@ -185,7 +149,7 @@ func resolveRoutingDelivery(targetDir string, agent model.AgentID) (routingDeliv
 // installers can resolve the delivery root for these agents without keeping a
 // second copy of the agent list that could drift from this dispatch.
 func DeliversThroughOrchestratorPrompt(agent model.AgentID) bool {
-	return agent == model.AgentOpenCode || agent == model.AgentKilocode
+	return agent == model.AgentOpenCode
 }
 
 // injectPromptSection is the default delivery: a managed marker section inside
@@ -206,59 +170,6 @@ func injectPromptSection(delivery routingDelivery, rendered string) (Result, err
 	}
 
 	return Result{Changed: writeResult.Changed, Files: []string{promptPath}}, nil
-}
-
-// injectJinjaModule delivers guidance as a standalone include module.
-//
-// A Jinja adapter's system prompt file is a router that its installer rewrites
-// verbatim from an embedded asset on every run, so anything injected into that
-// file is destroyed by the next sync. The module survives because the router
-// only references it.
-func injectJinjaModule(targetDir string, delivery routingDelivery, agent model.AgentID, rendered string) (Result, error) {
-	// Bootstrap first: the module is only ever read through the router template,
-	// so the template must exist before the module is worth writing.
-	if err := delivery.bootstrapper.BootstrapTemplate(targetDir); err != nil {
-		return Result{}, fmt.Errorf("bootstrap routing guidance template for %q: %w", agent, err)
-	}
-
-	if err := requireModuleIsIncluded(delivery.adapter, agent, targetDir); err != nil {
-		return Result{}, err
-	}
-
-	modulePath := delivery.paths[0]
-	existing, err := readFileOrEmpty(modulePath)
-	if err != nil {
-		return Result{}, err
-	}
-
-	updated := filemerge.InjectMarkdownSection(existing, RoutingSectionID, rendered)
-
-	writeResult, err := filemerge.WriteFileAtomic(modulePath, []byte(updated), 0o644)
-	if err != nil {
-		return Result{}, err
-	}
-
-	return Result{Changed: writeResult.Changed, Files: []string{modulePath}}, nil
-}
-
-// requireModuleIsIncluded verifies the freshly bootstrapped router template
-// references the guidance module. Without the reference the module is inert, so
-// failing here is preferable to reporting a successful install of guidance no
-// agent will ever read.
-func requireModuleIsIncluded(adapter agents.Adapter, agent model.AgentID, targetDir string) error {
-	templatePath := adapter.SystemPromptFile(targetDir)
-	if strings.TrimSpace(templatePath) == "" {
-		return fmt.Errorf("%w: adapter %q exposes no router template", ErrUnloadableGuidance, agent)
-	}
-
-	template, err := readFileOrEmpty(templatePath)
-	if err != nil {
-		return err
-	}
-	if !strings.Contains(template, routingModuleFile) {
-		return fmt.Errorf("%w: router template %q does not include %q", ErrUnloadableGuidance, templatePath, routingModuleFile)
-	}
-	return nil
 }
 
 // injectOrchestratorPrompt delivers guidance inside the managed orchestrator

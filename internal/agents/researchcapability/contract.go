@@ -59,12 +59,6 @@ var capabilities = map[model.AgentID]Capability{
 			ClassOpenWeb:       {GrantWebSearch, GrantWebFetch},
 		},
 	},
-	model.AgentKiroIDE: {
-		Schema: SchemaV1,
-		Grants: map[Class][]Grant{
-			ClassDocumentation: {GrantContext7},
-		},
-	},
 	model.AgentPi: {
 		Schema: SchemaV1,
 		Grants: map[Class][]Grant{

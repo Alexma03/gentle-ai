@@ -356,16 +356,3 @@ func TestOpenCodeBackgroundPolicyMalformedPreservedPromptReturnsError(t *testing
 		t.Fatalf("Inject() error = %v, want preserved-policy validation error", err)
 	}
 }
-
-func TestOpenCodeBackgroundPolicyIsExcludedByKilocodePublicInject(t *testing.T) {
-	home := t.TempDir()
-	adapter := kilocodeAdapter()
-	_, err := Inject(home, adapter, model.SDDModeMulti, InjectOptions{IncludeOpenCodeBackgroundPolicy: true})
-	if err != nil {
-		t.Fatalf("Inject(Kilocode) error = %v", err)
-	}
-	prompt := agentPrompt(t, readOpenCodeAgents(t, adapter.SettingsPath(home)), "gentle-orchestrator")
-	if strings.Contains(prompt, openCodeBackgroundPolicyMarker) || strings.Contains(prompt, openCodeBackgroundPolicyEnd) {
-		t.Fatal("Kilocode received the OpenCode-only background policy")
-	}
-}

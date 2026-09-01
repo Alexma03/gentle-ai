@@ -608,8 +608,6 @@ func TestInjectNativeSDDSubagentsIncludeCodeGraphGuidanceWhenEnabled(t *testing.
 	}{
 		{name: "claude", agentID: model.AgentClaudeCode, toolGrant: claudeCodeGraphToolGrant},
 		{name: "cursor", agentID: model.AgentCursor},
-		{name: "kiro", agentID: model.AgentKiroIDE, toolGrant: kiroCodeGraphToolGrant},
-		{name: "kimi", agentID: model.AgentKimi},
 	}
 
 	for _, tc := range tests {
@@ -646,9 +644,6 @@ func TestInjectNativeSDDSubagentsIncludeCodeGraphGuidanceWhenEnabled(t *testing.
 					emptyToolsContract = strings.TrimSpace(strings.TrimPrefix(sourceTools, "tools:")) == "[]"
 					foundEmptyTools = foundEmptyTools || emptyToolsContract
 					wantTools := sourceTools + ", " + tc.toolGrant
-					if tc.agentID == model.AgentKiroIDE {
-						wantTools = strings.TrimSuffix(sourceTools, "]") + `, "` + tc.toolGrant + `"]`
-					}
 					if emptyToolsContract {
 						// Tool-free reviewers keep their empty tools contract:
 						// appending the grant would corrupt the frontmatter and
@@ -659,7 +654,7 @@ func TestInjectNativeSDDSubagentsIncludeCodeGraphGuidanceWhenEnabled(t *testing.
 						t.Fatalf("%s tools = %q, want %q", fileName, got, wantTools)
 					}
 				}
-				for _, grant := range []string{claudeCodeGraphToolGrant, kiroCodeGraphToolGrant} {
+				for _, grant := range []string{claudeCodeGraphToolGrant} {
 					wantCount := 0
 					if grant == tc.toolGrant && !emptyToolsContract {
 						wantCount = 1
@@ -699,7 +694,6 @@ func TestInjectCodeGraphToolGrantPreservesEmptyToolsContract(t *testing.T) {
 	}{
 		{name: "claude empty flow sequence", agentID: model.AgentClaudeCode, prompt: "---\ntools: []\n---\nBody\n"},
 		{name: "claude empty value", agentID: model.AgentClaudeCode, prompt: "---\ntools:\n---\nBody\n"},
-		{name: "kiro empty flow sequence", agentID: model.AgentKiroIDE, prompt: "---\ntools: []\n---\nBody\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := injectCodeGraphToolGrantIntoPrompt(tc.prompt, tc.agentID, guidance); got != tc.prompt {
@@ -710,7 +704,7 @@ func TestInjectCodeGraphToolGrantPreservesEmptyToolsContract(t *testing.T) {
 }
 
 func TestInjectNativeSDDSubagentsOmitCodeGraphGuidanceByDefault(t *testing.T) {
-	for _, agentID := range []model.AgentID{model.AgentClaudeCode, model.AgentKiroIDE} {
+	for _, agentID := range []model.AgentID{model.AgentClaudeCode} {
 		t.Run(string(agentID), func(t *testing.T) {
 			home := t.TempDir()
 			adapter := mustAdapter(t, agentID)
@@ -728,7 +722,7 @@ func TestInjectNativeSDDSubagentsOmitCodeGraphGuidanceByDefault(t *testing.T) {
 				if strings.Contains(text, "<!-- gentle-ai:codegraph-guidance -->") || strings.Contains(text, "gentle-ai codegraph init --cwd <project-root>") {
 					t.Fatalf("%s native subagent unexpectedly contains CodeGraph guidance by default", fileName)
 				}
-				for _, grant := range []string{claudeCodeGraphToolGrant, kiroCodeGraphToolGrant} {
+				for _, grant := range []string{claudeCodeGraphToolGrant} {
 					if strings.Contains(text, grant) {
 						t.Fatalf("%s native subagent unexpectedly grants %q by default", fileName, grant)
 					}
@@ -742,67 +736,9 @@ func TestInjectNativeSDDSubagentsOmitCodeGraphGuidanceByDefault(t *testing.T) {
 		prompt  string
 	}{
 		{agentID: model.AgentClaudeCode, prompt: "---\ntools: Read, Grep\n---\nBody\n"},
-		{agentID: model.AgentKiroIDE, prompt: "---\ntools: [\"read\"]\n---\nBody\n"},
 	} {
 		if got := injectCodeGraphToolGrantIntoPrompt(tc.prompt, tc.agentID, ""); got != tc.prompt {
 			t.Fatalf("disabled %s grant changed prompt bytes: got %q, want %q", tc.agentID, got, tc.prompt)
-		}
-	}
-}
-
-func TestInjectKimiYAMLSubagentsOmitCodeGraphGuidanceByDefault(t *testing.T) {
-	home := t.TempDir()
-
-	if _, err := Inject(home, kimiAdapter(), model.SDDModeSingle); err != nil {
-		t.Fatalf("Inject(kimi) error = %v", err)
-	}
-
-	for _, fileName := range kimiYAMLSubagentFilesForCodeGraphTest() {
-		path := filepath.Join(home, ".kimi", "agents", fileName)
-		content, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatalf("ReadFile(%q) error = %v", path, err)
-		}
-		text := string(content)
-		if strings.Contains(text, "  instructions: |-") || strings.Contains(text, "gentle-ai codegraph init --cwd <project-root>") {
-			t.Fatalf("%s YAML unexpectedly contains CodeGraph guidance by default", fileName)
-		}
-	}
-}
-
-func TestInjectKimiYAMLSubagentsRemainControlFilesWhenCodeGraphEnabled(t *testing.T) {
-	home := t.TempDir()
-
-	if _, err := Inject(home, kimiAdapter(), model.SDDModeSingle, InjectOptions{CodeGraphGuidanceMarkdown: codegraph.CodeGraphGuidanceMarkdown()}); err != nil {
-		t.Fatalf("Inject(kimi) error = %v", err)
-	}
-
-	for _, fileName := range kimiYAMLSubagentFilesForCodeGraphTest() {
-		path := filepath.Join(home, ".kimi", "agents", fileName)
-		content, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatalf("ReadFile(%q) error = %v", path, err)
-		}
-		text := string(content)
-		for _, want := range []string{"  system_prompt_path: ./", "  exclude_tools:"} {
-			if !strings.Contains(text, want) {
-				t.Fatalf("%s YAML missing %q:\n%s", fileName, want, text)
-			}
-		}
-		for _, forbidden := range []string{"  instructions: |-", "<!-- gentle-ai:codegraph-guidance -->", "gentle-ai codegraph init --cwd <project-root>"} {
-			if strings.Contains(text, forbidden) {
-				t.Fatalf("%s YAML unexpectedly contains %q:\n%s", fileName, forbidden, text)
-			}
-		}
-
-		markdownPath := strings.TrimSuffix(path, ".yaml") + ".md"
-		markdownContent, err := os.ReadFile(markdownPath)
-		if err != nil {
-			t.Fatalf("ReadFile(%q) error = %v", markdownPath, err)
-		}
-		markdownText := string(markdownContent)
-		if !strings.Contains(markdownText, "<!-- gentle-ai:codegraph-guidance -->") || !strings.Contains(markdownText, "gentle-ai codegraph init --cwd <project-root>") {
-			t.Fatalf("%s referenced Markdown prompt missing CodeGraph guidance when enabled", markdownPath)
 		}
 	}
 }

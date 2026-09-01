@@ -23,14 +23,11 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/engram"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/filemerge"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/gga"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/mcp"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/opencodeplugin"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/permissions"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/persona"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/sdd"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/skills"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/theme"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	opencodeactivation "github.com/gentleman-programming/gentle-ai/v2/internal/opencode"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/pipeline"
@@ -47,7 +44,6 @@ type SyncFlags struct {
 	SDDProfileStrategy string
 	StrictTDD          bool
 	IncludePermissions bool
-	IncludeTheme       bool
 	DryRun             bool
 
 	OpenCodeBackgroundSubagents    string
@@ -67,7 +63,6 @@ type SyncFlags struct {
 	sddModeSet       bool
 	strictTDDSet     bool
 	permissionsSet   bool
-	themeSet         bool
 }
 
 // SyncResult holds the outcome of a sync execution.
@@ -118,7 +113,6 @@ func ParseSyncFlags(args []string) (SyncFlags, error) {
 	fs.StringVar(&opts.SDDProfileStrategy, "sdd-profile-strategy", "", "OpenCode SDD profile sync strategy: generated-multi or external-single-active (default: auto-detect)")
 	fs.BoolVar(&opts.StrictTDD, "strict-tdd", false, "enable strict TDD mode for SDD agents (RED → GREEN → REFACTOR)")
 	fs.BoolVar(&opts.IncludePermissions, "include-permissions", false, "include permissions component in sync")
-	fs.BoolVar(&opts.IncludeTheme, "include-theme", false, "include theme component in sync")
 	fs.StringVar(&opts.OpenCodeBackgroundSubagents, "opencode-background-subagents", "", "--opencode-background-subagents=auto|on|off; env: GENTLE_AI_OPENCODE_BACKGROUND_SUBAGENTS; eligible versions use a managed launcher")
 	fs.StringVar(&opts.PiBackgroundSubagents, "pi-background-subagents", "", "--pi-background-subagents=auto|on|off; env: GENTLE_AI_PI_BACKGROUND_SUBAGENTS; the resolved policy is projected for gentle-pi")
 	fs.BoolVar(&opts.DryRun, "dry-run", false, "preview plan without executing")
@@ -149,8 +143,6 @@ func ParseSyncFlags(args []string) (SyncFlags, error) {
 			opts.strictTDDSet = true
 		case "include-permissions":
 			opts.permissionsSet = true
-		case "include-theme":
-			opts.themeSet = true
 		case "opencode-background-subagents":
 			opts.OpenCodeBackgroundSubagentsSet = true
 		case "pi-background-subagents":
@@ -191,7 +183,6 @@ FLAGS
   --sdd-profile-strategy <strategy>  OpenCode SDD profile sync strategy
   --strict-tdd                       Enable strict TDD mode for SDD agents
   --include-permissions              Include permissions component
-  --include-theme                    Include theme component
   --profile <name:provider/model>    Sync a named SDD profile
   --profile-phase <name:phase:model> Sync a named SDD profile phase
   --opencode-background-subagents=auto|on|off
@@ -349,10 +340,9 @@ func parseModelSpec(spec string) (model.ModelAssignment, error) {
 
 // BuildSyncSelection builds a model.Selection for the sync command.
 //
-// Default sync scope: SDD, Engram, Context7, GGA, Skills, Persona.
-// Excluded by default: Permissions, Theme (no markers; managed via JSON
-// overlays where user customization cannot be safely diff-merged).
-// Permissions and Theme can be opted-in via flags.
+// Default sync scope: SDD, Engram, Context7, Skills, Persona.
+// Permissions remain opt-in because they are managed via JSON overlays where
+// user customization cannot be safely diff-merged.
 //
 // Persona is included because its content lives between
 // <!-- gentle-ai:persona --> markers — that block is harness-managed and
@@ -372,15 +362,11 @@ func BuildSyncSelection(flags SyncFlags, agentIDs []model.AgentID) model.Selecti
 		model.ComponentSDD,
 		model.ComponentEngram,
 		model.ComponentContext7,
-		model.ComponentGGA,
 		model.ComponentSkills,
 	}
 
 	if flags.IncludePermissions {
 		components = append(components, model.ComponentPermission)
-	}
-	if flags.IncludeTheme {
-		components = append(components, model.ComponentTheme)
 	}
 
 	sddMode := model.SDDModeID(flags.SDDMode)
@@ -424,7 +410,6 @@ func RestorePersistedSelection(selection *model.Selection, persisted state.Insta
 		selection.StrictTDD = explicit.StrictTDD
 	}
 	setSelectionComponent(selection, model.ComponentPermission, flags.permissionsSet, flags.IncludePermissions)
-	setSelectionComponent(selection, model.ComponentTheme, flags.themeSet, flags.IncludeTheme)
 }
 
 func setSelectionComponent(selection *model.Selection, component model.ComponentID, configured, included bool) {
@@ -507,7 +492,6 @@ type syncRuntime struct {
 func newSyncRuntime(homeDir string, selection model.Selection) (*syncRuntime, error) {
 	backupRoot := filepath.Join(homeDir, ".gentle-ai", "backups")
 	workspaceDir, _ := os.Getwd()
-	workspaceDir = resolveOpenClawWorkspaceDir(homeDir, workspaceDir, selection.Agents)
 	compatibilityTransaction, err := newCompatibilityRefreshTransaction(homeDir, selection.Components, selection)
 	if err != nil {
 		return nil, err
@@ -655,7 +639,7 @@ func syncBackupTargets(homeDir, workspaceDir string, selection model.Selection, 
 		if component == model.ComponentPersona {
 			plan := persona.ResourcePlanFor(selection.Persona)
 			for _, adapter := range adapters {
-				if adapter.Agent() == model.AgentOpenCode || adapter.Agent() == model.AgentKilocode {
+				if adapter.Agent() == model.AgentOpenCode {
 					// Persona sync can remove stale managed agent state from settings.
 					// This target is backup-only: syncPersonaPaths intentionally does
 					// not make best-effort cleanup a post-sync verification target.
@@ -813,16 +797,10 @@ func syncPersonaPathsWithWorkspace(homeDir, workspaceDir string, selection model
 			continue
 		}
 		targetDir := componentInjectionDir(homeDir, workspaceDir, adapter)
-		if adapter.Agent() == model.AgentOpenClaw {
-			paths = append(paths, filepath.Join(targetDir, "SOUL.md"))
-			continue
-		}
 		if !adapter.SupportsSystemPrompt() {
 			continue
 		}
-		if adapter.SystemPromptStrategy() != model.StrategyJinjaModules {
-			paths = append(paths, adapter.SystemPromptFile(targetDir))
-		}
+		paths = append(paths, adapter.SystemPromptFile(targetDir))
 		if adapter.SupportsOutputStyles() {
 			if stylePaths := persona.ResourcePlanFor(selection.Persona).OutputStylePaths(adapter.OutputStyleDir(targetDir)); stylePaths.Write != "" {
 				paths = append(paths, stylePaths.Write)
@@ -1072,14 +1050,8 @@ func (s componentSyncStep) Run() error {
 			Version:                     engramVersion,
 		}
 		for _, adapter := range adapters {
-			var res engram.InjectionResult
-			var err error
-			if adapter.Agent() == model.AgentOpenClaw {
-				res, err = engram.InjectWithPromptDir(s.homeDir, s.workspaceDir, adapter)
-			} else {
-				targetDir := componentInjectionDir(s.homeDir, s.workspaceDir, adapter)
-				res, err = engram.InjectWithOptions(targetDir, adapter, engramOpts)
-			}
+			targetDir := componentInjectionDir(s.homeDir, s.workspaceDir, adapter)
+			res, err := engram.InjectWithOptions(targetDir, adapter, engramOpts)
 			if err != nil {
 				return fmt.Errorf("sync engram for %q: %w", adapter.Agent(), err)
 			}
@@ -1139,7 +1111,6 @@ func (s componentSyncStep) Run() error {
 				OpenCodeModelAssignments:           s.selection.ModelAssignments,
 				ClaudeModelAssignments:             s.selection.ClaudeModelAssignments,
 				ClaudePhaseAssignments:             s.selection.ClaudePhaseAssignments,
-				KiroModelAssignments:               s.selection.KiroModelAssignments,
 				CodexModelAssignments:              s.selection.CodexModelAssignments,
 				CodexCarrilModelAssignments:        s.selection.CodexCarrilModelAssignments,
 				CodexPhaseModelAssignments:         s.selection.CodexPhaseModelAssignments,
@@ -1174,33 +1145,6 @@ func (s componentSyncStep) Run() error {
 			}
 			s.countChanged(boolToInt(res.Changed), res.Files...)
 		}
-		return nil
-
-	case model.ComponentGGA:
-		// Sync: ensure runtime assets are current and inject config.
-		// NO binary install.
-		if err := gga.EnsureRuntimeAssets(s.homeDir); err != nil {
-			return fmt.Errorf("sync gga runtime assets: %w", err)
-		}
-		if runtime.GOOS == "windows" {
-			if err := gga.EnsurePowerShellShim(s.homeDir); err != nil {
-				return fmt.Errorf("ensure gga powershell shim: %w", err)
-			}
-		}
-		res, err := gga.Inject(s.homeDir, s.agents)
-		if err != nil {
-			return fmt.Errorf("sync gga config: %w", err)
-		}
-		// Count GGA files changed based on individual Changed flags.
-		total := boolToInt(res.ConfigChanged) + boolToInt(res.AgentsChanged)
-		var ggaFiles []string
-		if res.ConfigChanged && res.ConfigFile != "" {
-			ggaFiles = append(ggaFiles, res.ConfigFile)
-		}
-		if res.AgentsChanged && res.AgentsFile != "" {
-			ggaFiles = append(ggaFiles, res.AgentsFile)
-		}
-		s.countChanged(total, ggaFiles...)
 		return nil
 
 	case model.ComponentPermission:
@@ -1241,35 +1185,6 @@ func (s componentSyncStep) Run() error {
 			}
 			s.countChanged(boolToInt(res.Changed), res.Files...)
 		}
-		return nil
-
-	case model.ComponentTheme:
-		// Opt-in only — reached when --include-theme is set.
-		for _, adapter := range adapters {
-			res, err := theme.Inject(s.homeDir, adapter)
-			if err != nil {
-				return fmt.Errorf("sync theme for %q: %w", adapter.Agent(), err)
-			}
-			s.countChanged(boolToInt(res.Changed), res.Files...)
-		}
-		return nil
-
-	case model.ComponentClaudeTheme:
-		for _, adapter := range adapters {
-			res, err := theme.InjectVisualThemes(s.homeDir, adapter)
-			if err != nil {
-				return fmt.Errorf("sync visual themes for %q: %w", adapter.Agent(), err)
-			}
-			s.countChanged(boolToInt(res.Changed), res.Files...)
-		}
-		return nil
-
-	case model.ComponentOpenCodeGentleLogo:
-		res, err := opencodeplugin.Install(s.homeDir, model.OpenCodePluginGentleLogo)
-		if err != nil {
-			return fmt.Errorf("sync OpenCode Gentle Logo plugin: %w", err)
-		}
-		s.countChanged(boolToInt(res.Changed), res.Files...)
 		return nil
 
 	default:
@@ -1836,13 +1751,6 @@ func RunSync(args []string) (SyncResult, error) {
 			m[k] = model.ClaudeModelAlias(v)
 		}
 		selection.ClaudeModelAssignments = m
-	}
-	if len(selection.KiroModelAssignments) == 0 && len(persistedState.KiroModelAssignments) > 0 {
-		m := make(map[string]model.KiroModelAlias, len(persistedState.KiroModelAssignments))
-		for k, v := range persistedState.KiroModelAssignments {
-			m[k] = model.KiroModelAlias(v)
-		}
-		selection.KiroModelAssignments = m
 	}
 	if len(selection.ModelAssignments) == 0 && len(persistedState.ModelAssignments) > 0 {
 		m := make(map[string]model.ModelAssignment, len(persistedState.ModelAssignments))

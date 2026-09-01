@@ -9,7 +9,6 @@ func TestRenderCompleteSuccessShowsGGANotesWhenInstalled(t *testing.T) {
 	out := RenderComplete(CompletePayload{
 		ConfiguredAgents:    1,
 		InstalledComponents: 1,
-		GGAInstalled:        true,
 	})
 
 	if !strings.Contains(out, "GGA (per project)") {
@@ -24,7 +23,6 @@ func TestRenderCompleteSuccessHidesGGANotesWhenNotInstalled(t *testing.T) {
 	out := RenderComplete(CompletePayload{
 		ConfiguredAgents:    1,
 		InstalledComponents: 1,
-		GGAInstalled:        false,
 	})
 
 	if strings.Contains(out, "GGA (per project)") {

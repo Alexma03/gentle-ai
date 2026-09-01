@@ -13,21 +13,16 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/claude"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/codex"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/cursor"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/gemini"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/hermes"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/vscode"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
 
-func claudeAdapter() agents.Adapter      { return claude.NewAdapter() }
-func opencodeAdapter() agents.Adapter    { return opencode.NewAdapter() }
-func geminiAdapter() agents.Adapter      { return gemini.NewAdapter() }
-func cursorAdapter() agents.Adapter      { return cursor.NewAdapter() }
-func vscodeAdapter() agents.Adapter      { return vscode.NewAdapter() }
+func claudeAdapter() agents.Adapter   { return claude.NewAdapter() }
+func opencodeAdapter() agents.Adapter { return opencode.NewAdapter() }
+func cursorAdapter() agents.Adapter   { return cursor.NewAdapter() }
+
 func codexAdapter() agents.Adapter       { return codex.NewAdapter() }
 func antigravityAdapter() agents.Adapter { return antigravity.NewAdapter() }
-func hermesAdapter() agents.Adapter      { return hermes.NewAdapter() }
 
 // codexInjectedLegacyConfig mirrors a config.toml produced by the retired
 // gentle-dev permission profile injection, wrapped in user-authored content.
@@ -87,26 +82,6 @@ func writeCodexConfig(t *testing.T, home, content string) string {
 
 // TestInjectHermesSkipsPermissions verifies that Hermes returns nil (no file written)
 // because Hermes permission format is undocumented — §14 of spec.
-func TestInjectHermesSkipsPermissions(t *testing.T) {
-	home := t.TempDir()
-
-	result, err := Inject(home, hermesAdapter())
-	if err != nil {
-		t.Fatalf("Inject(hermes) error = %v", err)
-	}
-	if result.Changed {
-		t.Fatal("Inject(hermes) changed = true, want false (no file should be written)")
-	}
-	if len(result.Files) != 0 {
-		t.Fatalf("Inject(hermes) files = %v, want [] (no file should be written)", result.Files)
-	}
-
-	// Confirm no config.yaml or settings file was created.
-	hermesDir := filepath.Join(home, ".hermes")
-	if _, err := os.Stat(hermesDir); err == nil {
-		t.Fatal("Inject(hermes) created ~/.hermes directory, want no files written")
-	}
-}
 
 func TestInjectOpenCodeIsIdempotent(t *testing.T) {
 	home := t.TempDir()
@@ -215,131 +190,6 @@ func TestInjectClaudeCodeUsesBypassPermissions(t *testing.T) {
 	mode, ok := perms["defaultMode"].(string)
 	if !ok || mode != "bypassPermissions" {
 		t.Fatalf("expected defaultMode=bypassPermissions, got %q", mode)
-	}
-}
-
-func TestInjectGeminiCLIUsesAutoEditMode(t *testing.T) {
-	home := t.TempDir()
-
-	result, err := Inject(home, geminiAdapter())
-	if err != nil {
-		t.Fatalf("Inject() error = %v", err)
-	}
-	if !result.Changed {
-		t.Fatal("Inject() changed = false")
-	}
-
-	settingsPath := filepath.Join(home, ".gemini", "settings.json")
-	content, err := os.ReadFile(settingsPath)
-	if err != nil {
-		t.Fatalf("read settings file: %v", err)
-	}
-
-	var settings map[string]any
-	if err := json.Unmarshal(content, &settings); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-
-	general, ok := settings["general"].(map[string]any)
-	if !ok {
-		t.Fatalf("general node missing: %#v", settings)
-	}
-
-	mode, ok := general["defaultApprovalMode"].(string)
-	if !ok || mode != "auto_edit" {
-		t.Fatalf("expected defaultApprovalMode=auto_edit, got %q", mode)
-	}
-
-	// Ensure no Claude Code keys leaked
-	if _, exists := settings["permissions"]; exists {
-		t.Fatal("gemini settings should not contain 'permissions' key")
-	}
-}
-
-func TestInjectVSCodeCopilotUsesAutoApprove(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
-	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
-
-	adapter := vscodeAdapter()
-	result, err := Inject(home, adapter)
-	if err != nil {
-		t.Fatalf("Inject() error = %v", err)
-	}
-	if !result.Changed {
-		t.Fatal("Inject() changed = false")
-	}
-
-	settingsPath := adapter.SettingsPath(home)
-	content, err := os.ReadFile(settingsPath)
-	if err != nil {
-		t.Fatalf("read settings file: %v", err)
-	}
-
-	var settings map[string]any
-	if err := json.Unmarshal(content, &settings); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-
-	autoApprove, ok := settings["chat.tools.autoApprove"].(bool)
-	if !ok || !autoApprove {
-		t.Fatalf("expected chat.tools.autoApprove=true, got %v", settings["chat.tools.autoApprove"])
-	}
-
-	// Ensure no Claude Code keys leaked
-	if _, exists := settings["permissions"]; exists {
-		t.Fatal("vscode settings should not contain 'permissions' key")
-	}
-}
-
-func TestInjectVSCodeCopilotMergesIntoJSONCSettings(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
-	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
-
-	adapter := vscodeAdapter()
-	settingsPath := adapter.SettingsPath(home)
-	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll() error = %v", err)
-	}
-
-	baseSettings := `{
-	  // User has comments and trailing commas in VS Code settings
-	  "editor.formatOnSave": true,
-	  "files.exclude": {
-	    "**/.git": true,
-	  },
-	}
-`
-	if err := os.WriteFile(settingsPath, []byte(baseSettings), 0o644); err != nil {
-		t.Fatalf("WriteFile(settings.json) error = %v", err)
-	}
-
-	result, err := Inject(home, adapter)
-	if err != nil {
-		t.Fatalf("Inject() error = %v", err)
-	}
-	if !result.Changed {
-		t.Fatal("Inject() changed = false")
-	}
-
-	content, err := os.ReadFile(settingsPath)
-	if err != nil {
-		t.Fatalf("read settings file: %v", err)
-	}
-
-	var settings map[string]any
-	if err := json.Unmarshal(content, &settings); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-
-	autoApprove, ok := settings["chat.tools.autoApprove"].(bool)
-	if !ok || !autoApprove {
-		t.Fatalf("expected chat.tools.autoApprove=true, got %v", settings["chat.tools.autoApprove"])
-	}
-
-	if settings["editor.formatOnSave"] != true {
-		t.Fatalf("expected editor.formatOnSave=true, got %v", settings["editor.formatOnSave"])
 	}
 }
 

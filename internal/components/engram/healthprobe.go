@@ -21,7 +21,6 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/claude"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/filemerge"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
-	"gopkg.in/yaml.v3"
 )
 
 // ErrNotInstalled reports that the supported bare Engram command could not be
@@ -422,12 +421,6 @@ func readPersistedStdioCommand(path string, agentID model.AgentID) (StdioCommand
 			return StdioCommand{}, false, fmt.Errorf("parse persisted engram MCP configuration %q: %w", path, err)
 		}
 		return command, found, nil
-	case ".yaml", ".yml":
-		command, found, err := readYAMLEngramCommand(raw)
-		if err != nil {
-			return StdioCommand{}, false, fmt.Errorf("parse persisted engram MCP configuration %q: %w", path, err)
-		}
-		return command, found, nil
 	default:
 		root, err := filemerge.UnmarshalJSONObject(raw)
 		if err != nil {
@@ -451,16 +444,8 @@ func engramServerFromJSON(root map[string]any, agentID model.AgentID) (map[strin
 	}
 
 	var server any
-	switch agentID {
-	case model.AgentOpenCode, model.AgentKilocode:
-		server = nestedJSONObject(root["mcp"])["engram"]
-	case model.AgentOpenClaw:
-		server = nestedJSONObject(nestedJSONObject(root["mcp"])["servers"])["engram"]
-	case model.AgentVSCodeCopilot:
-		server = nestedJSONObject(root["servers"])["engram"]
-	default:
-		server = nestedJSONObject(root["mcpServers"])["engram"]
-	}
+	_ = agentID
+	server = nestedJSONObject(root["mcpServers"])["engram"]
 
 	entry, ok := server.(map[string]any)
 	return entry, ok
@@ -490,22 +475,6 @@ func readTOMLEngramCommand(raw string) (StdioCommand, bool, error) {
 		return StdioCommand{}, true, errors.New("command must be a non-empty string")
 	}
 	return StdioCommand{Command: server.Command, Args: server.Args}, true, nil
-}
-
-func readYAMLEngramCommand(raw []byte) (StdioCommand, bool, error) {
-	var root map[string]any
-	if err := yaml.Unmarshal(raw, &root); err != nil {
-		return StdioCommand{}, false, err
-	}
-	server := nestedJSONObject(nestedJSONObject(root["mcp_servers"])["engram"])
-	if server == nil {
-		return StdioCommand{}, false, nil
-	}
-	command, err := stdioCommandFromServer(server)
-	if err != nil {
-		return StdioCommand{}, false, err
-	}
-	return command, true, nil
 }
 
 func stdioCommandFromServer(server map[string]any) (StdioCommand, error) {

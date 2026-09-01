@@ -80,8 +80,6 @@ func codeGraphToolWiringPaths(homeDir string, adapter agents.Adapter) []string {
 			filepath.Join(homeDir, ".gemini", "config", "mcp_config.json"),
 			filepath.Join(homeDir, ".gemini", "antigravity", "mcp_config.json"),
 		}
-	case model.AgentKiroIDE:
-		return []string{filepath.Join(homeDir, ".kiro", "settings", "mcp.json")}
 	default:
 		paths := []string{adapter.MCPConfigPath(homeDir, "codegraph"), adapter.SettingsPath(homeDir)}
 		if _, ok := adapter.(agents.EffectiveCodeGraphWiringDetector); ok && strings.HasSuffix(adapter.SettingsPath(homeDir), ".json") {

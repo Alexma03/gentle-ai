@@ -162,25 +162,13 @@ func sddOrchestratorAsset(agent model.AgentID) string {
 	switch agent {
 	case model.AgentClaudeCode:
 		return "claude/sdd-orchestrator.md"
-	case model.AgentGeminiCLI:
-		return "gemini/sdd-orchestrator.md"
 	case model.AgentCodex:
 		return "codex/sdd-orchestrator.md"
 	case model.AgentAntigravity:
 		return "antigravity/sdd-orchestrator.md"
-	case model.AgentWindsurf:
-		return "windsurf/sdd-orchestrator.md"
 	case model.AgentCursor:
 		return "cursor/sdd-orchestrator.md"
-	case model.AgentKimi:
-		return "kimi/sdd-orchestrator.md"
-	case model.AgentQwenCode:
-		return "qwen/sdd-orchestrator.md"
-	case model.AgentKiroIDE:
-		return "kiro/sdd-orchestrator.md"
-	case model.AgentHermes:
-		return "hermes/sdd-orchestrator.md"
-	case model.AgentOpenCode, model.AgentKilocode:
+	case model.AgentOpenCode:
 		return "opencode/sdd-orchestrator.md"
 	default:
 		return "generic/sdd-orchestrator.md"

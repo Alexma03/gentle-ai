@@ -47,8 +47,6 @@ func Inject(homeDir, targetDir string, adapter agents.Adapter) (InjectionResult,
 		return injectMCPConfigFile(targetDir, adapter)
 	case model.StrategyTOMLFile:
 		return injectTOMLFile(targetDir, adapter)
-	case model.StrategyMergeIntoYAML:
-		return injectYAMLFile(targetDir, adapter)
 	default:
 		return InjectionResult{}, fmt.Errorf("mcp injector does not support MCP strategy %d for agent %q", adapter.MCPStrategy(), adapter.Agent())
 	}
@@ -81,35 +79,6 @@ func injectTOMLFile(homeDir string, adapter agents.Adapter) (InjectionResult, er
 	return InjectionResult{Changed: writeResult.Changed, Files: []string{configPath}}, nil
 }
 
-// injectYAMLFile upserts the context7 MCP server block into a YAML-based agent
-// config file (e.g. ~/.hermes/config.yaml) via the filemerge YAML helpers.
-// The file is created if it does not yet exist. The upsert is idempotent and
-// comment-preserving — user content outside the managed block is untouched.
-func injectYAMLFile(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
-	configPath := adapter.MCPConfigPath(homeDir, "context7")
-
-	raw, err := os.ReadFile(configPath)
-	var existingBytes []byte
-	switch {
-	case err == nil:
-		existingBytes = raw
-	case os.IsNotExist(err):
-		existingBytes = nil
-	default:
-		return InjectionResult{}, fmt.Errorf("read YAML config %q: %w", configPath, err)
-	}
-
-	existing := string(existingBytes)
-	updated := filemerge.UpsertHermesContext7Block(existing)
-
-	writeResult, err := filemerge.WriteFileAtomic(configPath, []byte(updated), 0o644)
-	if err != nil {
-		return InjectionResult{}, fmt.Errorf("write YAML config %q: %w", configPath, err)
-	}
-
-	return InjectionResult{Changed: writeResult.Changed, Files: []string{configPath}}, nil
-}
-
 // injectSeparateFile writes a standalone JSON file per MCP server.
 func injectSeparateFile(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
 	path := adapter.MCPConfigPath(homeDir, "context7")
@@ -129,11 +98,8 @@ func injectMergeIntoSettings(homeDir string, adapter agents.Adapter) (InjectionR
 	}
 
 	overlay := DefaultContext7OverlayJSON()
-	if adapter.Agent() == model.AgentOpenCode || adapter.Agent() == model.AgentKilocode {
+	if adapter.Agent() == model.AgentOpenCode {
 		return injectOpenCodeMergeIntoSettings(settingsPath)
-	}
-	if adapter.Agent() == model.AgentOpenClaw {
-		return injectOpenClawMergeIntoSettings(settingsPath)
 	}
 
 	settingsWrite, err := mergeJSONFile(settingsPath, overlay)
@@ -191,73 +157,6 @@ func injectOpenCodeMergeIntoSettings(settingsPath string) (InjectionResult, erro
 	}
 
 	return InjectionResult{Changed: settingsWrite.Changed, Files: []string{settingsPath}}, nil
-}
-
-func injectOpenClawMergeIntoSettings(settingsPath string) (InjectionResult, error) {
-	baseJSON, err := osReadFile(settingsPath)
-	if err != nil {
-		return InjectionResult{}, err
-	}
-
-	normalized, err := migrateOpenClawLegacyMCPServers(baseJSON)
-	if err != nil {
-		return InjectionResult{}, err
-	}
-
-	merged, err := filemerge.MergeJSONObjects(normalized, OpenClawContext7OverlayJSON())
-	if err != nil {
-		return InjectionResult{}, err
-	}
-
-	settingsWrite, err := filemerge.WriteFileAtomic(settingsPath, merged, 0o644)
-	if err != nil {
-		return InjectionResult{}, err
-	}
-
-	return InjectionResult{Changed: settingsWrite.Changed, Files: []string{settingsPath}}, nil
-}
-
-func migrateOpenClawLegacyMCPServers(baseJSON []byte) ([]byte, error) {
-	normalized, err := filemerge.MergeJSONObjects(baseJSON, []byte("{}"))
-	if err != nil {
-		return nil, err
-	}
-
-	root := map[string]any{}
-	if err := json.Unmarshal(normalized, &root); err != nil {
-		return nil, fmt.Errorf("unmarshal openclaw settings json: %w", err)
-	}
-
-	legacyServers, ok := root["mcpServers"].(map[string]any)
-	if !ok {
-		return normalized, nil
-	}
-
-	mcp, ok := root["mcp"].(map[string]any)
-	if !ok {
-		mcp = map[string]any{}
-		root["mcp"] = mcp
-	}
-
-	servers, ok := mcp["servers"].(map[string]any)
-	if !ok {
-		servers = map[string]any{}
-		mcp["servers"] = servers
-	}
-
-	for name, server := range legacyServers {
-		if _, exists := servers[name]; !exists {
-			servers[name] = server
-		}
-	}
-	delete(root, "mcpServers")
-
-	migrated, err := json.MarshalIndent(root, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("marshal migrated openclaw settings json: %w", err)
-	}
-
-	return append(migrated, '\n'), nil
 }
 
 // injectClaudeUserConfig registers Context7 in ~/.claude.json, the only
@@ -364,14 +263,8 @@ func injectMCPConfigFile(homeDir string, adapter agents.Adapter) (InjectionResul
 	}
 
 	overlay := DefaultContext7OverlayJSON()
-	if adapter.Agent() == model.AgentVSCodeCopilot {
-		overlay = VSCodeContext7OverlayJSON()
-	}
 	if adapter.Agent() == model.AgentAntigravity {
 		overlay = AntigravityContext7OverlayJSON()
-	}
-	if adapter.Agent() == model.AgentKimi {
-		overlay = KimiContext7OverlayJSON()
 	}
 
 	// For mcp.json pattern, merge the server config as a named entry.

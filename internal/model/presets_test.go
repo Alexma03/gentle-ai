@@ -5,34 +5,25 @@ import (
 	"testing"
 )
 
-func TestComponentsForPresetFullGentlemanUsesInstallSafeVisualInventory(t *testing.T) {
-	tests := []struct {
-		name    string
-		persona PersonaID
-	}{
-		{name: "gentleman persona", persona: PersonaGentleman},
-		{name: "custom persona", persona: PersonaCustom},
+func TestComponentsForPresetRetainsPersonalStack(t *testing.T) {
+	want := []ComponentID{
+		ComponentEngram,
+		ComponentSDD,
+		ComponentSkills,
+		ComponentContext7,
+		ComponentPermission,
+		ComponentPersona,
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := ComponentsForPreset(PresetFullGentleman, tt.persona)
-
-			if slices.Contains(got, ComponentTheme) {
-				t.Fatalf("ComponentsForPreset() includes generic ComponentTheme: %v", got)
-			}
-			for _, want := range []ComponentID{ComponentClaudeTheme, ComponentOpenCodeGentleLogo} {
-				if !slices.Contains(got, want) {
-					t.Errorf("ComponentsForPreset() missing safe visual component %q: %v", want, got)
-				}
-			}
-		})
+	got := ComponentsForPreset(PresetFullGentleman, PersonaGentleman)
+	if !slices.Equal(got, want) {
+		t.Fatalf("ComponentsForPreset() = %v, want %v", got, want)
 	}
 }
 
-func TestVisualPolishComponentsReturnsCompleteManagedCleanupInventory(t *testing.T) {
-	want := []ComponentID{ComponentTheme, ComponentClaudeTheme, ComponentOpenCodeGentleLogo}
-	if got := VisualPolishComponents(); !slices.Equal(got, want) {
-		t.Fatalf("VisualPolishComponents() = %v, want complete cleanup inventory %v", got, want)
+func TestComponentsForPresetCustomPersonaOmitsPersona(t *testing.T) {
+	got := ComponentsForPreset(PresetEcosystemOnly, PersonaCustom)
+	want := []ComponentID{ComponentEngram, ComponentSDD, ComponentSkills, ComponentContext7}
+	if !slices.Equal(got, want) {
+		t.Fatalf("ComponentsForPreset() = %v, want %v", got, want)
 	}
 }

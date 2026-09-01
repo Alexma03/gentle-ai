@@ -7,12 +7,8 @@ import (
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/claude"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/gemini"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/kilocode"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/openclaw"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
 	piagent "github.com/gentleman-programming/gentle-ai/v2/internal/agents/pi"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/qwen"
 )
 
 // TestMain overrides verifyEngramVersion and probeEngramProtocolFlag with
@@ -76,10 +72,6 @@ func TestMain(m *testing.M) {
 	agentPresent := func(name string) (string, error) { return "/usr/local/bin/" + name, nil }
 	claude.LookPathOverride = agentPresent
 	opencode.LookPathOverride = agentPresent
-	gemini.LookPathOverride = agentPresent
-	qwen.LookPathOverride = agentPresent
-	kilocode.LookPathOverride = agentPresent
-	openclaw.LookPathOverride = agentPresent
 
 	code := m.Run()
 	_ = os.RemoveAll(testHome)

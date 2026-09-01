@@ -109,33 +109,19 @@ func SetupAgentSlug(agent model.AgentID) (string, bool) {
 	switch agent {
 	case model.AgentOpenCode:
 		return "opencode", true
-	case model.AgentKilocode:
-		return "kilocode", true
 	case model.AgentClaudeCode:
 		return "claude-code", true
-	case model.AgentGeminiCLI:
-		return "gemini-cli", true
 	case model.AgentCodex:
 		// Codex slug registered for future MCP support; ShouldAttemptSetup gates on SupportsMCP().
 		return "codex", true
 	case model.AgentAntigravity:
-		// Antigravity relies on Gemini's engram setup surface; the engram binary
-		// does not currently expose a native "antigravity" slug.
-		return "gemini-cli", true
-	case model.AgentWindsurf:
-		return "windsurf", true
-	case model.AgentCursor, model.AgentVSCodeCopilot:
-		// Cursor and VS Code Copilot do not use `engram setup` — their MCP
+		// Antigravity receives its MCP and ~/.gemini/GEMINI.md projections
+		// directly; engram has no native Antigravity setup slug.
+		return "", false
+	case model.AgentCursor:
+		// Cursor does not use `engram setup` — its MCP
 		// config is injected directly by the engram component. Returning false
 		// here is intentional, not an omission.
-		return "", false
-	case model.AgentQwenCode:
-		// Qwen uses direct settings.json injection only. The engram binary does
-		// not currently expose a native `qwen-code` setup target.
-		return "", false
-	case model.AgentHermes:
-		// Hermes MCP is injected directly via YAML helpers (UpsertHermesEngramBlock).
-		// The engram binary does not expose a native Hermes setup target.
 		return "", false
 	default:
 		return "", false

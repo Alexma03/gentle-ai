@@ -24,10 +24,8 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/claude"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/assets"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/backup"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/gga"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/sdd"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/skills"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/components/theme"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/state"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
@@ -208,16 +206,6 @@ func managedAgentBackupPaths(homeDir string, adapter agents.Adapter, diagnostics
 	}
 	add(adapter.SettingsPath(homeDir))
 
-	if adapter.SystemPromptStrategy() == model.StrategyJinjaModules {
-		configDir := adapter.GlobalConfigDir(homeDir)
-		add(
-			filepath.Join(configDir, "persona.md"),
-			filepath.Join(configDir, "output-style.md"),
-			filepath.Join(configDir, "sdd-orchestrator.md"),
-			filepath.Join(configDir, "strict-tdd-mode.md"),
-		)
-	}
-
 	if adapter.SupportsMCP() {
 		add(adapter.MCPConfigPath(homeDir, "engram"), adapter.MCPConfigPath(homeDir, "context7"))
 	}
@@ -245,9 +233,7 @@ func managedAgentBackupPaths(homeDir string, adapter agents.Adapter, diagnostics
 	switch adapter.Agent() {
 	case model.AgentClaudeCode:
 		add(claude.UserConfigPath(homeDir))
-		add(theme.VisualThemePaths(homeDir, adapter)...)
 	case model.AgentOpenCode:
-		add(theme.VisualThemePaths(homeDir, adapter)...)
 		add(
 			filepath.Join(homeDir, ".config", "opencode", "plugins", "background-agents.ts"),
 			filepath.Join(homeDir, ".config", "opencode", "tui-plugins", "gentle-logo.tsx"),
@@ -264,10 +250,6 @@ func managedAgentBackupPaths(homeDir string, adapter agents.Adapter, diagnostics
 func managedGlobalBackupPaths(homeDir string) []string {
 	return []string{
 		state.Path(homeDir),
-		gga.ConfigPath(homeDir),
-		gga.AgentsTemplatePath(homeDir),
-		gga.RuntimePRModePath(homeDir),
-		gga.RuntimePS1Path(homeDir),
 	}
 }
 
@@ -719,10 +701,6 @@ func effectiveMethod(tool update.ToolInfo, profile system.PlatformProfile) updat
 //   - Windows without Go on PATH, or without a declared GoImportPath, returns
 //     InstallBinary, which binaryUpgrade turns into an explicit refusal naming
 //     the runnable source-install command. Nothing is downloaded or executed.
-//
-// Returning InstallBinary in every non-go-install case is also what disables a
-// legacy InstallScript declaration on Windows, where scriptUpgrade has no bash
-// and would point the user at a releases page that publishes no Windows assets.
 func gentleAISelfUpgradeMethod(tool update.ToolInfo, profile system.PlatformProfile) update.InstallMethod {
 	if profile.OS == "windows" && profile.GoAvailable && tool.GoImportPath != "" {
 		return update.InstallGoInstall

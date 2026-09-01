@@ -71,14 +71,6 @@ func TestDetectInstalledVersion(t *testing.T) {
 			wantVersion: "dev",
 		},
 		{
-			name: "gga not installed",
-			tool: ToolInfo{Name: "gga", DetectCmd: []string{"gga", "--version"}},
-			lookPathFn: func(string) (string, error) {
-				return "", fmt.Errorf("not found")
-			},
-			wantVersion: "",
-		},
-		{
 			name: "binary exists but version command fails",
 			tool: ToolInfo{Name: "engram", DetectCmd: []string{"engram", "version"}},
 			lookPathFn: func(string) (string, error) {
@@ -86,17 +78,6 @@ func TestDetectInstalledVersion(t *testing.T) {
 			},
 			execCommandFn: func(name string, args ...string) *exec.Cmd {
 				return mockCmd("false") // exits with error
-			},
-			wantVersion: "",
-		},
-		{
-			name: "unparseable version output",
-			tool: ToolInfo{Name: "gga", DetectCmd: []string{"gga", "--version"}},
-			lookPathFn: func(string) (string, error) {
-				return "/usr/local/bin/gga", nil
-			},
-			execCommandFn: func(name string, args ...string) *exec.Cmd {
-				return mockCmd("echo", "gga - no version info")
 			},
 			wantVersion: "",
 		},
@@ -980,8 +961,6 @@ func TestCheckAll(t *testing.T) {
 		switch {
 		case contains(path, "gentle-ai"):
 			release = githubRelease{TagName: "v1.5.0", HTMLURL: "https://github.com/Gentleman-Programming/gentle-ai/releases/tag/v1.5.0"}
-		case contains(path, "gentleman-guardian-angel"):
-			release = githubRelease{TagName: "v2.0.0", HTMLURL: "https://github.com/Gentleman-Programming/gentleman-guardian-angel/releases/tag/v2.0.0"}
 		case contains(path, "sub-agent-statusline"):
 			release = githubRelease{TagName: "v0.4.0", HTMLURL: "https://github.com/Joaquinvesapa/sub-agent-statusline/releases/tag/v0.4.0"}
 		case contains(path, "sdd-engram-plugin"):
@@ -1007,13 +986,11 @@ func TestCheckAll(t *testing.T) {
 	httpClient = server.Client()
 	httpClient.Transport = &testTransport{server: server}
 
-	// Mock: engram is installed at v0.3.2, gga is not installed.
+	// Mock: engram is installed at v0.3.2.
 	lookPath = func(name string) (string, error) {
 		switch name {
 		case "engram":
 			return "/usr/local/bin/engram", nil
-		case "gga":
-			return "", fmt.Errorf("not found")
 		default:
 			return "", fmt.Errorf("not found")
 		}
@@ -1030,8 +1007,8 @@ func TestCheckAll(t *testing.T) {
 	profile := system.PlatformProfile{OS: "darwin", PackageManager: "brew", Supported: true}
 	results := CheckAll(context.Background(), "1.5.0", profile)
 
-	if len(results) != 5 {
-		t.Fatalf("len(results) = %d, want 5", len(results))
+	if len(results) != 4 {
+		t.Fatalf("len(results) = %d, want 4", len(results))
 	}
 
 	// gentle-ai: 1.5.0 local == 1.5.0 remote → UpToDate
@@ -1040,10 +1017,8 @@ func TestCheckAll(t *testing.T) {
 	// engram: 0.3.2 local < 0.4.0 remote → UpdateAvailable
 	assertResult(t, results[1], "engram", UpdateAvailable, "0.3.2", "0.4.0")
 
-	// gga: not installed
-	assertResult(t, results[2], "gga", NotInstalled, "", "2.0.0")
-	assertResult(t, results[3], "opencode-subagent-statusline", NotInstalled, "", "0.4.0")
-	assertResult(t, results[4], "opencode-sdd-engram-manage", NotInstalled, "", "1.1.7")
+	assertResult(t, results[2], "opencode-subagent-statusline", NotInstalled, "", "0.4.0")
+	assertResult(t, results[3], "opencode-sdd-engram-manage", NotInstalled, "", "1.1.7")
 }
 
 func TestCheckSingleTool_EngramUsesBinaryReleaseChannel(t *testing.T) {
@@ -1138,9 +1113,6 @@ func TestCheckAll_NetworkError(t *testing.T) {
 
 	if results[1].Status != CheckFailed {
 		t.Fatalf("engram status = %q, want %q", results[1].Status, CheckFailed)
-	}
-	if results[2].Status != CheckFailed {
-		t.Fatalf("gga status = %q, want %q", results[2].Status, CheckFailed)
 	}
 }
 
@@ -1243,25 +1215,6 @@ func TestUpdateHint(t *testing.T) {
 			tool:    ToolInfo{Name: "engram"},
 			profile: system.PlatformProfile{OS: "windows", PackageManager: "winget"},
 			want:    "gentle-ai upgrade (downloads pre-built binary)",
-		},
-		{
-			name:          "gga macOS brew-owned",
-			tool:          ToolInfo{Name: "gga"},
-			profile:       system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
-			brewInstalled: true,
-			want:          "brew upgrade gga",
-		},
-		{
-			name:    "gga macOS non-brew",
-			tool:    ToolInfo{Name: "gga"},
-			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
-			want:    "See https://github.com/Gentleman-Programming/gentleman-guardian-angel",
-		},
-		{
-			name:    "gga linux",
-			tool:    ToolInfo{Name: "gga"},
-			profile: system.PlatformProfile{OS: "linux", PackageManager: "apt"},
-			want:    "See https://github.com/Gentleman-Programming/gentleman-guardian-angel",
 		},
 		{
 			name:    "unknown tool",
@@ -1428,7 +1381,6 @@ func TestParseVersionFromOutput(t *testing.T) {
 		want   string
 	}{
 		{name: "engram v0.3.2", output: "engram v0.3.2", want: "0.3.2"},
-		{name: "gga 1.0.0", output: "gga version 1.0.0", want: "1.0.0"},
 		{name: "bare version", output: "2.1.0", want: "2.1.0"},
 		{name: "no version", output: "no version info here", want: ""},
 		{name: "empty", output: "", want: ""},
@@ -1446,8 +1398,8 @@ func TestParseVersionFromOutput(t *testing.T) {
 
 // TestRegistryContents verifies the registry has all expected tools.
 func TestRegistryContents(t *testing.T) {
-	if len(Tools) != 5 {
-		t.Fatalf("len(Tools) = %d, want 5", len(Tools))
+	if len(Tools) != 4 {
+		t.Fatalf("len(Tools) = %d, want 4", len(Tools))
 	}
 
 	expected := map[string]struct {
@@ -1456,7 +1408,6 @@ func TestRegistryContents(t *testing.T) {
 	}{
 		"gentle-ai":                    {owner: "Gentleman-Programming", repo: "gentle-ai"},
 		"engram":                       {owner: "Gentleman-Programming", repo: "engram"},
-		"gga":                          {owner: "Gentleman-Programming", repo: "gentleman-guardian-angel"},
 		"opencode-subagent-statusline": {owner: "Joaquinvesapa", repo: "sub-agent-statusline"},
 		"opencode-sdd-engram-manage":   {owner: "j0k3r-dev-rgl", repo: "sdd-engram-plugin"},
 	}
@@ -1479,17 +1430,14 @@ func TestRegistryContents(t *testing.T) {
 		t.Fatalf("gentle-ai DetectCmd should be nil")
 	}
 
-	// engram and gga must have non-nil DetectCmd.
+	// engram must have a non-nil DetectCmd.
 	if Tools[1].DetectCmd == nil {
 		t.Fatalf("engram DetectCmd should not be nil")
 	}
 	if Tools[1].ReleaseTagPattern != `^v[0-9]+\.[0-9]+\.[0-9]+$` {
 		t.Fatalf("engram ReleaseTagPattern = %q, want binary v* channel pattern", Tools[1].ReleaseTagPattern)
 	}
-	if Tools[2].DetectCmd == nil {
-		t.Fatalf("gga DetectCmd should not be nil")
-	}
-	if Tools[3].NpmPackage == "" || Tools[4].NpmPackage == "" {
+	if Tools[2].NpmPackage == "" || Tools[3].NpmPackage == "" {
 		t.Fatalf("OpenCode plugin tools should declare NpmPackage")
 	}
 }
@@ -1658,7 +1606,7 @@ func TestCheckFiltered_UnknownToolIgnored(t *testing.T) {
 //
 // The spec says:
 //   - Dev build MUST be reported as development-build semantic
-//   - gentle-ai self-upgrade is skipped while engram/gga remain eligible
+//   - gentle-ai self-upgrade is skipped while engram remains eligible
 func TestCheckFiltered_DevBuildSemanticsForGentleAI(t *testing.T) {
 	mockNoHomebrew(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1785,8 +1733,6 @@ func TestNoUpdatesPath(t *testing.T) {
 		switch {
 		case contains(path, "engram"):
 			release = githubRelease{TagName: "v0.3.2"}
-		case contains(path, "gentleman-guardian-angel"):
-			release = githubRelease{TagName: "v1.0.0"}
 		default:
 			release = githubRelease{TagName: "v1.0.0"}
 		}
@@ -1808,7 +1754,7 @@ func TestNoUpdatesPath(t *testing.T) {
 	httpClient = server.Client()
 	httpClient.Transport = &testTransport{server: server}
 
-	// engram is at v0.3.2 (same as remote), gga is not installed
+	// engram is at v0.3.2 (same as remote)
 	lookPath = func(name string) (string, error) {
 		if name == "engram" {
 			return "/usr/local/bin/engram", nil
@@ -1821,14 +1767,14 @@ func TestNoUpdatesPath(t *testing.T) {
 		}
 		return mockCmd("false")
 	}
-	// Only engram and gga for this test (skip gentle-ai to avoid dev-build behavior)
-	Tools = []ToolInfo{Tools[1], Tools[2]}
+	// Only engram for this test (skip gentle-ai to avoid dev-build behavior)
+	Tools = []ToolInfo{Tools[1]}
 
 	profile := system.PlatformProfile{OS: "darwin", PackageManager: "brew", Supported: true}
 
 	results := CheckFiltered(context.Background(), "1.0.0", profile, nil)
-	if len(results) != 2 {
-		t.Fatalf("len = %d, want 2", len(results))
+	if len(results) != 1 {
+		t.Fatalf("len = %d, want 1", len(results))
 	}
 
 	// engram: up to date
@@ -1836,10 +1782,6 @@ func TestNoUpdatesPath(t *testing.T) {
 		t.Fatalf("engram status = %q, want UpToDate", results[0].Status)
 	}
 
-	// gga: not installed
-	if results[1].Status != NotInstalled {
-		t.Fatalf("gga status = %q, want NotInstalled", results[1].Status)
-	}
 }
 
 // --- TestEngramHintNoBrew ---
@@ -1902,28 +1844,6 @@ func TestInstallMethodFieldsOnRegistry(t *testing.T) {
 	}
 }
 
-func TestBuildExecCmd_Ps1UsesPoershellFile(t *testing.T) {
-	ps1Path := `C:\Users\test\bin\gga.ps1`
-
-	gotBin, gotArgs := buildExecCmd(ps1Path, []string{"--version"})
-
-	if gotBin == ps1Path {
-		t.Fatalf("buildExecCmd returned the .ps1 path as argv[0]: %q — "+
-			"exec.Command cannot launch .ps1 directly on Windows (CreateProcess rejects non-PE images). "+
-			"Must be wrapped via the PowerShell resolver.", gotBin)
-	}
-
-	wantArgs := []string{"-NoProfile", "-File", ps1Path, "--version"}
-	if len(gotArgs) != len(wantArgs) {
-		t.Fatalf("buildExecCmd args len = %d, want %d; args = %v", len(gotArgs), len(wantArgs), gotArgs)
-	}
-	for i, want := range wantArgs {
-		if gotArgs[i] != want {
-			t.Fatalf("buildExecCmd args[%d] = %q, want %q; full args = %v", i, gotArgs[i], want, gotArgs)
-		}
-	}
-}
-
 func TestBuildExecCmd_NonPs1Passthrough(t *testing.T) {
 	cases := []struct {
 		binary string
@@ -1931,7 +1851,6 @@ func TestBuildExecCmd_NonPs1Passthrough(t *testing.T) {
 	}{
 		{"/usr/local/bin/engram", []string{"version"}},
 		{`C:\Users\user\AppData\Local\engram\bin\engram.exe`, []string{"version"}},
-		{"/home/user/.local/bin/gga", []string{"--version"}},
 	}
 
 	for _, c := range cases {
@@ -1950,81 +1869,6 @@ func TestBuildExecCmd_NonPs1Passthrough(t *testing.T) {
 		}
 	}
 }
-
-// TestDetectInstalledVersionPs1FallbackInvokesViaPowershell verifies the full
-// integration path: when LookPath fails for gga, the fallback finds a .ps1
-// file on disk and dispatches it through the central PowerShell resolver.
-func TestDetectInstalledVersionPs1FallbackInvokesViaPowershell(t *testing.T) {
-	tmpDir := t.TempDir()
-	ps1Path := filepath.Join(tmpDir, "gga.ps1")
-	if err := os.WriteFile(ps1Path, []byte(""), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	tool := ToolInfo{
-		Name:      "gga",
-		DetectCmd: []string{"gga", "--version"},
-		FallbackPaths: func(homeDir, localAppData string) []string {
-			return []string{ps1Path}
-		},
-	}
-
-	origLookPath := lookPath
-	origExecCommand := execCommand
-	origRunPowerShell := runPowerShell
-	origOsStat := osStat
-	origUserHomeDir := userHomeDir
-	t.Cleanup(func() {
-		lookPath = origLookPath
-		execCommand = origExecCommand
-		runPowerShell = origRunPowerShell
-		osStat = origOsStat
-		userHomeDir = origUserHomeDir
-	})
-
-	// Simulate stale PATH: gga not found via LookPath.
-	lookPath = func(string) (string, error) { return "", fmt.Errorf("not found") }
-	osStat = os.Stat // real stat so the .ps1 file is found
-	userHomeDir = func() (string, error) { return t.TempDir(), nil }
-
-	// Capture the command planned for the PowerShell runner.
-	var capturedBinary string
-	var capturedArgs []string
-	runPowerShell = func(_ context.Context, args ...string) ([]byte, error) {
-		capturedBinary = powerShellCommand
-		capturedArgs = append([]string{}, args...)
-		return []byte("gga 1.2.3"), nil
-	}
-
-	got := detectInstalledVersion(context.Background(), tool, "")
-
-	// Primary assertion: the binary must NOT be the .ps1 path itself.
-	if capturedBinary == ps1Path {
-		t.Fatalf("PowerShell runner received the .ps1 path as the executable (%q)", capturedBinary)
-	}
-
-	// The first arg must be -NoProfile (PowerShell wrapping).
-	if len(capturedArgs) == 0 || capturedArgs[0] != "-NoProfile" {
-		t.Fatalf("PowerShell args[0] = %q, want \"-NoProfile\"; full args = %v", func() string {
-			if len(capturedArgs) > 0 {
-				return capturedArgs[0]
-			}
-			return "(empty)"
-		}(), capturedArgs)
-	}
-
-	// The -File flag must point to the .ps1 path.
-	if len(capturedArgs) < 3 || capturedArgs[1] != "-File" || capturedArgs[2] != ps1Path {
-		t.Fatalf("expected args [-NoProfile, -File, %q, ...], got %v", ps1Path, capturedArgs)
-	}
-
-	// The version must still be extracted from output.
-	if got != "1.2.3" {
-		t.Fatalf("detectInstalledVersion() = %q, want \"1.2.3\"", got)
-	}
-}
-
-// --- helpers ---
 
 func unsetUpdateChannelEnv(t *testing.T) {
 	t.Helper()

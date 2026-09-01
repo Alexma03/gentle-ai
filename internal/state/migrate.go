@@ -919,8 +919,7 @@ func legacyCodeGraphPresent(s InstallState) bool {
 func knownComponent(component model.ComponentID) bool {
 	switch component {
 	case model.ComponentEngram, model.ComponentSDD, model.ComponentSkills, model.ComponentContext7,
-		model.ComponentCodeGraph, model.ComponentPersona, model.ComponentPermission, model.ComponentGGA,
-		model.ComponentTheme, model.ComponentClaudeTheme, model.ComponentOpenCodeGentleLogo:
+		model.ComponentCodeGraph, model.ComponentPersona, model.ComponentPermission:
 		return true
 	default:
 		return false

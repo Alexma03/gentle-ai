@@ -141,53 +141,6 @@ func TestGentleAIOnMacOSNeverRoutesToGoInstall(t *testing.T) {
 	}
 }
 
-// TestGentleAILegacyScriptDeclarationNeverReachesScriptUpgradeOnWindows covers
-// the second job of the Windows branch: a legacy InstallScript declaration must
-// not route to scriptUpgrade, which on Windows has no bash and would send the
-// user to a releases page that publishes no Windows assets.
-func TestGentleAILegacyScriptDeclarationNeverReachesScriptUpgradeOnWindows(t *testing.T) {
-	origHomebrewPackageInstalled := homebrewPackageInstalled
-	t.Cleanup(func() { homebrewPackageInstalled = origHomebrewPackageInstalled })
-	homebrewPackageInstalled = func(string) bool { return false }
-
-	tests := []struct {
-		name         string
-		goAvailable  bool
-		goImportPath string
-		want         update.InstallMethod
-	}{
-		{name: "with Go available", goAvailable: true, goImportPath: gentleAIImportPath, want: update.InstallGoInstall},
-		{name: "without Go available", goAvailable: false, goImportPath: gentleAIImportPath, want: update.InstallBinary},
-		{name: "without an import path", goAvailable: true, want: update.InstallBinary},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			tool := update.ToolInfo{
-				Name:          "gentle-ai",
-				Owner:         "Gentleman-Programming",
-				Repo:          "gentle-ai",
-				InstallMethod: update.InstallScript,
-				GoImportPath:  tc.goImportPath,
-			}
-			profile := system.PlatformProfile{OS: "windows", PackageManager: "winget", GoAvailable: tc.goAvailable}
-			got := effectiveMethod(tool, profile)
-			if got == update.InstallScript {
-				t.Fatal("a legacy script declaration reached scriptUpgrade on Windows")
-			}
-			if got != tc.want {
-				t.Fatalf("effectiveMethod = %q, want %q", got, tc.want)
-			}
-		})
-	}
-}
-
-// TestGentleAIUpgradeWindowsPreservesResolvedAppDataDestination proves the
-// public upgrade boundary refuses before a backup or go install can create a
-// filesystem mutation.
-// No real Windows execution happens here: the platform profile and detectOS are
-// synthetic, which is the only way to exercise Windows ".exe" behavior from a
-// Linux host.
 func TestGentleAIUpgradeWindowsPreservesResolvedAppDataDestination(t *testing.T) {
 	origHomebrewPackageInstalled := homebrewPackageInstalled
 	t.Cleanup(func() { homebrewPackageInstalled = origHomebrewPackageInstalled })
