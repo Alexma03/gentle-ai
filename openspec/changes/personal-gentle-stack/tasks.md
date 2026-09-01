@@ -24,11 +24,11 @@ Bases: PR1 base=feature/tracker branch; PR2 base=PR1 branch; PR3 base=PR2; PR4 b
 - [x] 1.7 Verify CodeGraph enabled/unavailable doctor and parity (CodeGraph/Pi tests; D:1.2; P:focused tests).
 
 ## Phase 2: Retained Clients
-- [ ] 2.1 Preserve Antigravity `.gemini/GEMINI.md`; remove Gemini CLI selection (adapter/model/catalog tests; D:1.6; P:tests).
-- [ ] 2.2 Thin Claude/Codex/Cursor/Antigravity/Pi projections (adapter files; D:1.6; P:adapter tests).
-- [ ] 2.3 RED Pi package/RPC acceptance and retired identity rejection (`internal/agents/pi/`; D:2.2; P:failures).
-- [ ] 2.4 Implement only `npm:pi-subagents`, versioned RPC checks, no fallback (Pi/manifests; D:2.3; P:package tests).
-- [ ] 2.5 Remove old generic CodeGraph framework after parity (`internal/components/communitytool/`; D:1.7; P:ratchets).
+- [x] 2.1 Preserve Antigravity `.gemini/GEMINI.md`; remove Gemini CLI selection (adapter/model/catalog tests; D:1.6; P:tests).
+- [x] 2.2 Thin Claude/Codex/Cursor/Antigravity/Pi projections (adapter files; D:1.6; P:adapter tests).
+- [x] 2.3 RED Pi package/RPC acceptance and retired identity rejection (`internal/agents/pi/`; D:2.2; P:failures).
+- [x] 2.4 Implement only `npm:pi-subagents`, versioned RPC checks, no fallback (Pi/manifests; D:2.3; P:package tests).
+- [x] 2.5 Remove old generic CodeGraph framework after parity (`internal/components/communitytool/`; D:1.7; P:ratchets).
 
 ## Phase 3: Retirement Cohorts
 - [ ] 3.1 Remove cohort A adapters/tests: Hermes, KiloCode, Kimi (`internal/agents/`; D:2.5; P:IDs rejected).

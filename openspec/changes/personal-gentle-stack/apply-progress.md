@@ -98,3 +98,68 @@ The PR1 foundation is reversible as a contiguous commit set in reverse order. Th
 ## Next Steps
 
 Parent should independently run native SDD verification and settle the existing attempt. PR2 should address the recorded legacy communitytool test/cleanup boundary in task 2.5 and continue with retained-client work. Phase 2 and later task checkboxes remain unchecked.
+
+## PR2 Phase 2: Retained Clients
+
+The PR1 snapshot above is preserved verbatim. The cumulative state below records the completed PR2 Phase 2 slice and supersedes only the historical next-step status in that snapshot.
+
+### Work Unit Evidence
+
+| Evidence | Required value | Result |
+| --- | --- | --- |
+| Work unit | U2 / PR2 Clients/Pi | Complete for Phase 2 tasks 2.1–2.5 only. Retirement cohorts and contracts/release work remain out of scope. |
+| Focused test command and exact result | Smallest commands proving this unit | `go test ./internal/agents/pi ./internal/cli ./internal/components/codegraph ./internal/system -count=1` — PASS; all four packages exited 0. `go run ./internal/gofmtcheck` — PASS. `bash scripts/deadcode-ratchet.sh` — PASS (`no new unreachable functions`). `go test ./... -count=1` — PASS; root suite exited 0. |
+| Runtime harness command/scenario and exact result | Real integration/runtime path | The production `agentInstallStep.Run` path now probes a real Pi `--mode rpc` process through Pi's documented extension API and passes the captured Nicobailon response through the canonical acceptance boundary. Focused production-caller tests cover absent, malformed, wrong-version, incomplete, and retired responses with no fallback; canonical v1 is accepted. Manual real-Pi probe exited 0. |
+| Rollback boundary | Exact files/behavior independently reversible | Revert the PR2 commit set in reverse order to remove retained-client corrections without reverting PR1. The Pi runtime gate is independently reversible by reverting `c8c9cf56`; the dead-code cleanup/baseline update is independently reversible by reverting `21d81ac1`; test-only evidence commits can be reverted independently. State/migration and rollback vocabulary remain unchanged. |
+
+### Completed Tasks
+
+- [x] 2.1 Preserved Antigravity `.gemini/GEMINI.md` behavior and removed Gemini CLI selection from the retained-client surface.
+- [x] 2.2 Moved shared policy and CodeGraph ownership into core/component code while keeping adapters as client-specific projections; boundary tests pass.
+- [x] 2.3 Added RED evidence and canonical Pi package/RPC acceptance coverage, including retired identity rejection.
+- [x] 2.4 Implemented canonical `npm:pi-subagents` installation, Nicobailon v1 readiness validation, and no-fallback behavior.
+- [x] 2.5 Removed the residual generic one-item CodeGraph/communitytool wrappers after parity and made the deadcode ratchet pass.
+
+### Commit and RED Evidence
+
+The Phase 2 implementation and evidence commits, in order, are:
+
+- `376d4476` — initial Phase 2 retained-client/Pi work.
+- `2db09342` — promoted CodeGraph lifecycle ownership into the component.
+- `e435d296` — aligned retained-client lifecycle coverage.
+- `805a5017` — `test(pi): pin runtime RPC acceptance red cases`.
+- `b31725ff` — `fix(pi): enforce canonical subagents RPC readiness`.
+- `5ddc341d` — `refactor(codegraph): own Pi policy and drop generic wrappers`.
+- `4e336b82` — `test(clients): replace retired compatibility skips`.
+- `eef3733a` — `test(cli): cover Pi RPC install acceptance boundary`.
+- `c8c9cf56` — `feat(pi): gate install on canonical subagents RPC`.
+- `21d81ac1` — `refactor(deadcode): remove obsolete compatibility shims`.
+- `6ac21b4c` — `test(cli): assert Pi install has no RPC fallback`.
+
+RED evidence is visible in the test-only history before each corresponding implementation:
+
+```text
+go test ./internal/agents/pi -run 'TestAdapter(AcceptsCanonicalPiSubagentsProvider|RejectsAbsentMalformedWrongVersionIncompleteAndRetiredPiSubagents)$' -count=1
+internal/agents/pi/rpc_runtime_test.go:28:36: NewAdapter().AcceptSubagentsRPCResponse undefined
+FAIL github.com/gentleman-programming/gentle-ai/v2/internal/agents/pi [build failed]
+```
+
+The production-boundary RED test was then added in `eef3733a` before its seam existed:
+
+```text
+go test ./internal/cli -run 'TestPiAgentInstall(AcceptsCanonicalSubagentsRPCAtProductionBoundary|RejectsUnvalidatedSubagentsRPCAtProductionBoundary)$' -count=1
+internal/cli/run_integration_test.go:102:18: undefined: probePiSubagentsRPC
+FAIL github.com/gentleman-programming/gentle-ai/v2/internal/cli [build failed]
+```
+
+`c8c9cf56` supplied the production probe/caller; the same production-boundary command is now green. `6ac21b4c` adds assertions that exactly one canonical install command runs and no retired/Tintinweb fallback command appears.
+
+### Independent Audit and Scope Boundary
+
+The terminal independent audit passed at `6ac21b4c`: the actual production caller invokes `AcceptSubagentsRPCResponse`, rejects absent/malformed/wrong-version/incomplete/retired replies, accepts only canonical Nicobailon v1, and has no fallback. The deadcode baseline removes only stale entries for deleted or newly reachable shims; explicit migration/rollback compatibility symbols remain documented and tested. No tasks or apply-progress changes were made during implementation, no attempt was acquired or settled, and no push, PR, or merge was performed.
+
+Phase 3 retirement cohorts and Phase 4 contracts/release tasks remain out of scope and remain unchecked in `tasks.md`.
+
+### Current Next Steps
+
+Parent may proceed to independent SDD verification. Do not infer Phase 3/4 completion from this Phase 2 record.
