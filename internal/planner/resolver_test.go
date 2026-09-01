@@ -11,7 +11,7 @@ func TestResolverAddsMissingDependenciesInOrder(t *testing.T) {
 	resolver := NewResolver(MVPGraph())
 
 	selection := model.Selection{
-		Agents:     []model.AgentID{model.AgentClaudeCode, model.AgentOpenCode},
+		Agents:     []model.AgentID{model.AgentClaudeCode, model.AgentCodex},
 		Components: []model.ComponentID{model.ComponentSkills},
 	}
 
@@ -20,7 +20,7 @@ func TestResolverAddsMissingDependenciesInOrder(t *testing.T) {
 		t.Fatalf("Resolve() returned error: %v", err)
 	}
 
-	if !reflect.DeepEqual(plan.Agents, []model.AgentID{model.AgentClaudeCode, model.AgentOpenCode}) {
+	if !reflect.DeepEqual(plan.Agents, []model.AgentID{model.AgentClaudeCode, model.AgentCodex}) {
 		t.Fatalf("Resolve() agents = %v", plan.Agents)
 	}
 

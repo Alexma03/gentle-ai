@@ -10,6 +10,8 @@ Toggle components with enter or space.
     Curated coding skill library
   [ ] context7
     Latest framework and library docs
+  [ ] codegraph
+    Code graph indexing and MCP wiring
   [ ] persona
     Managed agent behavior and conversation tone
   [ ] permissions

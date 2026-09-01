@@ -27,7 +27,7 @@ func TestEngramPathGuidanceZsh(t *testing.T) {
 
 func TestEngramPathGuidanceDefault(t *testing.T) {
 	msg := engramPathGuidance("")
-	want := filepath.Join("go", "bin")
+	want := goInstallBinDir()
 	if !strings.Contains(msg, want) {
 		t.Fatalf("engramPathGuidance(default) missing %q: %s", want, msg)
 	}

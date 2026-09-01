@@ -279,7 +279,7 @@ func TestGeneratedOpenCodeReviewControllersUseNegotiatedStatusRouting(t *testing
 }
 
 func TestSharedReviewLifecycleRendersOnlyForAdvertisedRuntimes(t *testing.T) {
-	const wantExposed = 4
+	const wantExposed = 3
 	const lifecycleSentinel = "### Authority-First Terminal Procedure"
 
 	exposed := 0
@@ -357,8 +357,8 @@ func TestBoundedReviewContractRendersForAdvertisedRuntimes(t *testing.T) {
 			}
 		})
 	}
-	if rendered != 4 {
-		t.Fatalf("review lifecycle runtime count = %d, want 4", rendered)
+	if rendered != 3 {
+		t.Fatalf("review lifecycle runtime count = %d, want 3", rendered)
 	}
 	for _, forbidden := range []string{"review-start", "review-step", "review-resume", "review-validate", "review-bundle-export", "review-bundle-import"} {
 		if strings.Contains(boundedReviewContract(), forbidden) {
@@ -601,8 +601,8 @@ func TestAuthorityFirstLifecycleRendersForAdvertisedRuntimes(t *testing.T) {
 			}
 		})
 	}
-	if rendered != 4 {
-		t.Fatalf("authority-first lifecycle runtime count = %d, want 4", rendered)
+	if rendered != 3 {
+		t.Fatalf("authority-first lifecycle runtime count = %d, want 3", rendered)
 	}
 }
 

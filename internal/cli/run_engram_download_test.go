@@ -42,7 +42,7 @@ func TestRunInstallLinuxEngramUsesDownloadNotGoInstall(t *testing.T) {
 
 	detection := linuxDetectionResult(system.LinuxDistroUbuntu, "apt")
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		detection,
 	)
 	if err != nil {
@@ -94,7 +94,7 @@ func TestRunInstallEngramDownloadAddsBinDirToPath(t *testing.T) {
 
 	detection := linuxDetectionResult(system.LinuxDistroUbuntu, "apt")
 	_, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		detection,
 	)
 	if err != nil {
@@ -156,7 +156,7 @@ func TestRunInstallFreshEngramDownloadUsesDownloadedBinaryForVersionProbeAndSetu
 
 	detection := linuxDetectionResult(system.LinuxDistroUbuntu, "apt")
 	_, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		detection,
 	)
 	if err != nil {
@@ -230,7 +230,7 @@ func TestRunInstallWindowsEngramUsesDownloadNotGoInstall(t *testing.T) {
 	}
 
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		detection,
 	)
 	if err != nil {
@@ -574,7 +574,7 @@ func TestRunInstallMacOSEngramStillUsesBrew(t *testing.T) {
 
 	detection := macOSDetectionResult()
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		detection,
 	)
 	if err != nil {
@@ -645,7 +645,7 @@ func TestRunInstallBetaEngramUsesMainGoInstallAndInstalledBinary(t *testing.T) {
 
 	detection := linuxDetectionResult(system.LinuxDistroUbuntu, "apt")
 	_, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram", "--channel", "beta"},
+		[]string{"--agent", "claude-code", "--component", "engram", "--channel", "beta"},
 		detection,
 	)
 	if err != nil {

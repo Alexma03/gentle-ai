@@ -65,7 +65,7 @@ func TestRunInstallAppliesFilesystemChanges(t *testing.T) {
 	runCommand = func(string, ...string) error { return nil }
 	cmdLookPath = missingBinaryLookPath
 
-	result, err := RunInstall([]string{"--agent", "opencode", "--component", "permissions"}, system.DetectionResult{})
+	result, err := RunInstall([]string{"--agent", "claude-code", "--component", "permissions"}, system.DetectionResult{})
 	if err != nil {
 		t.Fatalf("RunInstall() error = %v", err)
 	}
@@ -74,7 +74,7 @@ func TestRunInstallAppliesFilesystemChanges(t *testing.T) {
 		t.Fatalf("verification ready = false, report = %#v", result.Verify)
 	}
 
-	configPath := filepath.Join(home, ".config", "opencode", "opencode.json")
+	configPath := filepath.Join(home, ".claude", "settings.json")
 	if _, err := os.Stat(configPath); err != nil {
 		t.Fatalf("expected config file %q: %v", configPath, err)
 	}
@@ -98,14 +98,14 @@ func TestRunInstallReturnsStatePersistenceFailure(t *testing.T) {
 		cmdLookPath = restoreLookPath
 	})
 
-	if err := state.Write(home, state.InstallState{}); err != nil {
+	if err := state.Write(home, state.InstallState{SchemaVersion: state.CurrentSchemaVersion}); err != nil {
 		t.Fatal(err)
 	}
 	originalState, err := os.ReadFile(state.Path(home))
 	if err != nil {
 		t.Fatal(err)
 	}
-	configPath := filepath.Join(home, ".config", "opencode", "opencode.json")
+	configPath := filepath.Join(home, ".claude", "settings.json")
 	if _, err := os.ReadFile(configPath); !os.IsNotExist(err) {
 		t.Fatalf("pre-install config read error = %v, want absent", err)
 	}
@@ -118,7 +118,7 @@ func TestRunInstallReturnsStatePersistenceFailure(t *testing.T) {
 		t.Skipf("state symlink unavailable: %v", err)
 	}
 
-	_, err = RunInstall([]string{"--agent", "opencode", "--component", "permissions"}, system.DetectionResult{})
+	_, err = RunInstall([]string{"--agent", "claude-code", "--component", "permissions"}, system.DetectionResult{})
 	if err == nil || !strings.Contains(err.Error(), "persist install state") {
 		t.Fatalf("RunInstall() error = %v, want state persistence failure", err)
 	}
@@ -134,7 +134,7 @@ func TestRunInstallReturnsStatePersistenceFailure(t *testing.T) {
 	}
 }
 
-func TestRunInstallEngramForPiAndOpenCodeProvisionsBothMCPTargets(t *testing.T) {
+func TestRunInstallEngramForPiAndClaudeProvisionsBothMCPTargets(t *testing.T) {
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
@@ -173,7 +173,7 @@ func TestRunInstallEngramForPiAndOpenCodeProvisionsBothMCPTargets(t *testing.T) 
 
 	result, err := RunInstall([]string{
 		"--agent", "pi",
-		"--agent", "opencode",
+		"--agent", "claude-code",
 		"--component", "engram",
 	}, system.DetectionResult{})
 	if err != nil {
@@ -185,7 +185,7 @@ func TestRunInstallEngramForPiAndOpenCodeProvisionsBothMCPTargets(t *testing.T) 
 
 	assertFileContains(t, filepath.Join(home, ".pi", "agent", "settings.json"), "npm:pi-mcp-adapter")
 	assertFileContains(t, filepath.Join(home, ".pi", "npm", "package.json"), "pi-mcp-adapter")
-	assertFileContains(t, filepath.Join(home, ".config", "opencode", "opencode.json"), "engram")
+	assertFileContains(t, filepath.Join(home, ".claude.json"), "engram")
 
 	if !stringSliceContains(commands, "pi install npm:pi-mcp-adapter") {
 		t.Fatalf("commands missing %q; got %v", "pi install npm:pi-mcp-adapter", commands)
@@ -238,7 +238,7 @@ func TestPiAgentInstallProgressUsesAdapterCommandNames(t *testing.T) {
 		t.Fatalf("agentInstallStep.Run() error = %v", err)
 	}
 
-	wantPackages := []string{"pi install npm:gentle-pi", "pi install npm:gentle-engram", "pi install npm:pi-mcp-adapter", engramInitCommandForTest, "pi install npm:pi-subagents-j0k3r", "pi install npm:@juicesharp/rpiv-ask-user-question", "pi install npm:pi-web-access", "pi install npm:@juicesharp/rpiv-todo", "pi install npm:pi-btw"}
+	wantPackages := []string{"pi install npm:gentle-pi", "pi install npm:gentle-engram", "pi install npm:pi-mcp-adapter", engramInitCommandForTest, "pi install npm:pi-subagents", "pi install npm:@juicesharp/rpiv-ask-user-question", "pi install npm:pi-web-access", "pi install npm:@juicesharp/rpiv-todo", "pi install npm:pi-btw"}
 	if len(events) != len(wantPackages)*2 {
 		t.Fatalf("progress events = %d, want %d: %v", len(events), len(wantPackages)*2, events)
 	}
@@ -335,7 +335,7 @@ func TestPiAgentInstallRunsPackageCommandsWhenPiAlreadyInstalled(t *testing.T) {
 		"pi install npm:gentle-engram",
 		"pi install npm:pi-mcp-adapter",
 		engramInitCommandForTest,
-		"pi install npm:pi-subagents-j0k3r",
+		"pi install npm:pi-subagents",
 		"pi install npm:@juicesharp/rpiv-ask-user-question",
 		"pi install npm:pi-web-access",
 		"pi install npm:@juicesharp/rpiv-todo",
@@ -349,7 +349,7 @@ func TestPiAgentInstallRunsPackageCommandsWhenPiAlreadyInstalled(t *testing.T) {
 
 func TestRunInstallRollsBackOnComponentFailure(t *testing.T) {
 	home := t.TempDir()
-	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
+	settingsPath := filepath.Join(home, ".claude", "settings.json")
 	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
@@ -382,7 +382,7 @@ func TestRunInstallRollsBackOnComponentFailure(t *testing.T) {
 	// makes the before/after comparison fail even when the pipeline rollback
 	// works correctly. Context7 rollback is tracked separately.
 	_, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		system.DetectionResult{},
 	)
 	if err == nil {
@@ -509,7 +509,7 @@ func TestRunInstallLinuxUbuntuResolvesAptCommands(t *testing.T) {
 
 	detection := linuxDetectionResult(system.LinuxDistroUbuntu, "apt")
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "permissions"},
+		[]string{"--agent", "claude-code", "--component", "permissions"},
 		detection,
 	)
 	if err != nil {
@@ -547,7 +547,7 @@ func TestRunInstallLinuxArchResolvesPacmanCommands(t *testing.T) {
 
 	detection := linuxDetectionResult(system.LinuxDistroArch, "pacman")
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "permissions"},
+		[]string{"--agent", "claude-code", "--component", "permissions"},
 		detection,
 	)
 	if err != nil {
@@ -588,7 +588,7 @@ func TestRunInstallLinuxUbuntuWithEngramUsesDirectDownload(t *testing.T) {
 
 	detection := linuxDetectionResult(system.LinuxDistroUbuntu, "apt")
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		detection,
 	)
 	if err != nil {
@@ -631,7 +631,7 @@ func TestRunInstallLinuxArchWithEngramUsesDirectDownload(t *testing.T) {
 
 	detection := linuxDetectionResult(system.LinuxDistroArch, "pacman")
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		detection,
 	)
 	if err != nil {
@@ -652,7 +652,7 @@ func TestRunInstallLinuxArchWithEngramUsesDirectDownload(t *testing.T) {
 
 func TestRunInstallLinuxRollsBackOnComponentFailure(t *testing.T) {
 	home := t.TempDir()
-	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
+	settingsPath := filepath.Join(home, ".claude", "settings.json")
 	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
@@ -685,7 +685,7 @@ func TestRunInstallLinuxRollsBackOnComponentFailure(t *testing.T) {
 	detection := linuxDetectionResult(system.LinuxDistroUbuntu, "apt")
 	// Exclude context7 — it has no rollback and taints the settings file.
 	_, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		detection,
 	)
 	if err == nil {
@@ -753,7 +753,7 @@ func TestRunInstallWorkspaceScopeRollback_SurfacesRealError(t *testing.T) {
 
 	detection := linuxDetectionResult(system.LinuxDistroUbuntu, "apt")
 	_, err = RunInstall(
-		[]string{"--scope", "workspace", "--agent", "opencode", "--component", "engram"},
+		[]string{"--scope", "workspace", "--agent", "claude-code", "--component", "engram"},
 		detection,
 	)
 	if err == nil {
@@ -769,6 +769,8 @@ func TestRunInstallWorkspaceScopeRollback_SurfacesRealError(t *testing.T) {
 }
 
 func TestRunInstallFedoraQwenEngramSkipsUnsupportedSetupAndWritesSettings(t *testing.T) {
+	t.Skip("Qwen is a retired selector")
+
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
@@ -833,7 +835,7 @@ func TestRunInstallLinuxVerificationReportsReadyOnSuccess(t *testing.T) {
 
 	detection := linuxDetectionResult(system.LinuxDistroUbuntu, "apt")
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "permissions"},
+		[]string{"--agent", "claude-code", "--component", "permissions"},
 		detection,
 	)
 	if err != nil {
@@ -865,7 +867,7 @@ func TestRunInstallLinuxArchVerificationReportsReadyOnSuccess(t *testing.T) {
 
 	detection := linuxDetectionResult(system.LinuxDistroArch, "pacman")
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "permissions"},
+		[]string{"--agent", "claude-code", "--component", "permissions"},
 		detection,
 	)
 	if err != nil {
@@ -943,7 +945,7 @@ func TestRunInstallMacOSStillResolvesBrewCommands(t *testing.T) {
 
 	detection := macOSDetectionResult()
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		detection,
 	)
 	if err != nil {
@@ -1003,7 +1005,7 @@ func TestRunInstallMacOSVerificationMatchesPreLinuxBehavior(t *testing.T) {
 
 	detection := macOSDetectionResult()
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "permissions"},
+		[]string{"--agent", "claude-code", "--component", "permissions"},
 		detection,
 	)
 	if err != nil {
@@ -1020,7 +1022,7 @@ func TestRunInstallMacOSVerificationMatchesPreLinuxBehavior(t *testing.T) {
 
 func TestRunInstallMacOSRollbackStillWorks(t *testing.T) {
 	home := t.TempDir()
-	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
+	settingsPath := filepath.Join(home, ".claude", "settings.json")
 	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
@@ -1051,7 +1053,7 @@ func TestRunInstallMacOSRollbackStillWorks(t *testing.T) {
 	detection := macOSDetectionResult()
 	// Exclude context7 — it has no rollback and taints the settings file.
 	_, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		detection,
 	)
 	if err == nil {
@@ -1095,7 +1097,7 @@ func TestRunInstallEngramSkipsInstallWhenAlreadyOnPath(t *testing.T) {
 
 	detection := macOSDetectionResult()
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		detection,
 	)
 	if err != nil {
@@ -1114,7 +1116,7 @@ func TestRunInstallEngramSkipsInstallWhenAlreadyOnPath(t *testing.T) {
 	}
 }
 
-func TestRunInstallEngramAttemptsOpenCodeSetupWhenBinaryPresent(t *testing.T) {
+func TestRunInstallEngramAttemptsClaudeSetupWhenBinaryPresent(t *testing.T) {
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
@@ -1133,7 +1135,7 @@ func TestRunInstallEngramAttemptsOpenCodeSetupWhenBinaryPresent(t *testing.T) {
 	runCommand = recorder.record
 
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		macOSDetectionResult(),
 	)
 	if err != nil {
@@ -1146,7 +1148,7 @@ func TestRunInstallEngramAttemptsOpenCodeSetupWhenBinaryPresent(t *testing.T) {
 	commands := recorder.get()
 	foundSetup := false
 	for _, cmd := range commands {
-		if strings.Contains(cmd, "engram setup opencode") {
+		if strings.Contains(cmd, "engram setup claude-code") {
 			foundSetup = true
 			break
 		}
@@ -1172,14 +1174,14 @@ func TestRunInstallEngramFallsBackToInjectWhenSetupFails(t *testing.T) {
 		return "/usr/local/bin/" + name, nil
 	}
 	runCommand = func(name string, args ...string) error {
-		if name == "engram" && len(args) == 2 && args[0] == "setup" && args[1] == "opencode" {
+		if name == "engram" && len(args) >= 2 && args[0] == "setup" && args[1] == "claude-code" {
 			return errors.New("setup failed")
 		}
 		return nil
 	}
 
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		macOSDetectionResult(),
 	)
 	if err != nil {
@@ -1189,7 +1191,7 @@ func TestRunInstallEngramFallsBackToInjectWhenSetupFails(t *testing.T) {
 		t.Fatalf("verification ready = false")
 	}
 
-	configPath := filepath.Join(home, ".config", "opencode", "opencode.json")
+	configPath := filepath.Join(home, ".claude.json")
 	if _, err := os.Stat(configPath); err != nil {
 		t.Fatalf("expected fallback inject to create %q: %v", configPath, err)
 	}
@@ -1217,20 +1219,20 @@ func TestRunInstallEngramSetupStrictFailsWhenSetupFails(t *testing.T) {
 		return "/usr/local/bin/" + name, nil
 	}
 	runCommand = func(name string, args ...string) error {
-		if name == "engram" && len(args) == 2 && args[0] == "setup" && args[1] == "opencode" {
+		if name == "engram" && len(args) >= 2 && args[0] == "setup" && args[1] == "claude-code" {
 			return errors.New("setup failed")
 		}
 		return nil
 	}
 
 	_, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		macOSDetectionResult(),
 	)
 	if err == nil {
 		t.Fatalf("RunInstall() expected error in strict setup mode")
 	}
-	if !strings.Contains(err.Error(), "engram setup for \"opencode\"") {
+	if !strings.Contains(err.Error(), "engram setup for \"claude-code\"") {
 		t.Fatalf("RunInstall() error = %v, want setup error", err)
 	}
 }
@@ -1332,7 +1334,7 @@ func TestRunInstallAntigravityInitializesCLISettingsAfterEngramSetup(t *testing.
 	}
 }
 
-func TestRunInstallDeduplicatesSharedEngramSetupSlugs(t *testing.T) {
+func TestRunInstallDeduplicatesDuplicateEngramSetupSlugs(t *testing.T) {
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
@@ -1363,16 +1365,16 @@ func TestRunInstallDeduplicatesSharedEngramSetupSlugs(t *testing.T) {
 		return nil
 	}
 
-	// This test targets shared-slug engram setup dedup, not agent install
-	// behavior, so simulate Antigravity as already installed (its Detect
-	// looks for ~/.gemini/antigravity) — otherwise gentle-ai correctly
-	// refuses to proceed for an undetected agent.
+	// This test targets engram setup dedup, not agent install behavior, so
+	// simulate Antigravity as already installed (its Detect looks for
+	// ~/.gemini/antigravity) — otherwise gentle-ai correctly refuses to
+	// proceed for an undetected agent.
 	if err := os.MkdirAll(filepath.Join(home, ".gemini", "antigravity"), 0o755); err != nil {
 		t.Fatalf("MkdirAll(.gemini/antigravity): %v", err)
 	}
 
 	result, err := RunInstall(
-		[]string{"--agent", "gemini-cli", "--agent", "antigravity", "--component", "engram", "--component", "context7", "--component", "permissions"},
+		[]string{"--agent", "antigravity", "--agent", "antigravity", "--component", "engram", "--component", "context7", "--component", "permissions"},
 		macOSDetectionResult(),
 	)
 	if err != nil {
@@ -1413,7 +1415,7 @@ func TestRunInstallGGASkipsInstallWhenAlreadyOnPath(t *testing.T) {
 
 	detection := macOSDetectionResult()
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "gga"},
+		[]string{"--agent", "claude-code", "--component", "gga"},
 		detection,
 	)
 	if err != nil {
@@ -1463,7 +1465,7 @@ func TestRunInstallGGALinuxIncludesTempCleanupBeforeClone(t *testing.T) {
 	runCommand = recorder.record
 
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "gga"},
+		[]string{"--agent", "claude-code", "--component", "gga"},
 		linuxDetectionResult(system.LinuxDistroUbuntu, "apt"),
 	)
 	if err != nil {
@@ -1534,7 +1536,7 @@ func TestRunInstallEngramLinuxUsesDirectDownloadNoGoRequired(t *testing.T) {
 
 	detection := linuxDetectionResult(system.LinuxDistroUbuntu, "apt")
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		detection,
 	)
 	if err != nil {
@@ -1582,7 +1584,7 @@ func TestRunInstallEngramLinuxNeverInstallsGo(t *testing.T) {
 
 	detection := linuxDetectionResult(system.LinuxDistroUbuntu, "apt")
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		detection,
 	)
 	if err != nil {
@@ -1622,7 +1624,7 @@ func TestRunInstallEngramBrewSkipsGoCheck(t *testing.T) {
 
 	detection := macOSDetectionResult()
 	result, err := RunInstall(
-		[]string{"--agent", "opencode", "--component", "engram"},
+		[]string{"--agent", "claude-code", "--component", "engram"},
 		detection,
 	)
 	if err != nil {
@@ -1667,7 +1669,7 @@ func TestRunInstallEngramBrewSkipsGoCheck(t *testing.T) {
 func TestRunInstallDryRunMatchesActualInstall(t *testing.T) {
 	// ── Phase 1: dry-run — resolve the plan ───────────────────────────────────
 	// We do NOT need temp dir or mocks for dry-run; it never touches the FS.
-	installArgs := []string{"--agent", "opencode", "--component", "permissions"}
+	installArgs := []string{"--agent", "claude-code", "--component", "permissions"}
 	dryRunArgs := append([]string{"--dry-run"}, installArgs...)
 	dryResult, err := RunInstall(dryRunArgs, system.DetectionResult{})
 	if err != nil {
@@ -1732,6 +1734,7 @@ func TestRunInstallDryRunMatchesActualInstall(t *testing.T) {
 }
 
 func TestRunInstallDryRunMatchesActualInstallOpenCodeSDDMulti(t *testing.T) {
+	t.Skip("OpenCode SDD multi-mode is a legacy compatibility surface and is not selectable in the retained-client registry")
 	installArgs := []string{"--agent", "opencode", "--component", "sdd", "--sdd-mode", "multi"}
 	dryRunArgs := append([]string{"--dry-run"}, installArgs...)
 	dryResult, err := RunInstall(dryRunArgs, system.DetectionResult{})
@@ -2208,6 +2211,7 @@ func TestRunInstallCustomPresetExplicitComponentsResolveCorrectly(t *testing.T) 
 // Engram + SDD selected together and verifies that the final AGENTS.md
 // contains all three sections with no duplicates.
 func TestOpenCodePersonaBeforeSDDPreservesAllSections(t *testing.T) {
+	t.Skip("OpenCode is a retired selector; retained-client persona/SDD projections are covered by adapter-specific tests")
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
@@ -2290,6 +2294,7 @@ func TestOpenCodePersonaBeforeSDDPreservesAllSections(t *testing.T) {
 	}
 }
 func TestRunInstallKimiBootstrapsHub(t *testing.T) {
+	t.Skip("Kimi is a retired selector")
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
@@ -2343,6 +2348,7 @@ func TestRunInstallKimiBootstrapsHub(t *testing.T) {
 }
 
 func TestRunInstallKimiAlreadyInstalledDoesNotRequireUV(t *testing.T) {
+	t.Skip("Kimi is a retired selector")
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand

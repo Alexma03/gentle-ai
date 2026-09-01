@@ -1758,6 +1758,43 @@ func TestInjectGeminiWritesSDDOrchestratorAndSkills(t *testing.T) {
 	}
 }
 
+func TestInjectAntigravityPreservesSharedGeminiPrompt(t *testing.T) {
+	home := t.TempDir()
+	adapter, err := agents.NewAdapter("antigravity")
+	if err != nil {
+		t.Fatalf("NewAdapter(antigravity) error = %v", err)
+	}
+
+	promptPath := adapter.SystemPromptFile(home)
+	if err := os.MkdirAll(filepath.Dir(promptPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll(prompt dir) error = %v", err)
+	}
+	const existing = "# Existing Antigravity rules\n\nKeep this user-authored guidance exactly as written.\n"
+	if err := os.WriteFile(promptPath, []byte(existing), 0o644); err != nil {
+		t.Fatalf("WriteFile(prompt) error = %v", err)
+	}
+
+	result, err := Inject(home, adapter, "")
+	if err != nil {
+		t.Fatalf("Inject(antigravity) error = %v", err)
+	}
+	if !result.Changed {
+		t.Fatal("Inject(antigravity) changed = false")
+	}
+
+	content, err := os.ReadFile(promptPath)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", promptPath, err)
+	}
+	text := string(content)
+	if !strings.Contains(text, existing) {
+		t.Fatalf("existing Antigravity prompt was not preserved; got:\n%s", text)
+	}
+	if !strings.Contains(text, "Spec-Driven Development") {
+		t.Fatalf("Antigravity prompt missing SDD orchestrator content; got:\n%s", text)
+	}
+}
+
 func TestInjectKimiWritesNativeAgentFilesAndGlobalSkills(t *testing.T) {
 	home := t.TempDir()
 

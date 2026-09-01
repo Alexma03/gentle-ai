@@ -720,16 +720,12 @@ func TestConfigPathsForBackup_CoversManagedAgentPaths(t *testing.T) {
 	homeDir := t.TempDir()
 
 	managedFiles := map[string]string{
-		".claude.json":                                `{"oauthAccount":{"emailAddress":"user@example.com"},"mcpServers":{"engram":{"command":"engram"}}}`,
-		".claude/CLAUDE.md":                           "# Claude",
-		".claude/themes/gentleman.json":               `{"name":"gentleman"}`,
-		".claude/themes/gentleman-cute.json":          `{"name":"Gentleman Cute"}`,
-		".config/opencode/AGENTS.md":                  "# OpenCode",
-		".config/opencode/themes/gentleman.json":      `{"theme":{}}`,
-		".config/opencode/themes/gentleman-cute.json": `{"theme":{}}`,
-		".config/opencode/opencode.json":              `{"model":"claude"}`,
-		".gemini/GEMINI.md":                           "# Gemini",
-		".cursor/rules/gentle-ai.mdc":                 "# Cursor rules",
+		".claude.json":                       `{"oauthAccount":{"emailAddress":"user@example.com"},"mcpServers":{"engram":{"command":"engram"}}}`,
+		".claude/CLAUDE.md":                  "# Claude",
+		".claude/themes/gentleman.json":      `{"name":"gentleman"}`,
+		".claude/themes/gentleman-cute.json": `{"name":"Gentleman Cute"}`,
+		".cursor/rules/gentle-ai.mdc":        "# Cursor rules",
+		".codex/AGENTS.md":                   "# Codex",
 	}
 	unmanagedFile := filepath.Join(homeDir, ".claude", "conversation-transcript.md")
 
@@ -1252,16 +1248,16 @@ func TestConfigPathsForBackup_ExcludesRuntimeDirs(t *testing.T) {
 
 	geminiExcludes := []string{"browser_recordings", "brain", "conversations"}
 
-	// --- OpenCode: managed config file (keep) + node_modules (exclude) ---
-	openCodeConfig := filepath.Join(homeDir, ".config", "opencode", "opencode.json")
-	if err := os.MkdirAll(filepath.Dir(openCodeConfig), 0o755); err != nil {
+	// --- Codex: managed prompt file (keep) + runtime dirs (exclude) ---
+	codexConfig := filepath.Join(homeDir, ".codex", "AGENTS.md")
+	if err := os.MkdirAll(filepath.Dir(codexConfig), 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	if err := os.WriteFile(openCodeConfig, []byte(`{"model":"free"}`), 0o644); err != nil {
+	if err := os.WriteFile(codexConfig, []byte("# Codex"), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	openCodeExcludes := []string{"node_modules"}
+	codexExcludes := []string{"sessions"}
 
 	// Create excluded dirs with files for all agents.
 	type agentExclude struct {
@@ -1271,7 +1267,7 @@ func TestConfigPathsForBackup_ExcludesRuntimeDirs(t *testing.T) {
 	agents := []agentExclude{
 		{filepath.Join(homeDir, ".claude"), claudeExcludes},
 		{filepath.Join(homeDir, ".gemini"), geminiExcludes},
-		{filepath.Join(homeDir, ".config", "opencode"), openCodeExcludes},
+		{filepath.Join(homeDir, ".codex"), codexExcludes},
 	}
 
 	var excludedFiles []string
@@ -1305,7 +1301,7 @@ func TestConfigPathsForBackup_ExcludesRuntimeDirs(t *testing.T) {
 	}
 
 	// Config files must be present.
-	for _, cfg := range []string{claudeConfig, geminiConfig, openCodeConfig} {
+	for _, cfg := range []string{claudeConfig, geminiConfig, codexConfig} {
 		if _, ok := pathSet[cfg]; !ok {
 			t.Errorf("configPathsForBackup missing config file %q", cfg)
 		}

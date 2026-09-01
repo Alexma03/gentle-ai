@@ -79,6 +79,15 @@ func TestRenderedSurfaceNamesOnlyItsOwnRuntime(t *testing.T) {
 		}
 		slugToAgent[slug] = agent.ID
 	}
+	// Legacy rendered surfaces remain in the fixture corpus while their
+	// selectors are retired. Keep their provenance checks authoritative without
+	// re-exposing those identities through the current catalog.
+	for _, agent := range []model.AgentID{model.AgentOpenCode, model.AgentGeminiCLI} {
+		slug := strings.SplitN(string(agent), "-", 2)[0]
+		if _, exists := slugToAgent[slug]; !exists {
+			slugToAgent[slug] = agent
+		}
+	}
 
 	goldenDir := filepath.Join("..", "..", "testdata", "golden")
 	entries, err := os.ReadDir(goldenDir)

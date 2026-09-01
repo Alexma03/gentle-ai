@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/capabilitymanifest"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/catalog"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/reviewerprovider"
 )
 
 const reviewImmutableTransportUnsupportedCode = "immutable_review_transport_unsupported"
@@ -106,10 +106,14 @@ func (capability reviewImmutableRuntimePolicy) supportsImmutableReceiptReview() 
 // reviewTransportSupportedRuntimeIDs derives the actionable runtime list from
 // the compiled boundary. A refused runtime cannot appear as a substitute.
 func reviewTransportSupportedRuntimeIDs() []string {
-	supported := make([]string, 0)
-	for _, agent := range catalog.AllAgents() {
-		if reviewImmutableRuntimeCapability(agent.ID).supportsImmutableReceiptReview() {
-			supported = append(supported, string(agent.ID))
+	// The review provider boundary remains compatible with OpenCode until the
+	// Phase 3 retirement cohort lands. It is intentionally not sourced from
+	// catalog.AllAgents(), whose selection surface is already the retained
+	// five-client registry.
+	supported := make([]string, 0, len(reviewerprovider.RegisteredRuntimeIdentities()))
+	for _, runtime := range reviewerprovider.RegisteredRuntimeIdentities() {
+		if reviewImmutableRuntimeCapability(model.AgentID(runtime)).supportsImmutableReceiptReview() {
+			supported = append(supported, runtime)
 		}
 	}
 	return supported

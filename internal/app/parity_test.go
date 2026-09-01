@@ -200,7 +200,7 @@ func TestRunArgsUnknownCommandReturnsError(t *testing.T) {
 // and produces output about the sync plan — not a "unknown command" error.
 func TestRunArgsSyncDryRunIsDispatchedAndPrintsReport(t *testing.T) {
 	var buf bytes.Buffer
-	err := RunArgs([]string{"sync", "--agents", "opencode", "--dry-run"}, &buf)
+	err := RunArgs([]string{"sync", "--agents", "claude-code", "--dry-run"}, &buf)
 	if err != nil {
 		t.Fatalf("RunArgs(sync --dry-run) error = %v", err)
 	}
@@ -250,7 +250,7 @@ func TestRunArgsSyncNoAgentsIsNoOp(t *testing.T) {
 	// something meaningful (the no-op message).
 	// Use --dry-run to avoid any file creation and allow running in CI.
 	var buf bytes.Buffer
-	err := RunArgs([]string{"sync", "--agents", "opencode", "--dry-run"}, &buf)
+	err := RunArgs([]string{"sync", "--agents", "claude-code", "--dry-run"}, &buf)
 	if err != nil {
 		t.Fatalf("RunArgs(sync --dry-run): %v", err)
 	}
@@ -365,7 +365,7 @@ func TestInstallPlannerParityLinuxPreservesComponentOrder(t *testing.T) {
 		},
 	}
 
-	result, err := cli.RunInstall([]string{"--dry-run", "--agent", "opencode", "--component", "engram,sdd,skills"}, linuxDetection)
+	result, err := cli.RunInstall([]string{"--dry-run", "--agent", "claude-code", "--component", "engram,sdd,skills"}, linuxDetection)
 	if err != nil {
 		t.Fatalf("RunInstall() error = %v", err)
 	}

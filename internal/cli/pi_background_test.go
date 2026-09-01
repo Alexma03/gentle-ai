@@ -449,7 +449,7 @@ func TestSyncPiBackgroundPrecedenceAndDryRunReporting(t *testing.T) {
 			home := syncBackgroundTestHome(t)
 			var before []byte
 			if tt.prior != "" {
-				if err := state.Write(home, state.InstallState{InstalledAgents: []string{"pi"}, PiBackgroundIntent: tt.prior}); err != nil {
+				if err := state.Write(home, state.InstallState{SchemaVersion: state.CurrentSchemaVersion, InstalledAgents: []string{"pi"}, PiBackgroundIntent: tt.prior}); err != nil {
 					t.Fatal(err)
 				}
 				before, _ = os.ReadFile(state.Path(home))

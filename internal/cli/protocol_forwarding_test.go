@@ -157,11 +157,11 @@ func TestRunInstallForwardsProtocolSlimForClaudeCodeWhenSupported(t *testing.T) 
 	}
 }
 
-// TestRunInstallSafestWinsAcrossSharedSlug asserts the Per-slug forwarding
-// semantics from design.md: Gemini CLI and Antigravity share the gemini-cli
-// slug, and neither ever verifies slim, so the forwarded flag for that slug
-// MUST be --protocol=full even when the probe reports support.
-func TestRunInstallSafestWinsAcrossSharedSlug(t *testing.T) {
+// TestRunInstallAntigravityUsesSharedGeminiSetupSlug asserts that the retained
+// Antigravity adapter forwards setup through Engram's shared gemini-cli slug.
+// Antigravity does not verify slim, so the forwarded flag MUST be
+// --protocol=full even when the probe reports support.
+func TestRunInstallAntigravityUsesSharedGeminiSetupSlug(t *testing.T) {
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
@@ -209,7 +209,7 @@ func TestRunInstallSafestWinsAcrossSharedSlug(t *testing.T) {
 	}
 
 	result, err := RunInstall(
-		[]string{"--agent", "gemini-cli", "--agent", "antigravity", "--component", "engram", "--component", "context7", "--component", "permissions"},
+		[]string{"--agent", "antigravity", "--component", "engram", "--component", "context7", "--component", "permissions"},
 		macOSDetectionResult(),
 	)
 	if err != nil {
@@ -230,10 +230,10 @@ func TestRunInstallSafestWinsAcrossSharedSlug(t *testing.T) {
 		}
 	}
 	if setupCount != 1 {
-		t.Fatalf("engram setup gemini-cli count = %d, want 1 (deduped per-slug)", setupCount)
+		t.Fatalf("engram setup gemini-cli count = %d, want 1", setupCount)
 	}
 	if !foundFull {
-		t.Fatalf("expected 'engram setup gemini-cli --protocol=full' (safest-wins, neither adapter is slim), got commands: %v", recorder.get())
+		t.Fatalf("expected 'engram setup gemini-cli --protocol=full' (Antigravity is not slim), got commands: %v", recorder.get())
 	}
 }
 

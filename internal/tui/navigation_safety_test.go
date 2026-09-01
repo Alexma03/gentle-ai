@@ -86,7 +86,6 @@ func TestConditionalPickerNavigationResetsState(t *testing.T) {
 		name   string
 		screen Screen
 	}{
-		{"Kiro", ScreenKiroModelPicker},
 		{"Codex", ScreenCodexModelPicker},
 	} {
 		t.Run(tc.name+" custom starts at first phase", func(t *testing.T) {
