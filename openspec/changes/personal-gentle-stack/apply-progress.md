@@ -80,6 +80,7 @@ The full root suite is therefore a known cross-slice blocker, not evidence that 
 - `2e535426` — `fix(state): run migration before install and sync planning`
 - `1fb2ad7b` — `fix(state): secure migration restore and selection resolution`
 - `8b76266e` — `fix(state): anchor raw migration snapshots`
+- `0ff03225` — `docs(sdd): document migration correction evidence`
 
 ## Rollback Boundary
 
