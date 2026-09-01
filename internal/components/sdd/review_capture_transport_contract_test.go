@@ -60,7 +60,6 @@ func TestCompiledCaptureRuntimesComeFromOneSource(t *testing.T) {
 		model.AgentCodex:      true,
 		model.AgentOpenCode:   false,
 		model.AgentPi:         false,
-		model.AgentKilocode:   false,
 	} {
 		if got := reviewerprovider.CapturesInProcess(agent); got != want {
 			t.Errorf("CapturesInProcess(%s) = %v, want %v", agent, got, want)

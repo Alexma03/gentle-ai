@@ -40,7 +40,7 @@ func embeddedSharedFileNames(t *testing.T) []string {
 // it up and verifies it instead of leaving it unmanaged.
 func TestComponentPathsSDDCoversEveryEmbeddedSharedFile(t *testing.T) {
 	home := t.TempDir()
-	adapters := resolveAdapters([]model.AgentID{model.AgentGeminiCLI})
+	adapters := resolveAdapters([]model.AgentID{model.AgentAntigravity})
 
 	paths := componentPaths(home, model.Selection{}, adapters, model.ComponentSDD)
 	skillDir := adapters[0].SkillsDir(home)

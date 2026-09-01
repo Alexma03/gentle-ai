@@ -160,7 +160,6 @@ func TestDiscoverInstalled_MultipleInstalled(t *testing.T) {
 	reg := newStubRegistry(t,
 		stubAdapter{agent: model.AgentClaudeCode, configDir: claudeDir},
 		stubAdapter{agent: model.AgentOpenCode, configDir: opencodeDir},
-		stubAdapter{agent: model.AgentGeminiCLI, configDir: filepath.Join(home, ".gemini")}, // not created
 	)
 
 	got := DiscoverInstalled(reg, home)

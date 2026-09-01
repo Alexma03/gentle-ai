@@ -1544,42 +1544,6 @@ func TestInjectCursorWritesSDDOrchestratorAndSkills(t *testing.T) {
 	}
 }
 
-func TestInjectGeminiWritesSDDOrchestratorAndSkills(t *testing.T) {
-	home := t.TempDir()
-
-	geminiAdapter, err := agents.NewAdapter("gemini-cli")
-	if err != nil {
-		t.Fatalf("NewAdapter(gemini-cli) error = %v", err)
-	}
-
-	result, injectErr := Inject(home, geminiAdapter, "")
-	if injectErr != nil {
-		t.Fatalf("Inject(gemini) error = %v", injectErr)
-	}
-
-	if !result.Changed {
-		t.Fatal("Inject(gemini) changed = false")
-	}
-
-	// Verify SDD orchestrator was injected into GEMINI.md.
-	promptPath := filepath.Join(home, ".gemini", "GEMINI.md")
-	content, readErr := os.ReadFile(promptPath)
-	if readErr != nil {
-		t.Fatalf("ReadFile(%q) error = %v", promptPath, readErr)
-	}
-
-	text := string(content)
-	if !strings.Contains(text, "Spec-Driven Development") {
-		t.Fatal("Gemini system prompt missing SDD orchestrator content")
-	}
-
-	// Should also write SDD skill files.
-	skillPath := filepath.Join(home, ".gemini", "skills", "sdd-init", "SKILL.md")
-	if _, err := os.Stat(skillPath); err != nil {
-		t.Fatalf("expected SDD skill file %q: %v", skillPath, err)
-	}
-}
-
 func TestInjectAntigravityPreservesSharedGeminiPrompt(t *testing.T) {
 	home := t.TempDir()
 	adapter, err := agents.NewAdapter("antigravity")
@@ -4280,44 +4244,6 @@ func TestInjectModelAssignments_RootModelFallbackClearsVariant(t *testing.T) {
 // returns agent-specific paths for agents that have dedicated orchestrators,
 // and falls back to generic for all others.
 
-// TestInjectGeminiUsesAgentSpecificAsset verifies that Gemini injection uses
-// the gemini-specific sdd-orchestrator asset (with ~/.gemini/skills/ paths),
-// not the generic one with wrong vendor paths.
-func TestInjectGeminiUsesAgentSpecificAsset(t *testing.T) {
-	home := t.TempDir()
-
-	geminiAdapter, err := agents.NewAdapter("gemini-cli")
-	if err != nil {
-		t.Fatalf("NewAdapter(gemini-cli) error = %v", err)
-	}
-
-	result, injectErr := Inject(home, geminiAdapter, "")
-	if injectErr != nil {
-		t.Fatalf("Inject(gemini) error = %v", injectErr)
-	}
-	if !result.Changed {
-		t.Fatal("Inject(gemini) changed = false")
-	}
-
-	promptPath := filepath.Join(home, ".gemini", "GEMINI.md")
-	content, readErr := os.ReadFile(promptPath)
-	if readErr != nil {
-		t.Fatalf("ReadFile(%q) error = %v", promptPath, readErr)
-	}
-
-	text := string(content)
-
-	// Gemini-specific asset must reference Gemini skill paths.
-	if !strings.Contains(text, "~/.gemini/skills/_shared/") {
-		t.Fatal("GEMINI.md missing ~/.gemini/skills/_shared/ path — agent-specific asset not used")
-	}
-
-	// Gemini-specific asset must NOT reference Codex paths.
-	if strings.Contains(text, "~/.codex/") {
-		t.Fatal("GEMINI.md contains Codex-specific paths — wrong asset was injected")
-	}
-}
-
 // TestInjectCodexWritesSDDOrchestratorAndSkills verifies that Codex injection
 // creates agents.md with the SDD orchestrator and writes skill files.
 func TestInjectCodexWritesSDDOrchestratorAndSkills(t *testing.T) {
@@ -6161,7 +6087,7 @@ func TestInject_CodexNilPhaseModelAssignments_UsesCarrilTable(t *testing.T) {
 }
 
 func TestInject_NonCodexAdapterUnaffected(t *testing.T) {
-	// Kiro, Cursor, and Gemini adapters must not be affected by CodexModelAssignments.
+	// Retained non-Codex adapters must not be affected by CodexModelAssignments.
 	adapters := []struct {
 		name    string
 		adapter agents.Adapter
@@ -6170,8 +6096,8 @@ func TestInject_NonCodexAdapterUnaffected(t *testing.T) {
 			a, _ := agents.NewAdapter("cursor")
 			return a
 		}()},
-		{"gemini", func() agents.Adapter {
-			a, _ := agents.NewAdapter("gemini-cli")
+		{"antigravity", func() agents.Adapter {
+			a, _ := agents.NewAdapter("antigravity")
 			return a
 		}()},
 	}

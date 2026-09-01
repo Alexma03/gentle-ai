@@ -50,12 +50,7 @@ func agentForAssetPath(t *testing.T, path string) model.AgentID {
 		"claude":      model.AgentClaudeCode,
 		"codex":       model.AgentCodex,
 		"cursor":      model.AgentCursor,
-		"gemini":      model.AgentGeminiCLI,
-		"hermes":      model.AgentHermes,
-		"kimi":        model.AgentKimi,
-		"kiro":        model.AgentKiroIDE,
 		"opencode":    model.AgentOpenCode,
-		"qwen":        model.AgentQwenCode,
 	}[family]
 	if !known {
 		t.Fatalf("asset family %q in %q has no mapped runtime identity", family, path)

@@ -35,8 +35,8 @@ var retiredWorkRunCeremonyTokens = []string{
 
 func TestSDDOrchestratorsCarryNoRetiredWorkRunCeremony(t *testing.T) {
 	paths := allSDDOrchestratorAssetPaths(t)
-	if len(paths) != 12 {
-		t.Fatalf("WorkRun-removal coverage sees %d orchestrators, want 12", len(paths))
+	if len(paths) != 6 {
+		t.Fatalf("WorkRun-removal coverage sees %d orchestrators, want 6", len(paths))
 	}
 
 	for _, path := range paths {
@@ -55,8 +55,8 @@ func TestSDDOrchestratorsCarryNoRetiredWorkRunCeremony(t *testing.T) {
 
 func TestOrchestratorsProjectOrganicRouting(t *testing.T) {
 	paths := allSDDOrchestratorAssetPaths(t)
-	if len(paths) != 12 {
-		t.Fatalf("organic routing coverage sees %d orchestrators, want 12", len(paths))
+	if len(paths) != 6 {
+		t.Fatalf("organic routing coverage sees %d orchestrators, want 6", len(paths))
 	}
 
 	for _, path := range paths {
@@ -265,7 +265,6 @@ func TestAllEmbeddedAssetsAreReadable(t *testing.T) {
 		"opencode/commands/sdd-verify.md",
 
 		// Gemini agent files
-		"gemini/sdd-orchestrator.md",
 
 		// Antigravity agent files
 		"antigravity/sdd-orchestrator.md",
@@ -292,51 +291,8 @@ func TestAllEmbeddedAssetsAreReadable(t *testing.T) {
 		"cursor/agents/review-refuter.md",
 
 		// Kiro agent files
-		"kiro/agents/review-risk.md",
-		"kiro/agents/review-readability.md",
-		"kiro/agents/review-reliability.md",
-		"kiro/agents/review-resilience.md",
-		"kiro/agents/review-refuter.md",
 
 		// Kimi agent files
-		"kimi/persona-gentleman.md",
-		"kimi/output-style-gentleman.md",
-		"kimi/output-style-neutral.md",
-		"kimi/sdd-orchestrator.md",
-		"kimi/KIMI.md",
-		"kimi/agents/gentleman.yaml",
-		"kimi/agents/sdd-init.yaml",
-		"kimi/agents/sdd-explore.yaml",
-		"kimi/agents/sdd-propose.yaml",
-		"kimi/agents/sdd-research.yaml",
-		"kimi/agents/sdd-spec.yaml",
-		"kimi/agents/sdd-design.yaml",
-		"kimi/agents/sdd-tasks.yaml",
-		"kimi/agents/sdd-apply.yaml",
-		"kimi/agents/sdd-verify.yaml",
-		"kimi/agents/sdd-archive.yaml",
-		"kimi/agents/sdd-onboard.yaml",
-		"kimi/agents/sdd-init.md",
-		"kimi/agents/sdd-explore.md",
-		"kimi/agents/sdd-propose.md",
-		"kimi/agents/sdd-research.md",
-		"kimi/agents/sdd-spec.md",
-		"kimi/agents/sdd-design.md",
-		"kimi/agents/sdd-tasks.md",
-		"kimi/agents/sdd-apply.md",
-		"kimi/agents/sdd-verify.md",
-		"kimi/agents/sdd-archive.md",
-		"kimi/agents/sdd-onboard.md",
-		"kimi/agents/review-risk.yaml",
-		"kimi/agents/review-readability.yaml",
-		"kimi/agents/review-reliability.yaml",
-		"kimi/agents/review-resilience.yaml",
-		"kimi/agents/review-refuter.yaml",
-		"kimi/agents/review-risk.md",
-		"kimi/agents/review-readability.md",
-		"kimi/agents/review-reliability.md",
-		"kimi/agents/review-resilience.md",
-		"kimi/agents/review-refuter.md",
 
 		// SDD skills
 		"skills/sdd-init/SKILL.md",
@@ -360,12 +316,8 @@ func TestAllEmbeddedAssetsAreReadable(t *testing.T) {
 		"skills/_shared/sdd-phase-common.md",
 		"skills/_shared/sdd-status-contract.md",
 		"skills/_shared/research-lifecycle.md",
-		"kiro/agents/sdd-research.md",
 
 		// Hermes agent files
-		"hermes/sdd-orchestrator.md",
-		"hermes/persona-gentleman.md",
-		"hermes/persona-neutral.md",
 
 		// Foundation skills
 		"skills/go-testing/SKILL.md",
@@ -558,7 +510,7 @@ func TestSDDVerifyAdmissionPrecedesPersistence(t *testing.T) {
 	if count := strings.Count(MustRead("skills/sdd-verify/SKILL.md"), "sdd-verify-validate"); count < 2 {
 		t.Fatalf("both sdd-verify model sections require admission, got %d occurrences", count)
 	}
-	for _, path := range []string{"claude/agents/sdd-verify.md", "claude/commands/sdd-verify.md", "cursor/agents/sdd-verify.md", "kimi/agents/sdd-verify.md", "kiro/agents/sdd-verify.md"} {
+	for _, path := range []string{"claude/agents/sdd-verify.md", "claude/commands/sdd-verify.md", "cursor/agents/sdd-verify.md"} {
 		content := MustRead(path)
 		if skill, save := strings.Index(content, "sdd-verify/SKILL.md"), strings.LastIndex(content, "mem_save"); skill < 0 || save < 0 || skill > save {
 			t.Fatalf("%s must load the shared verify contract before persistence", path)
@@ -867,12 +819,7 @@ func TestSDDResearchRuntimeAssetsDeclareExactEvidenceGrants(t *testing.T) {
 			forbidden: []string{"Read", "Edit", "Write", "mcp__plugin_engram_engram__"},
 			required:  []string{"already-persisted intent", "Do not read or mutate repository or Engram state", "bounded evidence envelope", "The orchestrator validates and persists this envelope"},
 		},
-		{
-			path: "kiro/agents/sdd-research.md", declaration: "Evidence grants: documentation=[@context7]; open-web=[].",
-			toolLine: "tools:", evidence: []string{"@context7"},
-		},
 		{path: "cursor/agents/sdd-research.md", declaration: "Evidence grants: documentation=[]; open-web=[]."},
-		{path: "kimi/agents/sdd-research.md", declaration: "Evidence grants: documentation=[]; open-web=[]."},
 	}
 
 	for _, tt := range tests {
@@ -947,7 +894,7 @@ func TestEngramEmbeddedAssetLayout(t *testing.T) {
 
 func TestFourRReviewAgentAssets(t *testing.T) {
 	reviewAgents := []string{"review-risk", "review-readability", "review-reliability", "review-resilience"}
-	nativeDirs := []string{"claude/agents", "cursor/agents", "kiro/agents"}
+	nativeDirs := []string{"claude/agents", "cursor/agents"}
 	agentRules := map[string][]string{
 		"review-risk": {
 			"Rule sources: ai-course-2 slides",
@@ -987,19 +934,6 @@ func TestFourRReviewAgentAssets(t *testing.T) {
 				if !strings.Contains(content, want) {
 					t.Fatalf("%s/%s.md missing concrete 4R rule %q", dir, agent, want)
 				}
-			}
-		}
-	}
-
-	for _, agent := range reviewAgents {
-		md := MustRead("kimi/agents/" + agent + ".md")
-		yaml := MustRead("kimi/agents/" + agent + ".yaml")
-		if !strings.Contains(md, "No findings.") || !strings.Contains(yaml, "system_prompt_path: ./"+agent+".md") {
-			t.Fatalf("kimi review agent %s missing prompt or YAML binding", agent)
-		}
-		for _, want := range agentRules[agent] {
-			if !strings.Contains(md, want) {
-				t.Fatalf("kimi review agent %s missing concrete 4R rule %q", agent, want)
 			}
 		}
 	}
@@ -1193,16 +1127,10 @@ func TestClaudeSDDWorkflowRequiresSessionPreflight(t *testing.T) {
 // files and only its workflow file carries this sentence.
 var sddOrchestratorAutomaticDefaultRuntimes = []string{
 	"antigravity/sdd-orchestrator.md",
-	"hermes/sdd-orchestrator.md",
-	"gemini/sdd-orchestrator.md",
 	"codex/sdd-orchestrator.md",
-	"qwen/sdd-orchestrator.md",
-	"kimi/sdd-orchestrator.md",
-	"kiro/sdd-orchestrator.md",
 	"opencode/sdd-orchestrator.md",
 	"generic/sdd-orchestrator.md",
 	"cursor/sdd-orchestrator.md",
-	"windsurf/sdd-orchestrator.md",
 	"claude/sdd-orchestrator-workflow.md",
 }
 
@@ -1213,7 +1141,7 @@ const sddOrchestratorPromptBudgetSentence = "After scope approval, expect zero f
 // TestSDDOrchestratorAssetsDefaultToAutomatic pins that every SDD
 // orchestrator asset defaults to Automatic execution mode when unspecified,
 // with a byte-identical default sentence and prompt-budget sentence across
-// all 12 runtimes, and that Interactive stays explicitly selectable (never
+// all 6 retained runtimes, and that Interactive stays explicitly selectable (never
 // removed as an option).
 func TestSDDOrchestratorAssetsDefaultToAutomatic(t *testing.T) {
 	for _, path := range sddOrchestratorAutomaticDefaultRuntimes {
@@ -1344,16 +1272,10 @@ func TestNonClaudeSDDOrchestratorChainStrategyParity(t *testing.T) {
 		propagationScope string
 	}{
 		{path: "codex/sdd-orchestrator.md", propagationScope: "prompt"},
-		{path: "gemini/sdd-orchestrator.md", propagationScope: "prompt"},
-		{path: "qwen/sdd-orchestrator.md", propagationScope: "prompt"},
 		{path: "generic/sdd-orchestrator.md", propagationScope: "prompt"},
-		{path: "kimi/sdd-orchestrator.md", propagationScope: "Kimi custom-agent prompt"},
-		{path: "kiro/sdd-orchestrator.md", propagationScope: "Kiro phase context"},
-		{path: "windsurf/sdd-orchestrator.md", propagationScope: "inline phase context"},
 		{path: "antigravity/sdd-orchestrator.md", propagationScope: "dynamic subagent context"},
 		{path: "cursor/sdd-orchestrator.md", propagationScope: "prompt"},
 		{path: "opencode/sdd-orchestrator.md", propagationScope: "prompt"},
-		{path: "hermes/sdd-orchestrator.md", propagationScope: "prompt"},
 	}
 
 	for _, tc := range tests {
@@ -1390,24 +1312,6 @@ func TestDelegatedSDDProvidersForwardApplyVerifyContext(t *testing.T) {
 			name:             "Codex prompt",
 			path:             "codex/sdd-orchestrator.md",
 			delegatedContext: "Codex phase prompt",
-		},
-		{
-			name:             "Kimi custom agent",
-			path:             "kimi/sdd-orchestrator.md",
-			delegatedContext: "Kimi custom-agent prompt",
-			dependencyReadRows: []string{
-				"| `sdd-apply` | project init + tasks + spec + design + **apply-progress (if exists)** | `apply-progress` |",
-				"| `sdd-verify` | project init + spec + tasks + **apply-progress (if exists)** | `verify-report` |",
-			},
-		},
-		{
-			name:             "Kiro native subagent",
-			path:             "kiro/sdd-orchestrator.md",
-			delegatedContext: "native Kiro subagent context",
-			dependencyReadRows: []string{
-				"| `sdd-apply` | project init + tasks + spec + design + **apply-progress (if exists)** | `apply-progress` |",
-				"| `sdd-verify` | project init + spec + tasks + **apply-progress (if exists)** | `verify-report` |",
-			},
 		},
 	}
 
@@ -1495,9 +1399,6 @@ func TestPlatformNativeSDDOrchestratorsAvoidOpenCodePersistenceClaims(t *testing
 		path     string
 		required []string
 	}{
-		{path: "kimi/sdd-orchestrator.md", required: []string{"/skill:sdd-*", "multiagent:Task", "custom-agent prompt"}},
-		{path: "kiro/sdd-orchestrator.md", required: []string{"Kiro phase context", "native Kiro subagent context", "approval"}},
-		{path: "windsurf/sdd-orchestrator.md", required: []string{"solo-agent", "inline phase context", "There are no sub-agents"}},
 		{path: "antigravity/sdd-orchestrator.md", required: []string{"define_subagent", "invoke_subagent", "dynamic subagent context", "enable_mcp_tools: true"}},
 	}
 
@@ -1543,8 +1444,6 @@ func TestGentlemanLanguageInstructionsDoNotBiasEnglishSessions(t *testing.T) {
 		// Rules opener instead (JD-019).
 		{path: "claude/persona-gentleman.md", combineWith: "claude/output-style-gentleman.md", languagePhrase: "Always match the user's current language in your reply."},
 		{path: "generic/persona-gentleman.md", languagePhrase: "Match the user's current language in your REPLY ONLY"},
-		{path: "kiro/persona-gentleman.md", languagePhrase: "Match the user's current language in your REPLY ONLY"},
-		{path: "kimi/persona-gentleman.md", combineWith: "kimi/output-style-gentleman.md", languagePhrase: "Always match the user's current language in your reply."},
 		{path: "opencode/persona-gentleman.md", languagePhrase: "Match the user's current language in your REPLY ONLY"},
 	}
 
@@ -1579,7 +1478,6 @@ func TestGentlemanLanguageInstructionsDoNotBiasEnglishSessions(t *testing.T) {
 
 	for _, path := range []string{
 		"claude/output-style-gentleman.md",
-		"kimi/output-style-gentleman.md",
 	} {
 		t.Run(path, func(t *testing.T) {
 			content := MustRead(path)
@@ -1766,8 +1664,6 @@ func TestPersonasContainContextualSkillLoadingDirective(t *testing.T) {
 		{path: "opencode/persona-gentleman.md", isClaude: false, invokeMsg: "read the matching SKILL.md"},
 		{path: "generic/persona-gentleman.md", isClaude: false, invokeMsg: "read the matching SKILL.md"},
 		{path: "generic/persona-neutral.md", isClaude: false, invokeMsg: "read the matching SKILL.md"},
-		{path: "kiro/persona-gentleman.md", isClaude: false, invokeMsg: "read the matching SKILL.md"},
-		{path: "kimi/persona-gentleman.md", isClaude: false, invokeMsg: "read the matching SKILL.md"},
 	}
 
 	for _, tc := range tests {
@@ -2176,14 +2072,8 @@ func TestOrchestratorsRequireAutomaticGatekeeper(t *testing.T) {
 		"claude/sdd-orchestrator.md",
 		"codex/sdd-orchestrator.md",
 		"cursor/sdd-orchestrator.md",
-		"gemini/sdd-orchestrator.md",
 		"generic/sdd-orchestrator.md",
-		"hermes/sdd-orchestrator.md",
-		"kimi/sdd-orchestrator.md",
-		"kiro/sdd-orchestrator.md",
 		"opencode/sdd-orchestrator.md",
-		"qwen/sdd-orchestrator.md",
-		"windsurf/sdd-orchestrator.md",
 	}
 	anchors := []string{
 		"Automatic Mode Gatekeeper",
@@ -2230,14 +2120,8 @@ func TestSDDOrchestratorsUseNativeRuntimeAttemptAuthority(t *testing.T) {
 		"claude/sdd-orchestrator.md",
 		"codex/sdd-orchestrator.md",
 		"cursor/sdd-orchestrator.md",
-		"gemini/sdd-orchestrator.md",
 		"generic/sdd-orchestrator.md",
-		"hermes/sdd-orchestrator.md",
-		"kimi/sdd-orchestrator.md",
-		"kiro/sdd-orchestrator.md",
 		"opencode/sdd-orchestrator.md",
-		"qwen/sdd-orchestrator.md",
-		"windsurf/sdd-orchestrator.md",
 	}
 	required := []string{
 		"Native Runtime Attempt Authority",
@@ -2384,10 +2268,8 @@ func TestSDDOrchestratorAssetsScopedToDedicatedAgent(t *testing.T) {
 		"generic/sdd-orchestrator.md",
 		"claude/sdd-orchestrator.md",
 		"opencode/sdd-orchestrator.md",
-		"gemini/sdd-orchestrator.md",
 		"codex/sdd-orchestrator.md",
 		"cursor/sdd-orchestrator.md",
-		"kimi/sdd-orchestrator.md",
 	} {
 		t.Run(assetPath, func(t *testing.T) {
 			content := MustRead(assetPath)
@@ -2448,14 +2330,8 @@ func TestSDDArchiveFinalStateAuthorityContract(t *testing.T) {
 		"claude/sdd-orchestrator-workflow.md",
 		"codex/sdd-orchestrator.md",
 		"cursor/sdd-orchestrator.md",
-		"gemini/sdd-orchestrator.md",
 		"generic/sdd-orchestrator.md",
-		"hermes/sdd-orchestrator.md",
-		"kimi/sdd-orchestrator.md",
-		"kiro/sdd-orchestrator.md",
 		"opencode/sdd-orchestrator.md",
-		"qwen/sdd-orchestrator.md",
-		"windsurf/sdd-orchestrator.md",
 	}
 	for _, path := range orchestratorSurfaces {
 		content := MustRead(path)
@@ -2476,8 +2352,6 @@ func TestSDDArchiveFinalStateAuthorityContract(t *testing.T) {
 	for _, path := range []string{
 		"claude/agents/sdd-archive.md",
 		"cursor/agents/sdd-archive.md",
-		"kiro/agents/sdd-archive.md",
-		"kimi/agents/sdd-archive.md",
 		"claude/commands/sdd-archive.md",
 		"opencode/commands/sdd-archive.md",
 	} {

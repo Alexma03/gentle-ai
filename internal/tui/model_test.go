@@ -2716,9 +2716,6 @@ func TestModelConfig_ClaudePickerNavigation(t *testing.T) {
 	}
 }
 
-// TestModelConfig_KiroPickerNavigation verifies that selecting cursor 2
-// from ScreenModelConfig transitions to ScreenKiroModelPicker with ModelConfigMode set.
-
 // TestModelConfig_OpenCodePickerNavigation verifies that selecting cursor 1
 // from ScreenModelConfig transitions to ScreenModelPicker with ModelConfigMode set.
 func TestModelConfig_OpenCodePickerNavigation(t *testing.T) {
@@ -2737,19 +2734,18 @@ func TestModelConfig_OpenCodePickerNavigation(t *testing.T) {
 	}
 }
 
-// TestModelConfig_BackNavigation verifies that selecting cursor 4 (Back) from
+// TestModelConfig_BackNavigation verifies that selecting cursor 3 (Back) from
 // ScreenModelConfig returns to ScreenWelcome.
-// Index 3 is now "Configure Codex models"; Back moved to index 4.
 func TestModelConfig_BackNavigation(t *testing.T) {
 	m := NewModel(system.DetectionResult{}, "dev")
 	m.Screen = ScreenModelConfig
-	m.Cursor = 4 // Back is now at index 4
+	m.Cursor = 3 // Back is the last option
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	state := updated.(Model)
 
 	if state.Screen != ScreenWelcome {
-		t.Fatalf("ModelConfig cursor=4 (Back): screen = %v, want %v", state.Screen, ScreenWelcome)
+		t.Fatalf("ModelConfig cursor=3 (Back): screen = %v, want %v", state.Screen, ScreenWelcome)
 	}
 }
 
@@ -2913,7 +2909,7 @@ func TestModelConfig_OpenCodePickerBackReturnsToModelConfig(t *testing.T) {
 // makeDetectionWithAgents builds a DetectionResult with the specified agents
 // marked as Exists=true. All other agents are absent.
 func makeDetectionWithAgents(present ...string) system.DetectionResult {
-	known := []string{"claude-code", "opencode", "gemini-cli", "cursor", "vscode-copilot", "codex", "antigravity", "windsurf", "qwen-code", "hermes"}
+	known := []string{"claude-code", "opencode", "cursor", "codex", "antigravity", "pi"}
 	presentSet := make(map[string]bool, len(present))
 	for _, p := range present {
 		presentSet[p] = true
@@ -3655,11 +3651,10 @@ func TestPreselectedAgents_AllKnownAgentsMappedCorrectly(t *testing.T) {
 	}{
 		{"claude-code", model.AgentClaudeCode},
 		{"opencode", model.AgentOpenCode},
-		{"gemini-cli", model.AgentGeminiCLI},
 		{"cursor", model.AgentCursor},
-		{"vscode-copilot", model.AgentVSCodeCopilot},
 		{"codex", model.AgentCodex},
-		{"hermes", model.AgentHermes},
+		{"antigravity", model.AgentAntigravity},
+		{"pi", model.AgentPi},
 	}
 
 	for _, tt := range tests {
@@ -3702,8 +3697,8 @@ func TestAgentsToManage_StateTakesPriorityOverDetection(t *testing.T) {
 		{
 			name:        "empty state falls back to filesystem detection",
 			stateAgents: nil,
-			detectedIDs: []model.AgentID{model.AgentClaudeCode, model.AgentGeminiCLI},
-			want:        []model.AgentID{model.AgentClaudeCode, model.AgentGeminiCLI},
+			detectedIDs: []model.AgentID{model.AgentClaudeCode, model.AgentCursor},
+			want:        []model.AgentID{model.AgentClaudeCode, model.AgentCursor},
 			desc:        "first-time install: state.json absent, filesystem detection is the source",
 		},
 		{
@@ -3712,7 +3707,6 @@ func TestAgentsToManage_StateTakesPriorityOverDetection(t *testing.T) {
 			detectedIDs: []model.AgentID{
 				model.AgentClaudeCode,
 				model.AgentOpenCode,
-				model.AgentGeminiCLI,
 				model.AgentCursor,
 				model.AgentCodex,
 			},
@@ -3722,8 +3716,8 @@ func TestAgentsToManage_StateTakesPriorityOverDetection(t *testing.T) {
 		{
 			name:        "explicit empty installed_agents produces empty list",
 			stateAgents: []string{},
-			detectedIDs: []model.AgentID{model.AgentClaudeCode, model.AgentGeminiCLI},
-			want:        []model.AgentID{model.AgentClaudeCode, model.AgentGeminiCLI},
+			detectedIDs: []model.AgentID{model.AgentClaudeCode, model.AgentCursor},
+			want:        []model.AgentID{model.AgentClaudeCode, model.AgentCursor},
 			desc:        "empty slice in state.json is treated as no state (falls back to detection)",
 		},
 	}
@@ -3756,7 +3750,7 @@ func TestAgentsToManage_StateTakesPriorityOverDetection(t *testing.T) {
 // agents — not all detected config dirs.
 func TestPreselectedAgents_StateWinsOverDetection(t *testing.T) {
 	// 5 agents "detected" on filesystem.
-	detection := makeDetectionWithAgents("claude-code", "opencode", "gemini-cli", "cursor", "codex")
+	detection := makeDetectionWithAgents("claude-code", "opencode", "cursor", "codex")
 
 	// state.json only lists 1 agent (the user's deliberate selection).
 	installState := state.InstallState{
@@ -3777,20 +3771,20 @@ func TestPreselectedAgents_StateWinsOverDetection(t *testing.T) {
 // supplied InstallState for pre-selection instead of detection.
 func TestNewModel_StateAgentsArePreselected(t *testing.T) {
 	// Filesystem: 3 agents detected.
-	detection := makeDetectionWithAgents("claude-code", "gemini-cli", "cursor")
+	detection := makeDetectionWithAgents("claude-code", "cursor", "codex")
 
 	// state.json: only 1 agent.
 	installState := state.InstallState{
-		InstalledAgents: []string{string(model.AgentGeminiCLI)},
+		InstalledAgents: []string{string(model.AgentCursor)},
 	}
 
 	m := NewModel(detection, "dev", installState)
 
 	if len(m.Selection.Agents) != 1 {
-		t.Fatalf("NewModel Selection.Agents = %v, want [%s]", m.Selection.Agents, model.AgentGeminiCLI)
+		t.Fatalf("NewModel Selection.Agents = %v, want [%s]", m.Selection.Agents, model.AgentCursor)
 	}
-	if m.Selection.Agents[0] != model.AgentGeminiCLI {
-		t.Errorf("Selection.Agents[0] = %q, want %q", m.Selection.Agents[0], model.AgentGeminiCLI)
+	if m.Selection.Agents[0] != model.AgentCursor {
+		t.Errorf("Selection.Agents[0] = %q, want %q", m.Selection.Agents[0], model.AgentCursor)
 	}
 }
 

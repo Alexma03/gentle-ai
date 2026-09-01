@@ -456,9 +456,9 @@ func TestCheckStateJSON_AbsentAncestorChainKeepsSyncRemedy(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(homeDir, ".gentle-ai"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// windsurf lives two levels below home (~/.codeium/windsurf); neither
+	// Antigravity lives below home (~/.gemini/antigravity); neither
 	// level exists, so the path is genuinely missing and sync must stay.
-	if err := os.WriteFile(filepath.Join(homeDir, ".gentle-ai", "state.json"), []byte(`{"installed_agents":["windsurf"]}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(homeDir, ".gentle-ai", "state.json"), []byte(`{"installed_agents":["antigravity"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -941,7 +941,7 @@ func TestRunDoctor_IntegrationAllMocked(t *testing.T) {
   [ok]  engram:reachable               engram MCP (stdio) answered the initialize handshake for persisted configuration: %s
   [ok]  disk:space                     1024 MB free on %s filesystem
 
-Summary: 8 passed, 0 failed, 0 warnings
+Summary: 7 passed, 0 failed, 0 warnings
 Status:  healthy
 `, configPath, filepath.Join(homeDir, ".gentle-ai"))
 	if got := buf.String(); got != want {

@@ -10,7 +10,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
 
-// #3817: the SDD orchestrator contract is maintained as twelve hand-written
+// #3817: the SDD orchestrator contract is maintained as six hand-written
 // near-duplicates. Measured across them, 19 of 21 shared subsections have
 // drifted -- Delegation Rules alone has eleven variants across eleven runtimes
 // -- so reconciling those is a decision per section, not a refactor.
@@ -72,8 +72,8 @@ func TestSharedOrchestratorSectionsHaveOneSource(t *testing.T) {
 // reaches the rendered prompt: deleting duplication must not delete content.
 func TestEveryRuntimeRendersTheSharedSections(t *testing.T) {
 	for _, agent := range []model.AgentID{
-		model.AgentOpenCode, model.AgentCursor, model.AgentGeminiCLI, model.AgentQwenCode,
-		model.AgentHermes, model.AgentKimi, model.AgentWindsurf, model.AgentCodex,
+		model.AgentOpenCode, model.AgentCursor, model.AgentCodex,
+		model.AgentAntigravity, model.AgentClaudeCode, model.AgentPi,
 	} {
 		rendered := renderSDDOrchestratorAsset(agent)
 		for _, name := range sharedOrchestratorSectionNames {
@@ -93,9 +93,8 @@ func TestEveryRuntimeRendersTheSharedSections(t *testing.T) {
 // reaches a rendered prompt.
 func TestNoRawSharedSectionPlaceholderSurvivesRendering(t *testing.T) {
 	for _, agent := range []model.AgentID{
-		model.AgentOpenCode, model.AgentCursor, model.AgentGeminiCLI, model.AgentQwenCode,
-		model.AgentHermes, model.AgentKimi, model.AgentWindsurf, model.AgentCodex,
-		model.AgentKiroIDE, model.AgentAntigravity, model.AgentClaudeCode,
+		model.AgentOpenCode, model.AgentCursor, model.AgentCodex,
+		model.AgentAntigravity, model.AgentClaudeCode, model.AgentPi,
 	} {
 		if rendered := renderSDDOrchestratorAsset(agent); strings.Contains(rendered, "{{GENTLE_AI_SDD_SECTION:") {
 			t.Errorf("%s kept a raw shared-section placeholder", agent)

@@ -21,9 +21,9 @@ func TestComponentPathsSDDIncludesSystemPromptForAllSupportedAgents(t *testing.T
 	adapters := resolveAdapters([]model.AgentID{
 		model.AgentClaudeCode,
 		model.AgentOpenCode,
-		model.AgentGeminiCLI,
 		model.AgentCursor,
-		model.AgentVSCodeCopilot,
+		model.AgentAntigravity,
+		model.AgentCodex,
 	})
 
 	paths := componentPaths(home, model.Selection{}, adapters, model.ComponentSDD)
@@ -239,9 +239,9 @@ func TestLegacyOpenCodeBackgroundAgentsPluginRequiresConfigOpenCodePluginsPath(t
 	}
 }
 
-func TestComponentPathsSDDIncludesSkillsAndSharedConventions(t *testing.T) {
+func TestComponentPathsSDDIncludesAntigravitySkillsAndSharedConventions(t *testing.T) {
 	home := t.TempDir()
-	adapters := resolveAdapters([]model.AgentID{model.AgentGeminiCLI})
+	adapters := resolveAdapters([]model.AgentID{model.AgentAntigravity})
 
 	paths := componentPaths(home, model.Selection{}, adapters, model.ComponentSDD)
 
@@ -253,73 +253,15 @@ func TestComponentPathsSDDIncludesSkillsAndSharedConventions(t *testing.T) {
 		"sdd-phase-common.md",
 		"skill-resolver.md",
 	} {
-		shared := filepath.Join(home, ".gemini", "skills", "_shared", sharedFile)
+		shared := filepath.Join(adapters[0].SkillsDir(home), "_shared", sharedFile)
 		if !containsPath(paths, shared) {
 			t.Fatalf("componentPaths(sdd) missing shared convention path %q\npaths=%v", shared, paths)
 		}
 	}
 
-	skill := filepath.Join(home, ".gemini", "skills", "sdd-verify", "SKILL.md")
+	skill := filepath.Join(adapters[0].SkillsDir(home), "sdd-verify", "SKILL.md")
 	if !containsPath(paths, skill) {
 		t.Fatalf("componentPaths(sdd) missing SDD skill path %q\npaths=%v", skill, paths)
-	}
-}
-
-func TestComponentPathsWithWorkspaceOpenClawSDDUsesWorkspaceScopedSkills(t *testing.T) {
-	home := t.TempDir()
-	workspace := t.TempDir()
-	adapters := resolveAdapters([]model.AgentID{model.AgentOpenClaw})
-
-	paths := componentPathsWithWorkspace(home, workspace, model.Selection{}, adapters, model.ComponentSDD)
-
-	for _, want := range []string{
-		filepath.Join(workspace, ".openclaw", "skills", "_shared", "sdd-phase-common.md"),
-		filepath.Join(workspace, ".openclaw", "skills", "sdd-init", "SKILL.md"),
-		filepath.Join(workspace, ".openclaw", "skills", "sdd-verify", "SKILL.md"),
-	} {
-		if !containsPath(paths, want) {
-			t.Fatalf("componentPathsWithWorkspace(sdd,openclaw) missing workspace-scoped skill path %q\npaths=%v", want, paths)
-		}
-	}
-
-	for _, unwanted := range []string{
-		filepath.Join(home, ".openclaw", "skills", "_shared", "sdd-phase-common.md"),
-		filepath.Join(home, ".openclaw", "skills", "sdd-init", "SKILL.md"),
-		filepath.Join(home, ".openclaw", "skills", "sdd-verify", "SKILL.md"),
-	} {
-		if containsPath(paths, unwanted) {
-			t.Fatalf("componentPathsWithWorkspace(sdd,openclaw) must not include home-scoped SDD skill path %q\npaths=%v", unwanted, paths)
-		}
-	}
-}
-
-func TestComponentPathsOpenClawSkillsSkipsSDDPhaseSkills(t *testing.T) {
-	home := t.TempDir()
-	workspace := t.TempDir()
-	adapters := resolveAdapters([]model.AgentID{model.AgentOpenClaw})
-	selection := model.Selection{
-		Skills: []model.SkillID{
-			model.SkillSDDInit,
-			model.SkillGoTesting,
-			model.SkillSDDOnboard,
-		},
-	}
-
-	// OpenClaw always uses workspaceDir when set, independent of scope.
-	paths := componentPathsWithWorkspace(home, workspace, selection, adapters, model.ComponentSkills)
-
-	want := filepath.Join(workspace, ".openclaw", "skills", "go-testing", "SKILL.md")
-	if !containsPath(paths, want) {
-		t.Fatalf("componentPaths(skills,openclaw) missing portable skill path %q\npaths=%v", want, paths)
-	}
-
-	for _, unwanted := range []string{
-		filepath.Join(workspace, ".openclaw", "skills", "sdd-init", "SKILL.md"),
-		filepath.Join(workspace, ".openclaw", "skills", "sdd-onboard", "SKILL.md"),
-	} {
-		if containsPath(paths, unwanted) {
-			t.Fatalf("componentPaths(skills,openclaw) must not verify SDD phase skill path %q\npaths=%v", unwanted, paths)
-		}
 	}
 }
 
@@ -394,41 +336,6 @@ func TestInstallWorkspaceScopeVerificationWithNoGlobalSkills(t *testing.T) {
 		if containsPath(paths, unwanted) {
 			t.Fatalf("workspace-scoped verification must not check home path %q when scope=workspace\npaths=%v", unwanted, paths)
 		}
-	}
-}
-
-func TestComponentPathsSDDKimiIncludesAgentFilesAndGlobalSkills(t *testing.T) {
-	home := t.TempDir()
-	adapters := resolveAdapters([]model.AgentID{model.AgentKimi})
-
-	paths := componentPaths(home, model.Selection{}, adapters, model.ComponentSDD)
-
-	for _, want := range []string{
-		filepath.Join(home, ".kimi", "KIMI.md"),
-		filepath.Join(home, ".kimi", "agents", "gentleman.yaml"),
-		filepath.Join(home, ".kimi", "agents", "sdd-init.yaml"),
-		filepath.Join(home, ".kimi", "agents", "sdd-propose.md"),
-		filepath.Join(home, ".kimi", "agents", "sdd-apply.yaml"),
-		filepath.Join(home, ".kimi", "agents", "sdd-verify.md"),
-		filepath.Join(home, ".kimi", "agents", "sdd-archive.yaml"),
-		filepath.Join(home, ".config", "agents", "skills", "sdd-init", "SKILL.md"),
-		filepath.Join(home, ".config", "agents", "skills", "_shared", "engram-convention.md"),
-	} {
-		if !containsPath(paths, want) {
-			t.Fatalf("componentPaths(sdd,kimi) missing %q\npaths=%v", want, paths)
-		}
-	}
-}
-
-func TestComponentPathsContext7KimiIncludesMCPConfig(t *testing.T) {
-	home := t.TempDir()
-	adapters := resolveAdapters([]model.AgentID{model.AgentKimi})
-
-	paths := componentPaths(home, model.Selection{}, adapters, model.ComponentContext7)
-
-	want := filepath.Join(home, ".kimi", "mcp.json")
-	if !containsPath(paths, want) {
-		t.Fatalf("componentPaths(context7,kimi) missing %q\npaths=%v", want, paths)
 	}
 }
 
@@ -558,7 +465,7 @@ func TestComponentPathsPermissionsSkipsAgentsWithoutInjectionTarget(t *testing.T
 	adapters := resolveAdapters([]model.AgentID{
 		model.AgentCursor,
 		model.AgentAntigravity,
-		model.AgentHermes,
+		model.AgentPi,
 	})
 
 	paths := componentPaths(home, model.Selection{}, adapters, model.ComponentPermission)
@@ -579,10 +486,6 @@ func TestComponentPathsPermissionsIncludesAgentsWithInjectionTarget(t *testing.T
 	adapters := resolveAdapters([]model.AgentID{
 		model.AgentClaudeCode,
 		model.AgentOpenCode,
-		model.AgentKilocode,
-		model.AgentGeminiCLI,
-		model.AgentQwenCode,
-		model.AgentVSCodeCopilot,
 	})
 
 	paths := componentPaths(home, model.Selection{}, adapters, model.ComponentPermission)
@@ -592,32 +495,6 @@ func TestComponentPathsPermissionsIncludesAgentsWithInjectionTarget(t *testing.T
 		if !containsPath(paths, want) {
 			t.Fatalf("componentPaths(permissions) missing supported injection path %q\npaths=%v", want, paths)
 		}
-	}
-}
-
-// TestComponentPathsEngramOpenClawUsesCanonicalSettingsPath asserts that the
-// engram component path for OpenClaw always resolves to the canonical
-// ~/.openclaw/openclaw.json and never to a workspace-scoped copy.
-//
-// This is a regression test for issue #522: the verifier used to call
-// SettingsPath(workspaceDir) which produced
-// <workspace>/.openclaw/openclaw.json, causing post-sync verification to
-// fail even when the file at the canonical path existed.
-func TestComponentPathsEngramOpenClawUsesCanonicalSettingsPath(t *testing.T) {
-	home := t.TempDir()
-	workspace := t.TempDir()
-	adapters := resolveAdapters([]model.AgentID{model.AgentOpenClaw})
-
-	paths := componentPathsWithWorkspace(home, workspace, model.Selection{}, adapters, model.ComponentEngram)
-
-	canonical := filepath.Join(home, ".openclaw", "openclaw.json")
-	if !containsPath(paths, canonical) {
-		t.Fatalf("componentPathsWithWorkspace(engram,openclaw) missing canonical path %q\npaths=%v", canonical, paths)
-	}
-
-	wrongPath := filepath.Join(workspace, ".openclaw", "openclaw.json")
-	if containsPath(paths, wrongPath) {
-		t.Fatalf("componentPathsWithWorkspace(engram,openclaw) must not include workspace-scoped path %q\npaths=%v", wrongPath, paths)
 	}
 }
 
@@ -924,13 +801,12 @@ func TestInstallRoutingGuidanceWorkspaceScopeDeliversOpenCodeToHome(t *testing.T
 func TestRoutingGuidancePathsWorkspaceScopeReportOrchestratorPromptAgentsAtHome(t *testing.T) {
 	home := t.TempDir()
 	workspace := t.TempDir()
-	adapters := resolveAdapters([]model.AgentID{model.AgentOpenCode, model.AgentKilocode, model.AgentClaudeCode})
+	adapters := resolveAdapters([]model.AgentID{model.AgentOpenCode, model.AgentClaudeCode})
 
 	paths := routingGuidancePaths(home, workspace, ScopeWorkspace, adapters)
 
 	for _, want := range []string{
 		filepath.Join(home, ".config", "opencode", "opencode.json"),
-		filepath.Join(home, ".config", "kilo", "opencode.json"),
 	} {
 		if !containsPath(paths, want) {
 			t.Fatalf("routingGuidancePaths(workspace) missing home settings path %q\npaths=%v", want, paths)
@@ -938,7 +814,6 @@ func TestRoutingGuidancePathsWorkspaceScopeReportOrchestratorPromptAgentsAtHome(
 	}
 	for _, unwanted := range []string{
 		filepath.Join(workspace, ".config", "opencode", "opencode.json"),
-		filepath.Join(workspace, ".config", "kilo", "opencode.json"),
 	} {
 		if containsPath(paths, unwanted) {
 			t.Fatalf("routingGuidancePaths(workspace) reported %q, a path the agent never loads\npaths=%v", unwanted, paths)
@@ -1081,7 +956,7 @@ func TestBackupTargetsClaudeContext7IncludeCleanupWithoutVerificationRequirement
 
 func TestBackupTargetsContainNoDuplicatePaths(t *testing.T) {
 	home := t.TempDir()
-	agentIDs := []model.AgentID{model.AgentClaudeCode, model.AgentOpenCode, model.AgentKimi}
+	agentIDs := []model.AgentID{model.AgentClaudeCode, model.AgentOpenCode, model.AgentCursor}
 	selection := model.Selection{
 		Agents:     agentIDs,
 		Components: []model.ComponentID{model.ComponentSDD, model.ComponentEngram, model.ComponentPersona},

@@ -5,28 +5,27 @@ import (
 	"testing"
 )
 
-func TestRenderCompleteSuccessShowsGGANotesWhenInstalled(t *testing.T) {
+func TestRenderCompleteSuccessShowsNextSteps(t *testing.T) {
 	out := RenderComplete(CompletePayload{
 		ConfiguredAgents:    1,
 		InstalledComponents: 1,
 	})
 
-	if !strings.Contains(out, "GGA (per project)") {
-		t.Fatalf("missing GGA section: %q", out)
-	}
-	if !strings.Contains(out, "gga init") || !strings.Contains(out, "gga install") {
-		t.Fatalf("missing GGA repo commands: %q", out)
+	if !strings.Contains(out, "Next steps") || !strings.Contains(out, "Run your selected agent") {
+		t.Fatalf("missing completion next steps: %q", out)
 	}
 }
 
-func TestRenderCompleteSuccessHidesGGANotesWhenNotInstalled(t *testing.T) {
+func TestRenderCompleteSuccessDoesNotMentionRetiredIntegrations(t *testing.T) {
 	out := RenderComplete(CompletePayload{
 		ConfiguredAgents:    1,
 		InstalledComponents: 1,
 	})
 
-	if strings.Contains(out, "GGA (per project)") {
-		t.Fatalf("unexpected GGA section: %q", out)
+	for _, retired := range []string{"gga", "theme", "marketplace"} {
+		if strings.Contains(strings.ToLower(out), retired) {
+			t.Fatalf("unexpected retired integration %q: %q", retired, out)
+		}
 	}
 }
 

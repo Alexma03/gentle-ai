@@ -103,15 +103,6 @@ func TestDedicatedReviewAndJudgmentAssetsRenderRoleContracts(t *testing.T) {
 			"cursor/agents/review-risk.md", "cursor/agents/review-readability.md",
 			"cursor/agents/review-reliability.md", "cursor/agents/review-resilience.md",
 		},
-		"kimi": {
-			"kimi/agents/review-risk.md", "kimi/agents/review-readability.md",
-			"kimi/agents/review-reliability.md", "kimi/agents/review-resilience.md",
-		},
-		"kiro": {
-			"kiro/agents/review-risk.md", "kiro/agents/review-readability.md",
-			"kiro/agents/review-reliability.md", "kiro/agents/review-resilience.md",
-			"kiro/agents/jd-judge-a.md", "kiro/agents/jd-judge-b.md",
-		},
 	}
 	for family, paths := range assetsByFamily {
 		for _, path := range paths {
@@ -149,19 +140,6 @@ func TestDedicatedReviewersAndRefutersAreStructurallyReadOnly(t *testing.T) {
 		t.Errorf("Claude refuter grants an execution or mutation tool: %s", frontmatter)
 	}
 	for _, path := range []string{
-		"kiro/agents/review-risk.md", "kiro/agents/review-readability.md",
-		"kiro/agents/review-reliability.md", "kiro/agents/review-resilience.md",
-	} {
-		if frontmatter := markdownFrontmatter(t, path); !strings.Contains(frontmatter, `tools: ["read"]`) || strings.Contains(frontmatter, "shell") {
-			t.Errorf("%s does not fail closed without a narrow shell policy:\n%s", path, frontmatter)
-		}
-	}
-	for _, path := range []string{"kiro/agents/review-refuter.md", "kiro/agents/jd-judge-a.md", "kiro/agents/jd-judge-b.md"} {
-		if frontmatter := markdownFrontmatter(t, path); !strings.Contains(frontmatter, `tools: ["read"]`) {
-			t.Errorf("%s is not read-only:\n%s", path, frontmatter)
-		}
-	}
-	for _, path := range []string{
 		"cursor/agents/review-risk.md", "cursor/agents/review-readability.md",
 		"cursor/agents/review-reliability.md", "cursor/agents/review-resilience.md",
 		"cursor/agents/review-refuter.md",
@@ -170,28 +148,8 @@ func TestDedicatedReviewersAndRefutersAreStructurallyReadOnly(t *testing.T) {
 			t.Errorf("%s is not read-only", path)
 		}
 	}
-	for _, path := range []string{
-		"claude/agents/review-refuter.md", "cursor/agents/review-refuter.md",
-		"kimi/agents/review-refuter.md", "kiro/agents/review-refuter.md",
-	} {
+	for _, path := range []string{"claude/agents/review-refuter.md", "cursor/agents/review-refuter.md"} {
 		assertNoReviewerLifecycleInstructions(t, path, renderBoundedReviewAsset(agentForAssetPath(t, path), path))
-	}
-	for _, path := range []string{
-		"kimi/agents/review-risk.yaml", "kimi/agents/review-readability.yaml",
-		"kimi/agents/review-reliability.yaml", "kimi/agents/review-resilience.yaml",
-	} {
-		content := assets.MustRead(path)
-		for _, excluded := range []string{"multiagent:Task", "shell:Shell", "file:WriteFile", "file:StrReplaceFile"} {
-			if !strings.Contains(content, excluded) {
-				t.Errorf("%s does not exclude %s", path, excluded)
-			}
-		}
-	}
-	refuter := assets.MustRead("kimi/agents/review-refuter.yaml")
-	for _, excluded := range []string{"multiagent:Task", "shell:Shell", "file:WriteFile", "file:StrReplaceFile"} {
-		if !strings.Contains(refuter, excluded) {
-			t.Errorf("Kimi refuter does not exclude %s", excluded)
-		}
 	}
 }
 
@@ -320,8 +278,8 @@ func TestReviewerInspectionCommandsReturnIndependentValues(t *testing.T) {
 
 // TestReviewerBashPromptIsNativeAndWindowsPortable pins the shared
 // bash-command reviewer prompt (reviewerPrompt) still used by markdown-based
-// runtimes that keep their own shell (kiro, kimi, cursor). OpenCode and
-// Kilocode no longer use this prompt or a Bash permission wildcard: they get
+// runtime that keeps its own shell (Cursor). OpenCode uses a provider-injected
+// prompt with no Bash permission wildcard: it gets
 // openCodeProviderInjectedReviewerPrompt with no bash and no read tool
 // instead (see TestOpenCodeOverlaysRenderBoundedReadOnlyReviewRoles).
 func TestReviewerBashPromptIsNativeAndWindowsPortable(t *testing.T) {

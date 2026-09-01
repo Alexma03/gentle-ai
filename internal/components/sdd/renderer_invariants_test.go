@@ -327,23 +327,3 @@ func TestOpenCodeNamedProfileOrchestratorPreservesCurrentContract(t *testing.T) 
 		t.Fatalf("named profile unexpectedly inherited the default Desktop delegation section")
 	}
 }
-
-func TestKilocodeOrchestratorBaselineSharesHistoricalAssetWithoutReviewLifecycle(t *testing.T) {
-	if got, want := sddOrchestratorAsset(model.AgentKilocode), sddOrchestratorAsset(model.AgentOpenCode); got != want {
-		t.Fatalf("Kilocode orchestrator asset = %q, want shared historical asset %q", got, want)
-	}
-
-	content := renderSDDOrchestratorAsset(model.AgentKilocode)
-	if strings.Contains(content, "### Authority-First Terminal Procedure") {
-		t.Fatal("Kilocode baseline received the shared review lifecycle")
-	}
-	for _, want := range []string{"## SDD Workflow", "### Native SDD Dispatcher Guard", "### SDD Init Guard (MANDATORY)"} {
-		if !strings.Contains(content, want) {
-			t.Fatalf("Kilocode baseline lost normal SDD clause %q", want)
-		}
-	}
-
-	if strings.Contains(content, openCodeBackgroundPolicyMarker) {
-		t.Fatal("Kilocode baseline received an OpenCode-only background addendum")
-	}
-}

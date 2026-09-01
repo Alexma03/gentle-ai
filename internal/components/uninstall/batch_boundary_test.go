@@ -23,7 +23,7 @@ func TestPartialUninstallCommitsSucceededAgentsWhenAnotherAgentFails(t *testing.
 	piSettings := filepath.Join(home, ".pi", "agent", "settings.json")
 	piPrompt := filepath.Join(home, ".pi", "agent", "APPEND_SYSTEM.md")
 
-	writeBatchFile(t, claudeSettings, `{"theme":"gentleman","outputStyle":"gentleman","env":{"MY_VAR":"1"}}`)
+	writeBatchFile(t, claudeSettings, `{"outputStyle":"gentleman","env":{"MY_VAR":"1"}}`)
 	writeBatchFile(t, piSettings, "not json\n")
 	writeBatchFile(t, piPrompt, "<!-- gentle-ai:persona -->\nmanaged\n<!-- /gentle-ai:persona -->\n")
 	if err := state.Write(home, state.InstallState{InstalledAgents: []string{"claude-code", "pi"}}); err != nil {

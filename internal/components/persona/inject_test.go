@@ -1029,47 +1029,6 @@ func TestInjectCursorGentlemanWritesRulesFileWithRealContent(t *testing.T) {
 	}
 }
 
-func TestInjectGeminiGentlemanWritesSystemPromptWithRealContent(t *testing.T) {
-	home := t.TempDir()
-
-	geminiAdapter, err := agents.NewAdapter("gemini-cli")
-	if err != nil {
-		t.Fatalf("NewAdapter(gemini-cli) error = %v", err)
-	}
-
-	result, injectErr := Inject(home, geminiAdapter, model.PersonaGentleman)
-	if injectErr != nil {
-		t.Fatalf("Inject(gemini) error = %v", injectErr)
-	}
-
-	if !result.Changed {
-		t.Fatal("Inject(gemini, gentleman) changed = false")
-	}
-
-	path := filepath.Join(home, ".gemini", "GEMINI.md")
-	content, readErr := os.ReadFile(path)
-	if readErr != nil {
-		t.Fatalf("ReadFile(%q) error = %v", path, readErr)
-	}
-
-	text := string(content)
-	if !strings.Contains(text, "Senior Architect") {
-		t.Fatal("Gemini persona missing 'Senior Architect'")
-	}
-	assertLanguageGuardrails(t, text,
-		[]string{
-			"Match the user's current language in your REPLY ONLY",
-			"Do not switch languages unless the user does, asks you to, or you are quoting/translating content.",
-			"When replying to the user in English, keep the full reply in natural English with the same warm energy.",
-		},
-		[]string{
-			`Say "déjame verificar"`,
-			"Spanish input → Rioplatense Spanish",
-			"English input → same warm energy",
-		},
-	)
-}
-
 // --- Auto-heal tests: Claude Code stale free-text persona ---
 
 // legacyClaudePersonaBlock simulates a Gentleman persona block that was written

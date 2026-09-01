@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/codegraph"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/engram"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/doctor"
@@ -549,25 +550,11 @@ func danglingAncestor(homeDir, path string) (string, error) {
 
 // agentConfigDir returns the expected config directory for a known agent ID.
 func agentConfigDir(homeDir, agentID string) string {
-	cfgBase := filepath.Join(homeDir, ".config")
-	switch agentID {
-	case "claude-code":
-		return filepath.Join(homeDir, ".claude")
-	case "opencode":
-		return filepath.Join(cfgBase, "opencode")
-	case "cursor":
-		return filepath.Join(homeDir, ".cursor")
-	case "windsurf":
-		return filepath.Join(homeDir, ".codeium", "windsurf")
-	case "vscode":
-		return filepath.Join(cfgBase, "Code")
-	case "codex":
-		return filepath.Join(homeDir, ".codex")
-	case "kiro":
-		return filepath.Join(homeDir, ".kiro")
-	default:
+	adapter, err := agents.NewAdapter(model.AgentID(agentID))
+	if err != nil {
 		return ""
 	}
+	return adapter.GlobalConfigDir(homeDir)
 }
 
 // checkEngramReachable probes the configured Engram transport. An explicit

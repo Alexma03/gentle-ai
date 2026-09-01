@@ -205,7 +205,7 @@ func TestPiRenderedReviewContractUsesOnlyTheClosedChoiceRoute(t *testing.T) {
 			t.Errorf("Pi closed-choice route missing %q", clause)
 		}
 	}
-	if strings.Contains(renderSDDOrchestratorAsset(model.AgentKilocode), "ask_user_choice") {
+	if strings.Contains(renderSDDOrchestratorAsset(model.AgentCursor), "ask_user_choice") {
 		t.Fatal("generic fallback-only runtime received the Pi-only closed choice route")
 	}
 }
@@ -383,7 +383,6 @@ func TestOpenCodeOrchestratorAddsOnlyOneConcurrentReviewerGroupContract(t *testi
 		{name: "opencode", agent: model.AgentOpenCode, count: 1},
 		{name: "claude", agent: model.AgentClaudeCode},
 		{name: "codex", agent: model.AgentCodex},
-		{name: "kilocode", agent: model.AgentKilocode},
 		{name: "generic", agent: model.AgentPi},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -425,54 +424,8 @@ func TestOpenCodeOrchestratorAddsOnlyOneConcurrentReviewerGroupContract(t *testi
 	}
 }
 
-func TestPreservedSharedOrchestratorSubstitutesRuntimeAgentIdentity(t *testing.T) {
-	t.Parallel()
-
-	preserved := strings.Join([]string{
-		"Bind this to the dedicated `sdd-orchestrator` agent only.",
-		runtimeAgentIDPlaceholder,
-	}, "\n")
-	rendered := renderPreservedOpenCodeOrchestratorPrompt(
-		preserved,
-		model.AgentKilocode,
-	)
-	if !strings.Contains(rendered, "Bind this to the dedicated `gentle-orchestrator` agent only.") {
-		t.Fatalf("preserved prompt lost its migration:\n%s", rendered)
-	}
-	if strings.Contains(rendered, runtimeAgentIDPlaceholder) {
-		t.Fatal("preserved prompt retained runtime agent placeholder")
-	}
-	if !strings.Contains(rendered, string(model.AgentKilocode)) {
-		t.Fatalf("preserved prompt missing runtime agent identity:\n%s", rendered)
-	}
-}
-
-// The retired WorkRun commands no longer exist, so a preserved prompt that
-// still mentions them must pass through migration untouched instead of being
-// rewritten into a better-formed invocation of a deleted command.
-func TestPreservedSharedOrchestratorLeavesRetiredWorkCommandsUntouched(t *testing.T) {
-	t.Parallel()
-
-	retired := []string{
-		"gentle-ai work-capabilities --cwd <repo> --contract gentle-ai.work-capabilities/v2 --json",
-		"gentle-ai work-start --cwd <repo> --contract gentle-ai.work-start/v1 --json",
-	}
-	rendered := renderPreservedOpenCodeOrchestratorPrompt(
-		strings.Join(retired, "\n"),
-		model.AgentKilocode,
-	)
-	for _, command := range retired {
-		if !strings.Contains(rendered, command) {
-			t.Fatalf("preserved prompt rewrote retired command %q:\n%s", command, rendered)
-		}
-	}
-	if strings.Contains(rendered, "--agent "+string(model.AgentKilocode)) {
-		t.Fatalf("preserved prompt injected an adapter identity into a retired command:\n%s", rendered)
-	}
-}
-
 func TestRenderedReviewersAreReadOnlyAndSingleResult(t *testing.T) {
-	for _, family := range []string{"claude", "cursor", "kimi", "kiro"} {
+	for _, family := range []string{"claude", "cursor"} {
 		for _, lens := range []string{"risk", "readability", "reliability", "resilience"} {
 			path := family + "/agents/review-" + lens + ".md"
 			t.Run(family+"/"+lens, func(t *testing.T) {

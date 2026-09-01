@@ -21,7 +21,6 @@ func TestSDDTaskResultPluginIsOpenCodeOnlyAndCanonicallySynced(t *testing.T) {
 		assetPath  string
 	}{
 		{name: "OpenCode", agent: model.AgentOpenCode, wantPlugin: true, assetPath: "opencode/sdd-orchestrator.md"},
-		{name: "Kilo Code", agent: model.AgentKilocode, assetPath: "opencode/sdd-orchestrator.md"},
 		{name: "Claude Code", agent: model.AgentClaudeCode, assetPath: "claude/sdd-orchestrator.md"},
 		{name: "Pi", agent: model.AgentPi, assetPath: "generic/sdd-orchestrator.md"},
 	} {
