@@ -68,11 +68,6 @@ Support depends on the agent:
 
 Single-mode is not a downgrade. It is the simpler default and works well. Multi-mode is useful when you deliberately want cost, speed, or reasoning tradeoffs per phase.
 
-3. The base/default SDD conductor is `gentle-orchestrator`
-4. Named profiles generate `sdd-orchestrator-{name}` + suffixed sub-agents, each assigned to your chosen model
-
-You can create multiple profiles (e.g., "cheap" for experimentation, "premium" for production) and switch between them freely.
-
 For the complete support matrix, see [Supported Agents](agents.md).
 
 ---

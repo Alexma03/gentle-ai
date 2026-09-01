@@ -40,7 +40,7 @@ Use this page when you know what you need to change but not where it belongs.
 | Change install ordering | `internal/planner/`, `internal/pipeline/` | component tests and dry-run output |
 | Change backups or restore | `internal/backup/`, `internal/cli/restore.go` | `docs/rollback.md` |
 | Change updates or upgrades | `internal/update/`, `internal/update/upgrade/` | `internal/tui/screens/upgrade_sync.go` |
-| Change community tool install or guidance | `internal/components/communitytool/` | `docs/components.md`, `docs/usage.md` |
+| Change CodeGraph install or guidance | `internal/components/codegraph/` | `docs/components.md`, `docs/usage.md` |
 | Change skill registry behavior | `internal/skillregistry/`, `internal/app/` skill-registry dispatch | `docs/skill-registry.md`, `.atl/skill-registry.md` |
 | Update contributor-facing docs | `docs/CODEBASE-GUIDE.md` | `README.md` docs table |
 

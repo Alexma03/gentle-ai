@@ -24,7 +24,7 @@ func createWindowsCompatibilityJunction(t *testing.T, link, target string) {
 
 func windowsCompatibilitySelection() model.Selection {
 	return model.Selection{
-		Agents:     []model.AgentID{model.AgentOpenCode},
+		Agents:     []model.AgentID{model.AgentCodex},
 		Components: []model.ComponentID{model.ComponentSkills},
 		Skills:     []model.SkillID{model.SkillGoTesting},
 		Persona:    model.PersonaNeutral,

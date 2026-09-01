@@ -15,7 +15,7 @@ Gentle-AI integration code should stay thin: adapters describe where and how an 
 | Context7 MCP | `internal/components/mcp/` | Add documentation MCP server entries. |
 | Skills | `internal/components/skills/`, `internal/assets/skills/` | Copy curated skill files. |
 | Skill registry | `internal/skillregistry/`, `internal/app/` | Refresh or list `.atl/skill-registry.md` entries. |
-| Community tools | `internal/components/communitytool/` | Orchestrate community tool installation plus managed guidance/config/MCP reconciliation; do not own external runtime implementation. |
+| CodeGraph | `internal/components/codegraph/` | Install and reconcile CodeGraph guidance, configuration, and health checks. |
 
 ## Setup boundaries
 
@@ -24,14 +24,7 @@ Gentle-AI integration code should stay thin: adapters describe where and how an 
 | Agent discovery | Detect config roots or binaries through system/adapters; do not hard-code in UI screens. |
 | MCP wiring | Use adapter MCP strategy instead of custom JSON writes in feature code. |
 | Prompt injection | Use component/filemerge helpers to preserve user content when strategy requires it. |
-| Community tool orchestration | Keep install commands, generated guidance/config, and MCP reconciliation thin and traceable to the selected external tool. |
-
-## Thin plugin principle
-
-```text
-TUI selection
-  -> append external package name or managed local plugin path to plugin array
-```
+| CodeGraph orchestration | Keep installation, guidance, configuration, and health checks inside the CodeGraph component boundary. |
 
 ## Contributor checklist
 
@@ -39,7 +32,7 @@ TUI selection
 - [ ] Keep component behavior reusable across agents.
 - [ ] Add golden tests when generated config changes.
 - [ ] Update [Agents](../agents.md) for user-visible agent capabilities.
-- [ ] Keep optional community integrations thin and reversible.
+- [ ] Keep CodeGraph lifecycle changes thin and reversible.
 
 ## Navigation
 

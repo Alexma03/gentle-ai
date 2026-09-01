@@ -38,12 +38,13 @@ Antigravity is an agent-first platform with built-in sub-agents (Browser, Termin
 
 ## SDD Mode Support
 
-| ---------------- | :---------: | :------: | :-------: | :--------: | :----: | :-------------: | :---: | :------: | :---------: | :------: | :-------: | :------: | :--: | :-----: | :----: |
-| SDD orchestrator |     Yes     |   Yes    |    Yes    |    Yes     |  Yes   |       Yes       |  Yes  |   Yes    |     Yes     |   Yes    |    Yes    |   Yes    | Yes  |   Yes   |  Yes   |
-| Single-mode SDD  |     Yes     |   Yes    |    Yes    |    Yes     |  Yes   |       Yes       |  Yes  |   Yes    |     Yes     |   Yes    |    Yes    |   Yes    | Yes  |   Yes   |  Yes   |
-| Multi-mode SDD   |      —      |   Yes    |    Yes    |     —      |   —    |        —        |   —   |    —     |      —      |  Yes\*   |     —     |    —     |  —   | Yes\*\* |   —    |
+| Mode | Claude Code | Codex | Cursor | Antigravity | Pi |
+| --- | :---: | :---: | :---: | :---: | :---: |
+| SDD orchestrator | Yes | Yes | Yes | Yes | Yes |
+| Single-mode SDD | Yes | Yes | Yes | Yes | Yes |
+| Multi-mode SDD | — | Yes | — | — | Yes\* |
 
-> \*\* **Pi multi-mode** is owned by the Pi packages. `gentle-pi` installs SDD agent and chain assets into `.pi/agents/` and `.pi/chains/`; model overrides live in those Pi-managed files or chain steps.
+> \* **Pi multi-mode** is owned by the Pi packages. `gentle-pi` installs SDD agent and chain assets into `.pi/agents/` and `.pi/chains/`; model overrides live in those Pi-managed files or chain steps.
 
 ---
 
@@ -55,10 +56,6 @@ Antigravity is an agent-first platform with built-in sub-agents (Browser, Termin
 - MCP servers configured as plugins in `~/.claude/mcp/`
 - Output styles in `~/.claude/output-styles/`
 - System prompt via markdown sections in `~/.claude/CLAUDE.md`
-
-### Kilo Code
-
-- **Detection**: gentle-ai detects Kilo Code from `~/.config/kilo` and checks for the `kilo` binary on `PATH`
 
 ### Cursor
 

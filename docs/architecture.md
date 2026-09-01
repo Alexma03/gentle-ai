@@ -20,7 +20,7 @@ internal/
   backup/                  Config snapshot + restore
   assets/                  Embedded skill files + persona templates
   components/              Per-component install/inject logic
-    communitytool/         Community tool install/guidance/config orchestration
+    codegraph/             CodeGraph install, guidance, configuration, and health checks
     uninstall/             Managed uninstall cleanup service
     filemerge/             Marker-based file merging (inject without clobbering)
   skillregistry/           .atl skill registry refresh/list support

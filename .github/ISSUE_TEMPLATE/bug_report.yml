@@ -98,10 +98,10 @@ body:
       description: Which AI agent or client are you using?
       options:
         - Claude Code
-        - OpenCode
-        - Gemini CLI
+        - Codex
         - Cursor
-        - Windsurf
+        - Google Antigravity
+        - Pi
         - Other
     validations:
       required: true

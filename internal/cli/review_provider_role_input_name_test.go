@@ -25,7 +25,8 @@ func TestProviderRoleCollectInputNamesObeyPublishedPattern(t *testing.T) {
 		RepositoryContext: "rctx1_" + strings.Repeat("c", 64),
 	}
 
-	transition := reviewProviderRoleTransition("provider_refuter_required", binding, reviewerprovider.RoleTargetedValidator, model.AgentOpenCode, nil)
+	validation := &reviewtransaction.TargetedValidationRequest{RequestHash: "sha256:" + strings.Repeat("d", 64)}
+	transition := reviewProviderRoleTransition("provider_refuter_required", binding, reviewerprovider.RoleTargetedValidator, model.AgentCodex, validation)
 	if transition.Kind != "collect" || transition.Collect == nil || len(transition.Collect.Inputs) != 1 {
 		t.Fatalf("targeted-validator transition = %#v", transition)
 	}
@@ -37,12 +38,11 @@ func TestProviderRoleCollectInputNamesObeyPublishedPattern(t *testing.T) {
 		t.Fatalf("targeted-validator collect input name = %q, want provider_targeted_validator", input.Name)
 	}
 
-	refuter := reviewProviderRoleTransition("provider_refuter_required", binding, reviewerprovider.RoleRefuter, model.AgentOpenCode, nil)
+	refuter := reviewProviderRoleTransition("provider_refuter_required", binding, reviewerprovider.RoleRefuter, model.AgentCodex, nil)
 	if refuter.Collect == nil || len(refuter.Collect.Inputs) != 1 || refuter.Collect.Inputs[0].Name != "provider_refuter" {
 		t.Fatalf("refuter transition = %#v", refuter)
 	}
 
-	validation := &reviewtransaction.TargetedValidationRequest{RequestHash: "sha256:" + strings.Repeat("d", 64)}
 	relay, err := reviewProviderHostRelayRoleInput(binding, reviewerprovider.RoleTargetedValidator, model.AgentPi, validation)
 	if err != nil {
 		t.Fatal(err)
