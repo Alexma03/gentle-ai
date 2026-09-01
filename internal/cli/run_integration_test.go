@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	piagent "github.com/gentleman-programming/gentle-ai/v2/internal/agents/pi"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/backup"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/installcmd"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
@@ -69,6 +71,113 @@ func assertRunInstallRejectsRetiredSelector(t *testing.T, raw string, args ...st
 }
 
 const engramInitCommandForTest = "npm exec --yes --package gentle-engram@latest -- pi-engram init"
+
+const canonicalPiSubagentsReadyForCLI = `{
+  "version": 1,
+  "methods": ["ping", "status", "manage", "spawn", "steer", "interrupt", "stop", "resume"],
+  "capabilities": {
+    "status": true,
+    "asyncSpawn": true,
+    "steer": true,
+    "interrupt": true,
+    "stop": true,
+    "resume": true
+  },
+  "events": {
+    "ready": "subagents:rpc:v1:ready",
+    "request": "subagents:rpc:v1:request",
+    "replyPrefix": "subagents:rpc:v1:reply:",
+    "asyncComplete": "subagent:async-complete"
+  }
+}`
+
+func TestPiAgentInstallRejectsUnvalidatedSubagentsRPCAtProductionBoundary(t *testing.T) {
+	restorePreflightLookPath := installcmd.OverrideLookPath(func(name string) (string, error) { return name, nil })
+	t.Cleanup(restorePreflightLookPath)
+
+	restoreCommand := runCommand
+	runCommand = func(string, ...string) error { return nil }
+	t.Cleanup(func() { runCommand = restoreCommand })
+
+	restoreProbe := probePiSubagentsRPC
+	t.Cleanup(func() { probePiSubagentsRPC = restoreProbe })
+
+	tests := []struct {
+		name     string
+		response piagent.PiSubagentsRPCProviderResponse
+		want     string
+	}{
+		{
+			name:     "absent",
+			response: piagent.PiSubagentsRPCProviderResponse{Package: "npm:pi-subagents"},
+			want:     "ready payload",
+		},
+		{
+			name:     "malformed",
+			response: piagent.PiSubagentsRPCProviderResponse{Package: "npm:pi-subagents", Ready: []byte("{")},
+			want:     "invalid JSON",
+		},
+		{
+			name: "wrong version",
+			response: piagent.PiSubagentsRPCProviderResponse{
+				Package: "npm:pi-subagents",
+				Ready:   []byte(strings.Replace(canonicalPiSubagentsReadyForCLI, `"version": 1`, `"version": 2`, 1)),
+			},
+			want: "version",
+		},
+		{
+			name: "incomplete",
+			response: piagent.PiSubagentsRPCProviderResponse{
+				Package: "npm:pi-subagents",
+				Ready:   []byte(strings.Replace(canonicalPiSubagentsReadyForCLI, `"resume"`, `"not-resume"`, 1)),
+			},
+			want: "resume",
+		},
+		{
+			name: "retired provider",
+			response: piagent.PiSubagentsRPCProviderResponse{
+				Package: "npm:pi-subagents-j0k3r",
+				Ready:   []byte(canonicalPiSubagentsReadyForCLI),
+			},
+			want: "canonical",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			probePiSubagentsRPC = func(context.Context, string, string) (piagent.PiSubagentsRPCProviderResponse, error) {
+				return tt.response, nil
+			}
+			step := agentInstallStep{id: "agent:pi", agent: model.AgentPi, homeDir: t.TempDir()}
+			if err := step.Run(); err == nil || !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(tt.want)) {
+				t.Fatalf("agentInstallStep.Run() error = %v, want rejection containing %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestPiAgentInstallAcceptsCanonicalSubagentsRPCAtProductionBoundary(t *testing.T) {
+	restorePreflightLookPath := installcmd.OverrideLookPath(func(name string) (string, error) { return name, nil })
+	t.Cleanup(restorePreflightLookPath)
+
+	restoreCommand := runCommand
+	runCommand = func(string, ...string) error { return nil }
+	t.Cleanup(func() { runCommand = restoreCommand })
+
+	restoreProbe := probePiSubagentsRPC
+	probePiSubagentsRPC = func(context.Context, string, string) (piagent.PiSubagentsRPCProviderResponse, error) {
+		return piagent.PiSubagentsRPCProviderResponse{
+			Package: "npm:pi-subagents",
+			Ready:   []byte(canonicalPiSubagentsReadyForCLI),
+		}, nil
+	}
+	t.Cleanup(func() { probePiSubagentsRPC = restoreProbe })
+
+	step := agentInstallStep{id: "agent:pi", agent: model.AgentPi, homeDir: t.TempDir()}
+	if err := step.Run(); err != nil {
+		t.Fatalf("agentInstallStep.Run() error = %v, want canonical readiness accepted", err)
+	}
+}
 
 func TestRunInstallAppliesFilesystemChanges(t *testing.T) {
 	home := t.TempDir()
