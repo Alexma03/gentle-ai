@@ -142,6 +142,79 @@ func TestRunCodeGraphInitAcceptsProjectBelowHome(t *testing.T) {
 	assertSameFile(t, calledRoot, root)
 }
 
+// TestCanonicalCodeGraphProjectRootAcceptsEquivalentGitRootForms exercises
+// the selector boundary with the path forms users can legitimately provide:
+// a relative candidate, a symlink alias, and a git root with lexical `..`
+// segments. All forms must bind to the same canonical project root before the
+// upstream CodeGraph command is invoked.
+func TestCanonicalCodeGraphProjectRootAcceptsEquivalentGitRootForms(t *testing.T) {
+	workspace := t.TempDir()
+	root := filepath.Join(workspace, "repo")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(workspace, "repo-alias")
+	if err := os.Symlink(root, alias); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	originalRoot := codeGraphGitTopLevel
+	originalHome := codeGraphUserHomeDir
+	originalTemp := codeGraphTempDir
+	originalInit := codeGraphInit
+	t.Cleanup(func() {
+		codeGraphGitTopLevel = originalRoot
+		codeGraphUserHomeDir = originalHome
+		codeGraphTempDir = originalTemp
+		codeGraphInit = originalInit
+	})
+	codeGraphUserHomeDir = func() (string, error) { return filepath.Join(workspace, "home"), nil }
+	codeGraphTempDir = func() string { return filepath.Join(workspace, "temporary") }
+	codeGraphGitTopLevel = func(path string) (string, error) {
+		assertSameFile(t, path, root)
+		return filepath.Join(root, "..", filepath.Base(root)), nil
+	}
+	codeGraphInit = func(string, ...string) error { return nil }
+
+	for _, candidate := range []string{root, alias, filepath.Join(root, ".")} {
+		t.Run(candidate, func(t *testing.T) {
+			got, err := canonicalCodeGraphProjectRoot(candidate)
+			if err != nil {
+				t.Fatalf("canonicalCodeGraphProjectRoot(%q) error = %v", candidate, err)
+			}
+			assertSameFile(t, got, root)
+		})
+	}
+}
+
+// TestCanonicalCodeGraphProjectRootRejectsRelativeGitEscape ensures a
+// provider cannot return a relative root that resolves outside the selected
+// candidate. This closes the selector's symlink/relative-path ambiguity before
+// any CodeGraph process is started.
+func TestCanonicalCodeGraphProjectRootRejectsRelativeGitEscape(t *testing.T) {
+	workspace := t.TempDir()
+	root := filepath.Join(workspace, "repo")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	originalRoot := codeGraphGitTopLevel
+	originalHome := codeGraphUserHomeDir
+	originalTemp := codeGraphTempDir
+	t.Cleanup(func() {
+		codeGraphGitTopLevel = originalRoot
+		codeGraphUserHomeDir = originalHome
+		codeGraphTempDir = originalTemp
+	})
+	codeGraphUserHomeDir = func() (string, error) { return filepath.Join(workspace, "home"), nil }
+	codeGraphTempDir = func() string { return filepath.Join(workspace, "temporary") }
+	codeGraphGitTopLevel = func(string) (string, error) { return filepath.Join(workspace, ".."), nil }
+
+	if _, err := canonicalCodeGraphProjectRoot(root); err == nil {
+		t.Fatal("canonicalCodeGraphProjectRoot accepted a git root outside the selected project")
+	}
+}
+
 func assertSameFile(t *testing.T, got, want string) {
 	t.Helper()
 	gotInfo, gotErr := os.Stat(got)
