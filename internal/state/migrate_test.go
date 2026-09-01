@@ -146,12 +146,44 @@ func TestResolveSelectionAndRestoreMigrationAreReversible(t *testing.T) {
 	if string(content) != "original\n" {
 		t.Fatalf("restored managed path = %q", content)
 	}
+	if info, err := os.Stat(managed); err != nil || info.Mode().Perm() != 0o644 {
+		t.Fatalf("restored managed mode = %v, want 0644", info)
+	}
 	restoredReport, err := ReadMigrationReport(home)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !restoredReport.Restored || restoredReport.NeedsSelection() || !strings.Contains(restoredReport.BackupPath, result.Report.BackupID) {
 		t.Fatalf("restored report = %#v", restoredReport)
+	}
+}
+
+func TestMigrateInterruptionLeavesRawStateAndReportUnchanged(t *testing.T) {
+	home := t.TempDir()
+	original := InstallState{InstalledAgents: []string{"claude-code"}, CommunityTools: []string{"codegraph"}}
+	if err := Write(home, original); err != nil {
+		t.Fatal(err)
+	}
+	rawBefore, err := os.ReadFile(Path(home))
+	if err != nil {
+		t.Fatal(err)
+	}
+	managedDirectory := filepath.Join(home, "managed-directory")
+	if err := os.MkdirAll(managedDirectory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Migrate(home, []string{managedDirectory}); err == nil || !strings.Contains(err.Error(), "regular file or symlink") {
+		t.Fatalf("Migrate() error = %v, want managed-path interruption", err)
+	}
+	rawAfter, err := os.ReadFile(Path(home))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(rawAfter, rawBefore) {
+		t.Fatalf("raw state changed after interrupted migration")
+	}
+	if _, err := os.Stat(MigrationReportPath(home)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("migration report after interruption = %v, want absent", err)
 	}
 }
 
