@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/filemerge"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
@@ -38,7 +37,7 @@ func CodeGraphGuidanceMarkdown() string {
 		"",
 		"CodeGraph-aware worktree placement:",
 		"",
-		"- Create Git worktrees that may need CodeGraph under the user's home directory, preferably as a sibling such as `<repo-parent>/<repo-name>-worktrees/<worktree-name>`. Never place a CodeGraph-dependent worktree under `/tmp`, `/var/tmp`, or `/tmp/opencode`; generic temporary-work guidance does not override this rule.",
+		"- Create Git worktrees that may need CodeGraph under the user's home directory, preferably as a sibling such as `<repo-parent>/<repo-name>-worktrees/<worktree-name>`. Never place a CodeGraph-dependent worktree under `/tmp` or `/var/tmp`; generic temporary-work guidance does not override this rule.",
 		"- Every worktree needs its own `.codegraph/` index. Never copy, symlink, or reuse another checkout's index because its root and checked-out bytes may differ.",
 		"",
 		"CodeGraph intelligence surface:",
@@ -189,21 +188,6 @@ func InjectCodeGraphGuidance(homeDir string) (GuidanceInjectionResult, error) {
 		result.Files = append(result.Files, file)
 	}
 
-	// OpenCode is no longer selectable, but existing installations remain a
-	// compatibility surface for migration and rollback. Refresh its managed
-	// guidance when its legacy config directory is still present.
-	legacyAdapter := opencode.NewAdapter()
-	if legacyOpenCodeConfigPresent(homeDir) {
-		file, changed, err := injectCodeGraphGuidanceForAgent(homeDir, legacyAdapter)
-		if err != nil {
-			return result, fmt.Errorf("inject CodeGraph guidance for %s: %w", legacyAdapter.Agent(), err)
-		}
-		if file != "" {
-			result.Changed = result.Changed || changed
-			result.Files = append(result.Files, file)
-		}
-	}
-
 	return result, nil
 }
 
@@ -223,12 +207,6 @@ func CodeGraphGuidancePaths(homeDir string) []string {
 			continue
 		}
 		path := adapter.SystemPromptFile(homeDir)
-		if strings.TrimSpace(path) != "" {
-			paths = append(paths, path)
-		}
-	}
-	if legacyOpenCodeConfigPresent(homeDir) {
-		path := opencode.NewAdapter().SystemPromptFile(homeDir)
 		if strings.TrimSpace(path) != "" {
 			paths = append(paths, path)
 		}
@@ -253,10 +231,6 @@ func CodeGraphManagedPaths(homeDir string) []string {
 		}
 		paths = append(paths, codeGraphToolWiringPaths(homeDir, adapter)...)
 	}
-	if legacyOpenCodeConfigPresent(homeDir) {
-		paths = append(paths, legacyOpenCodeManagedPaths(homeDir)...)
-	}
-
 	seen := make(map[string]struct{}, len(paths))
 	managed := make([]string, 0, len(paths))
 	for _, path := range paths {
@@ -271,77 +245,6 @@ func CodeGraphManagedPaths(homeDir string) []string {
 	}
 	slices.Sort(managed)
 	return managed
-}
-
-func NeedsOpenCodeCodeGraphReconcile(homeDir string) bool {
-	// OpenCode is retired from the selectable registry, but existing installs
-	// still need a read/repair path so rollback and migration remain safe.
-	adapter := opencode.NewAdapter()
-	if !legacyOpenCodeConfigPresent(homeDir) {
-		return false
-	}
-	_, configured := hasCodeGraphToolWiring(homeDir, adapter)
-	return !configured
-}
-
-func legacyOpenCodeConfigPresent(homeDir string) bool {
-	_, err := os.Stat(opencode.NewAdapter().GlobalConfigDir(homeDir))
-	return err == nil
-}
-
-// ReconcileOpenCodeCodeGraph delegates JSON/JSONC editing to CodeGraph's own
-// installer so comments and unrelated user configuration remain untouched.
-func ReconcileOpenCodeCodeGraph(homeDir string, runner Runner) (GuidanceInjectionResult, error) {
-	if !NeedsOpenCodeCodeGraphReconcile(homeDir) {
-		return GuidanceInjectionResult{}, nil
-	}
-	if runner == nil {
-		return GuidanceInjectionResult{}, fmt.Errorf("OpenCode CodeGraph reconciliation runner is not configured")
-	}
-
-	paths := CodeGraphManagedPaths(homeDir)
-	before := readCodeGraphManagedFiles(paths)
-	if err := runner.Run("codegraph", "install", "--target", "opencode", "--location", "global", "--yes"); err != nil {
-		return GuidanceInjectionResult{}, fmt.Errorf("reconcile OpenCode CodeGraph MCP wiring: %w", err)
-	}
-	if NeedsOpenCodeCodeGraphReconcile(homeDir) {
-		return GuidanceInjectionResult{}, fmt.Errorf("CodeGraph installer did not create effective OpenCode MCP wiring")
-	}
-
-	result := GuidanceInjectionResult{}
-	for _, path := range paths {
-		after, err := os.ReadFile(path)
-		if err != nil && !os.IsNotExist(err) {
-			return result, fmt.Errorf("read reconciled CodeGraph file %q: %w", path, err)
-		}
-		if string(after) == before[path] {
-			continue
-		}
-		result.Changed = true
-		result.Files = append(result.Files, path)
-	}
-	return result, nil
-}
-
-func legacyOpenCodeManagedPaths(homeDir string) []string {
-	adapter := opencode.NewAdapter()
-	settingsPath := adapter.SettingsPath(homeDir)
-	paths := []string{settingsPath}
-	if strings.HasSuffix(settingsPath, ".json") {
-		paths = append(paths, strings.TrimSuffix(settingsPath, ".json")+".jsonc")
-	}
-	return paths
-}
-
-func readCodeGraphManagedFiles(paths []string) map[string]string {
-	files := make(map[string]string, len(paths))
-	for _, path := range paths {
-		data, err := os.ReadFile(path)
-		if err == nil {
-			files[path] = string(data)
-		}
-	}
-	return files
 }
 
 func injectCodeGraphGuidanceForAgent(homeDir string, adapter agents.Adapter) (string, bool, error) {

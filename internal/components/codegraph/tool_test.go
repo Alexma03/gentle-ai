@@ -14,7 +14,6 @@ import (
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/claude"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
 
@@ -299,7 +298,7 @@ func TestCodeGraphGuidanceContainsLazyInitAndUsageRules(t *testing.T) {
 		"hard ordering rule",
 		"Create Git worktrees that may need CodeGraph under the user's home directory",
 		"<repo-parent>/<repo-name>-worktrees/<worktree-name>",
-		"Never place a CodeGraph-dependent worktree under `/tmp`, `/var/tmp`, or `/tmp/opencode`",
+		"Never place a CodeGraph-dependent worktree under `/tmp` or `/var/tmp`",
 		"generic temporary-work guidance does not override this rule",
 		"Every worktree needs its own `.codegraph/` index",
 		"Never copy, symlink, or reuse another checkout's index",
@@ -669,7 +668,7 @@ func TestCodeGraphGuidanceInjectPreservesManualNotesInterleavedWithUnmarkedUpstr
 
 func TestUnselectedCodeGraphDoesNotInjectGuidance(t *testing.T) {
 	home := t.TempDir()
-	mustWrite(t, filepath.Join(home, ".config", "opencode", "opencode.json"), `{}`)
+	mustWrite(t, filepath.Join(home, ".claude", "settings.json"), `{}`)
 
 	result, err := InjectCodeGraphGuidanceIfSelected(home, nil)
 	if err != nil {
@@ -678,8 +677,8 @@ func TestUnselectedCodeGraphDoesNotInjectGuidance(t *testing.T) {
 	if result.Changed || len(result.Files) != 0 {
 		t.Fatalf("result = %#v, want no-op for unselected CodeGraph", result)
 	}
-	if _, err := os.Stat(filepath.Join(home, ".config", "opencode", "AGENTS.md")); !os.IsNotExist(err) {
-		t.Fatalf("OpenCode AGENTS.md should not exist when CodeGraph is unselected; stat err = %v", err)
+	if _, err := os.Stat(filepath.Join(home, ".claude", "CLAUDE.md")); !os.IsNotExist(err) {
+		t.Fatalf("Claude guidance should not exist when CodeGraph is unselected; stat err = %v", err)
 	}
 }
 
@@ -816,95 +815,14 @@ func TestCodeGraphEffectiveWiringCapabilityIsOptional(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("XDG_CONFIG_HOME", "")
 
-	var openCodeAdapter agents.Adapter = opencode.NewAdapter()
-	if _, ok := openCodeAdapter.(agents.EffectiveCodeGraphWiringDetector); !ok {
-		t.Fatal("OpenCode adapter does not expose effective CodeGraph wiring detection")
-	}
-
 	var claudeAdapter agents.Adapter = claude.NewAdapter()
 	if _, ok := claudeAdapter.(agents.EffectiveCodeGraphWiringDetector); ok {
-		t.Fatal("Claude adapter unexpectedly exposes OpenCode-specific wiring detection")
+		t.Fatal("Claude adapter unexpectedly exposes an agent-specific wiring detector")
 	}
 	path := filepath.Join(home, ".claude.json")
 	mustWrite(t, path, `{"mcpServers":{"codegraph":{"command":"codegraph"}}}`)
 	if gotPath, configured := hasCodeGraphToolWiring(home, claudeAdapter); !configured || gotPath != path {
 		t.Fatalf("Claude global detection = (%q, %v), want (%q, true)", gotPath, configured, path)
-	}
-}
-
-func TestReconcileOpenCodeCodeGraphUsesUpstreamInstaller(t *testing.T) {
-	home := t.TempDir()
-	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
-	mustWrite(t, settingsPath, `{"mcp":{"user":{"type":"remote","url":"https://example.com"}}}`)
-
-	var command string
-	result, err := ReconcileOpenCodeCodeGraph(home, RunnerFunc(func(name string, args ...string) error {
-		command = strings.Join(append([]string{name}, args...), " ")
-		mustWrite(t, settingsPath, `{"mcp":{"user":{"type":"remote","url":"https://example.com"},"codegraph":{"type":"local","command":["codegraph","serve","--mcp"],"enabled":true}}}`)
-		return nil
-	}))
-	if err != nil {
-		t.Fatalf("ReconcileOpenCodeCodeGraph() error = %v", err)
-	}
-	if command != "codegraph install --target opencode --location global --yes" {
-		t.Fatalf("command = %q", command)
-	}
-	if !result.Changed || !reflect.DeepEqual(result.Files, []string{settingsPath}) {
-		t.Fatalf("result = %#v, want changed OpenCode settings", result)
-	}
-	content, err := os.ReadFile(settingsPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(content), `"user"`) || !strings.Contains(string(content), `"codegraph"`) {
-		t.Fatalf("OpenCode settings lost user or CodeGraph MCP entry: %s", content)
-	}
-}
-
-func TestReconcileOpenCodeCodeGraphPreservesJSONCUserContent(t *testing.T) {
-	home := t.TempDir()
-	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.jsonc")
-	mustWrite(t, settingsPath, "{\n  // keep this comment\n  \"mcp\": {\"user\": {\"type\": \"remote\", \"url\": \"https://example.com\"},},\n}\n")
-
-	result, err := ReconcileOpenCodeCodeGraph(home, RunnerFunc(func(string, ...string) error {
-		mustWrite(t, settingsPath, "{\n  // keep this comment\n  \"mcp\": {\"user\": {\"type\": \"remote\", \"url\": \"https://example.com\"}, \"codegraph\": {\"type\": \"local\", \"command\": [\"codegraph\", \"serve\", \"--mcp\"], \"enabled\": true},},\n}\n")
-		return nil
-	}))
-	if err != nil {
-		t.Fatalf("ReconcileOpenCodeCodeGraph() error = %v", err)
-	}
-	if !result.Changed || !reflect.DeepEqual(result.Files, []string{settingsPath}) {
-		t.Fatalf("result = %#v, want changed JSONC settings", result)
-	}
-	content, err := os.ReadFile(settingsPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, want := range []string{"// keep this comment", `"user"`, `"codegraph"`} {
-		if !strings.Contains(string(content), want) {
-			t.Fatalf("JSONC content missing %q after reconcile: %s", want, content)
-		}
-	}
-}
-
-func TestReconcileOpenCodeCodeGraphUsesXDGConfigHome(t *testing.T) {
-	home := t.TempDir()
-	xdg := filepath.Join(home, "custom-config")
-	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home)
-	t.Setenv("XDG_CONFIG_HOME", xdg)
-	settingsPath := filepath.Join(xdg, "opencode", "opencode.json")
-	mustWrite(t, settingsPath, `{}`)
-
-	result, err := ReconcileOpenCodeCodeGraph(home, RunnerFunc(func(string, ...string) error {
-		mustWrite(t, settingsPath, `{"mcp":{"codegraph":{"type":"local","command":["codegraph","serve","--mcp"],"enabled":true}}}`)
-		return nil
-	}))
-	if err != nil {
-		t.Fatalf("ReconcileOpenCodeCodeGraph() error = %v", err)
-	}
-	if !result.Changed || !reflect.DeepEqual(result.Files, []string{settingsPath}) {
-		t.Fatalf("result = %#v, want XDG OpenCode settings", result)
 	}
 }
 
@@ -977,35 +895,11 @@ func TestInstallRepairsRelativeAntigravityCommand(t *testing.T) {
 	}
 }
 
-func TestInstallRecordsTargetedOpenCodeReconciliation(t *testing.T) {
-	home := t.TempDir()
-	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
-	mustWrite(t, settingsPath, `{}`)
-	mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
-	mustWrite(t, filepath.Join(home, ".claude", "CLAUDE.md"), "<!-- gentle-ai:codegraph-guidance -->\nmanaged\n<!-- /gentle-ai:codegraph-guidance -->\n")
-
-	result, err := Install(home, "/work/project", RunnerFunc(func(string, ...string) error {
-		mustWrite(t, settingsPath, `{"mcp":{"codegraph":{"type":"local","command":["codegraph","serve","--mcp"],"enabled":true}}}`)
-		mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
-		return nil
-	}), DetectorFunc(func(string) (string, error) { return "/bin/codegraph", nil }))
-	if err != nil {
-		t.Fatalf("InstallWithHome() error = %v", err)
-	}
-	want := []string{"codegraph install --target opencode --location global --yes"}
-	if !reflect.DeepEqual(result.CommandsRun, want) {
-		t.Fatalf("CommandsRun = %#v, want %#v", result.CommandsRun, want)
-	}
-}
-
 func TestInstallRunsFullReconcileWhenAnotherAgentIsMissing(t *testing.T) {
 	home := t.TempDir()
-	settingsPath := filepath.Join(home, ".config", "opencode", "opencode.json")
-	mustWrite(t, settingsPath, `{}`)
 	mustWrite(t, filepath.Join(home, ".claude", "settings.json"), `{}`)
 
 	result, err := Install(home, "/work/project", RunnerFunc(func(string, ...string) error {
-		mustWrite(t, settingsPath, `{"mcp":{"codegraph":{"type":"local","command":["codegraph","serve","--mcp"],"enabled":true}}}`)
 		mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
 		return nil
 	}), DetectorFunc(func(string) (string, error) { return "/bin/codegraph", nil }))
@@ -1148,12 +1042,12 @@ func TestValidateCodeGraphInstallStatusFailsForDetectedMissingAgent(t *testing.T
 		Tool: model.CommunityToolCodeGraph,
 		CLI:  AvailabilityAvailable,
 		Agents: []AgentStatus{
-			{Agent: model.AgentOpenCode, Name: "OpenCode", Detected: true, Configured: false},
+			{Agent: model.AgentClaudeCode, Name: "Claude Code", Detected: true, Configured: false},
 		},
 	}
 	err := validateCodeGraphInstallStatus(status)
-	if err == nil || !strings.Contains(err.Error(), "OpenCode") {
-		t.Fatalf("validateCodeGraphInstallStatus() error = %v, want missing OpenCode", err)
+	if err == nil || !strings.Contains(err.Error(), "Claude Code") {
+		t.Fatalf("validateCodeGraphInstallStatus() error = %v, want missing Claude Code", err)
 	}
 }
 

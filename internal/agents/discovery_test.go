@@ -90,11 +90,11 @@ func TestDiscoverInstalled_ReturnsOnlyInstalledAgents(t *testing.T) {
 	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	// opencode dir intentionally NOT created.
+	// codex dir intentionally NOT created.
 
 	reg := newStubRegistry(t,
 		stubAdapter{agent: model.AgentClaudeCode, configDir: claudeDir},
-		stubAdapter{agent: model.AgentOpenCode, configDir: filepath.Join(home, ".config", "opencode")},
+		stubAdapter{agent: model.AgentCodex, configDir: filepath.Join(home, ".config", "codex")},
 	)
 
 	got := DiscoverInstalled(reg, home)
@@ -133,7 +133,7 @@ func TestDiscoverInstalled_MissingDirIsSkipped(t *testing.T) {
 	// Config dir not created on disk.
 
 	reg := newStubRegistry(t,
-		stubAdapter{agent: model.AgentOpenCode, configDir: filepath.Join(home, ".config", "opencode")},
+		stubAdapter{agent: model.AgentCodex, configDir: filepath.Join(home, ".config", "codex")},
 	)
 
 	got := DiscoverInstalled(reg, home)
@@ -149,9 +149,9 @@ func TestDiscoverInstalled_MultipleInstalled(t *testing.T) {
 	home := t.TempDir()
 
 	claudeDir := filepath.Join(home, ".claude")
-	opencodeDir := filepath.Join(home, ".config", "opencode")
+	codexDir := filepath.Join(home, ".config", "codex")
 
-	for _, dir := range []string{claudeDir, opencodeDir} {
+	for _, dir := range []string{claudeDir, codexDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatalf("MkdirAll(%q): %v", dir, err)
 		}
@@ -159,7 +159,7 @@ func TestDiscoverInstalled_MultipleInstalled(t *testing.T) {
 
 	reg := newStubRegistry(t,
 		stubAdapter{agent: model.AgentClaudeCode, configDir: claudeDir},
-		stubAdapter{agent: model.AgentOpenCode, configDir: opencodeDir},
+		stubAdapter{agent: model.AgentCodex, configDir: codexDir},
 	)
 
 	got := DiscoverInstalled(reg, home)
@@ -197,7 +197,7 @@ func TestConfigRootsForBackup_ReturnsInstalledDirs(t *testing.T) {
 
 	reg := newStubRegistry(t,
 		stubAdapter{agent: model.AgentClaudeCode, configDir: claudeDir},
-		stubAdapter{agent: model.AgentOpenCode, configDir: filepath.Join(home, ".config", "opencode")}, // missing
+		stubAdapter{agent: model.AgentCodex, configDir: filepath.Join(home, ".config", "codex")}, // missing
 	)
 
 	roots := ConfigRootsForBackup(reg, home)
@@ -222,7 +222,7 @@ func TestConfigRootsForBackup_DeduplicatesSharedDirs(t *testing.T) {
 
 	reg := newStubRegistry(t,
 		stubAdapter{agent: model.AgentClaudeCode, configDir: sharedDir},
-		stubAdapter{agent: model.AgentOpenCode, configDir: sharedDir},
+		stubAdapter{agent: model.AgentCodex, configDir: sharedDir},
 	)
 
 	roots := ConfigRootsForBackup(reg, home)

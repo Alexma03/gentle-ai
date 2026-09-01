@@ -122,18 +122,13 @@ func TestEveryManifestKeepsWorkRoutingDormantAndHashesCanonically(t *testing.T) 
 	t.Parallel()
 
 	const wantRoutingDigest = "sha256:ed03b86f20c9449a6e4c018f51d1e05619e1070b1076287a0792a74c458762b2"
-	// Digests pin the four providers with an enforceable fresh-reviewer
-	// boundary: Claude Code's generated reviewer has no live tools, OpenCode
-	// relays one ordinary task through Go-owned admission, Codex's provider
-	// subprocess reaches the same contract, and gentle-pi's host relay
-	// forwards the Go-issued opaque task to a fresh locked-down pi
-	// subprocess (gentle-pi#311, gentle-ai#3249).
+	// Digests pin the retained providers with an enforceable fresh-reviewer
+	// boundary and provider-owned transport that reaches Go-owned admission.
 	wantManifestDigests := map[model.AgentID]string{
 		model.AgentAntigravity: "sha256:8e09945cd860b793c59f73db19827bcb4dcfd75c9ecc7f876167ab52fe77ccc2",
 		model.AgentClaudeCode:  "sha256:132b9219b222d35b0e4eafce3dae965c56eb8d79f07dff6d45c42c137e36fd9b",
 		model.AgentCodex:       "sha256:dbf94a3b7815cf68ccd6299c634f3e17be9abc305b3849adee382c65055c5ed9",
 		model.AgentCursor:      "sha256:08e32b28b4cde7ffaf67210354fb95df2aaf424016ec6093190fb38c5f7226cb",
-		model.AgentOpenCode:    "sha256:3df2c0ee0a61774b7b7f0d547abed55721cc37ecc332c131935ce72fb142103f",
 		model.AgentPi:          "sha256:0332851d2286a97ab824a1d656b94f02651bfbf85bdf0f6cc47fe8f7d09765ad",
 	}
 
@@ -153,7 +148,7 @@ func TestEveryManifestKeepsWorkRoutingDormantAndHashesCanonically(t *testing.T) 
 			if manifest.Advertises(ContractWorkRoutingV1) {
 				t.Fatal("work-routing must remain unadvertised before final activation")
 			}
-			wantImmutableExecutor := agent == model.AgentClaudeCode || agent == model.AgentOpenCode || agent == model.AgentCodex || agent == model.AgentPi
+			wantImmutableExecutor := agent == model.AgentClaudeCode || agent == model.AgentCodex || agent == model.AgentPi
 			if got := manifest.Advertises(ContractImmutableReviewExecutorV1); got != wantImmutableExecutor {
 				t.Fatalf("immutable reviewer execution advertised = %t, want %t", got, wantImmutableExecutor)
 			}
@@ -197,7 +192,7 @@ func TestEveryManifestKeepsWorkRoutingDormantAndHashesCanonically(t *testing.T) 
 }
 
 // TestEveryManifestDigestStaysByteStable pins every non-Pi row at the closed
-// review-transport baseline for the five retained non-Pi providers.
+// review-transport baseline for the four retained non-Pi providers.
 func TestEveryManifestDigestStaysByteStable(t *testing.T) {
 	t.Parallel()
 
@@ -206,7 +201,6 @@ func TestEveryManifestDigestStaysByteStable(t *testing.T) {
 		model.AgentClaudeCode:  "sha256:132b9219b222d35b0e4eafce3dae965c56eb8d79f07dff6d45c42c137e36fd9b",
 		model.AgentCodex:       "sha256:dbf94a3b7815cf68ccd6299c634f3e17be9abc305b3849adee382c65055c5ed9",
 		model.AgentCursor:      "sha256:08e32b28b4cde7ffaf67210354fb95df2aaf424016ec6093190fb38c5f7226cb",
-		model.AgentOpenCode:    "sha256:3df2c0ee0a61774b7b7f0d547abed55721cc37ecc332c131935ce72fb142103f",
 	}
 
 	nonPiAgents := make([]model.AgentID, 0, len(wantNonPiDigests))
@@ -214,8 +208,8 @@ func TestEveryManifestDigestStaysByteStable(t *testing.T) {
 		nonPiAgents = append(nonPiAgents, agent)
 	}
 
-	if got := len(nonPiAgents); got != 5 {
-		t.Fatalf("want 5 retained non-Pi agents, got %d", got)
+	if got := len(nonPiAgents); got != 4 {
+		t.Fatalf("want 4 retained non-Pi agents, got %d", got)
 	}
 
 	for _, agent := range nonPiAgents {
@@ -274,9 +268,6 @@ func TestCanonicalFeatureClaimsCoverOnlyPersonalClients(t *testing.T) {
 		if !want[agent] {
 			t.Fatalf("retired agent %q entered canonical feature claims", agent)
 		}
-	}
-	if len(legacyFeatureClaimsByAgent) == 0 {
-		t.Fatal("legacy feature claims disappeared; migration adapters need a compatibility projection")
 	}
 }
 

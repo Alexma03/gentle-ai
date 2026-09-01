@@ -59,14 +59,14 @@ func (m mockAdapter) SupportsMCP() bool {
 
 func TestRegistrySupportedAgentsSorted(t *testing.T) {
 	r, err := NewRegistry(
-		mockAdapter{agent: model.AgentOpenCode},
+		mockAdapter{agent: model.AgentCodex},
 		mockAdapter{agent: model.AgentClaudeCode},
 	)
 	if err != nil {
 		t.Fatalf("NewRegistry() returned error: %v", err)
 	}
 
-	if !reflect.DeepEqual(r.SupportedAgents(), []model.AgentID{model.AgentClaudeCode, model.AgentOpenCode}) {
+	if !reflect.DeepEqual(r.SupportedAgents(), []model.AgentID{model.AgentClaudeCode, model.AgentCodex}) {
 		t.Fatalf("SupportedAgents() = %v", r.SupportedAgents())
 	}
 }
@@ -85,18 +85,19 @@ func TestRegistryRejectsDuplicateAgent(t *testing.T) {
 	}
 }
 
-func TestFactoryReturnsMVPAdapters(t *testing.T) {
-	registry, err := NewMVPRegistry()
+func TestFactoryReturnsDefaultAdapters(t *testing.T) {
+	registry, err := NewDefaultRegistry()
 	if err != nil {
-		t.Fatalf("NewMVPRegistry() returned error: %v", err)
+		t.Fatalf("NewDefaultRegistry() returned error: %v", err)
 	}
 
 	if _, ok := registry.Get(model.AgentClaudeCode); !ok {
 		t.Fatalf("registry missing claude adapter")
 	}
-
-	if _, ok := registry.Get(model.AgentOpenCode); !ok {
-		t.Fatalf("registry missing opencode adapter")
+	for _, id := range model.PersonalClientIDs() {
+		if _, ok := registry.Get(id); !ok {
+			t.Fatalf("registry missing %s adapter", id)
+		}
 	}
 }
 

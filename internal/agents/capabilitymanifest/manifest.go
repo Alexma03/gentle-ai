@@ -116,12 +116,6 @@ type ContractClaim struct {
 func ForAgent(agent model.AgentID) (AgentCapabilityManifest, error) {
 	features, ok := featureClaimsByAgent[agent]
 	if !ok {
-		// Legacy adapter constructors remain available only so migration and
-		// rollback can inspect old persisted identities. They are not included
-		// in the canonical registry or selection surfaces.
-		features, ok = legacyFeatureClaimsByAgent[agent]
-	}
-	if !ok {
 		return AgentCapabilityManifest{}, fmt.Errorf("%w: %q", ErrUnsupportedAgent, agent)
 	}
 
@@ -153,15 +147,11 @@ func ForAgent(agent model.AgentID) (AgentCapabilityManifest, error) {
 // immutable reviewer boundary advertise receipt-driven review. A map miss
 // (an unknown agent) remains fail-closed.
 var reviewTransportExposureByAgent = func() map[model.AgentID]ContractExposure {
-	exposure := make(map[model.AgentID]ContractExposure, len(featureClaimsByAgent)+len(legacyFeatureClaimsByAgent))
+	exposure := make(map[model.AgentID]ContractExposure, len(featureClaimsByAgent))
 	for agent := range featureClaimsByAgent {
 		exposure[agent] = ContractExposureDormant
 	}
-	for agent := range legacyFeatureClaimsByAgent {
-		exposure[agent] = ContractExposureDormant
-	}
 	exposure[model.AgentClaudeCode] = ContractExposureAdvertised
-	exposure[model.AgentOpenCode] = ContractExposureAdvertised
 	exposure[model.AgentCodex] = ContractExposureAdvertised
 	exposure[model.AgentPi] = ContractExposureAdvertised
 	return exposure
@@ -170,13 +160,9 @@ var reviewTransportExposureByAgent = func() map[model.AgentID]ContractExposure {
 // immutableReviewExecutorExposureByAgent declares only providers with an
 // enforceable fresh-reviewer boundary. Claude launches a generated subagent
 // with no live tools and receives only the native prompt-carried evidence;
-// OpenCode relays one host Task through a Go-native transport process, which
-// materializes the bound prompt and captures matching raw output from an
-// ordinary already-running session -- no restart, child process, special
-// user-visible session, or `OPENCODE_DISABLE_*` variable (rdd-advisory-
-// transport SKILL.md). Capability advertisement records the provider contract
-// that can reach Go-owned admission; organic runtime proof is recorded by the
-// provider's own execution tests. Pi advertises through gentle-pi's host
+// Retained providers advertise only after their provider-owned immutable
+// boundary can reach Go-owned admission. Organic runtime proof is recorded by
+// the provider's own execution tests. Pi advertises through gentle-pi's host
 // relay: the launcher reads the negotiated collection input, spawns a
 // brand-new print-mode pi subprocess in an empty scratch directory with
 // every discovery surface disabled, forwards the Go-issued opaque prompt
@@ -184,15 +170,11 @@ var reviewTransportExposureByAgent = func() map[model.AgentID]ContractExposure {
 // Unsupported runtimes remain explicitly dormant until they own an equivalent
 // native boundary.
 var immutableReviewExecutorExposureByAgent = func() map[model.AgentID]ContractExposure {
-	exposure := make(map[model.AgentID]ContractExposure, len(featureClaimsByAgent)+len(legacyFeatureClaimsByAgent))
+	exposure := make(map[model.AgentID]ContractExposure, len(featureClaimsByAgent))
 	for agent := range featureClaimsByAgent {
 		exposure[agent] = ContractExposureDormant
 	}
-	for agent := range legacyFeatureClaimsByAgent {
-		exposure[agent] = ContractExposureDormant
-	}
 	exposure[model.AgentClaudeCode] = ContractExposureAdvertised
-	exposure[model.AgentOpenCode] = ContractExposureAdvertised
 	exposure[model.AgentCodex] = ContractExposureAdvertised
 	exposure[model.AgentPi] = ContractExposureAdvertised
 	return exposure
@@ -315,14 +297,5 @@ var featureClaimsByAgent = map[model.AgentID]AgentFeatureClaims{
 	},
 	model.AgentPi: {
 		SystemPrompt: false, MCP: true,
-	},
-}
-
-// legacyFeatureClaimsByAgent is intentionally isolated from the canonical map.
-// It exists only for NewAdapter compatibility while state migration can read
-// old installations; no current catalog or registry consumer enumerates it.
-var legacyFeatureClaimsByAgent = map[model.AgentID]AgentFeatureClaims{
-	model.AgentOpenCode: {
-		SlashCommands: true, Skills: true, SystemPrompt: true, MCP: true,
 	},
 }

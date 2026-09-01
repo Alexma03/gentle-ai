@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/catalog"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
@@ -101,13 +100,6 @@ func Install(homeDir, workspaceDir string, runner Runner, detector Detector) (Re
 		return result, cause
 	}
 	if before.CodeGraphReconcileSatisfied() || codeGraphCanRepairWithoutFullInstall(homeDir, before) {
-		if NeedsOpenCodeCodeGraphReconcile(homeDir) {
-			result.CommandsRun = append(result.CommandsRun, "codegraph install --target opencode --location global --yes")
-		}
-		openCodeResult, err := ReconcileOpenCodeCodeGraph(homeDir, runner)
-		if err != nil {
-			return rollback(err)
-		}
 		guidanceResult, err := InjectCodeGraphGuidanceIfSelected(homeDir, []model.CommunityToolID{model.CommunityToolCodeGraph})
 		if err != nil {
 			return rollback(err)
@@ -125,7 +117,7 @@ func Install(homeDir, workspaceDir string, runner Runner, detector Detector) (Re
 		if err := validateCodeGraphInstallStatus(after); err != nil {
 			return rollback(err)
 		}
-		if openCodeResult.Changed || guidanceResult.Changed {
+		if guidanceResult.Changed {
 			result.ManualActions = append(result.ManualActions, "CodeGraph is already available and MCP-configured. Agent guidance was updated so enabled agents lazily initialize project indexes when needed.")
 		} else {
 			result.ManualActions = append(result.ManualActions, "CodeGraph is already available and configured for all detected supported agents. No changes were needed.")
@@ -185,9 +177,6 @@ func Install(homeDir, workspaceDir string, runner Runner, detector Detector) (Re
 			}
 		}
 	}
-	if _, err := ReconcileOpenCodeCodeGraph(homeDir, runner); err != nil {
-		return rollback(err)
-	}
 	if _, err := InjectCodeGraphGuidanceIfSelected(homeDir, []model.CommunityToolID{model.CommunityToolCodeGraph}); err != nil {
 		return rollback(err)
 	}
@@ -222,9 +211,6 @@ func codeGraphCanRepairWithoutFullInstall(homeDir string, status Status) bool {
 			continue
 		}
 		foundMissing = true
-		if agent.Agent == model.AgentOpenCode {
-			continue
-		}
 		adapter, ok := reg.Get(agent.Agent)
 		if !ok {
 			return false
@@ -433,14 +419,6 @@ func hasDetectedCodeGraphToolWiring(homeDir string) bool {
 			continue
 		}
 		if _, ok := hasCodeGraphToolWiring(homeDir, adapter); ok {
-			return true
-		}
-	}
-	// OpenCode is retired from the selectable registry, but its existing
-	// configuration remains readable so migration and rollback can repair it
-	// without reintroducing the selector.
-	if legacyOpenCodeConfigPresent(homeDir) {
-		if _, configured := hasCodeGraphToolWiring(homeDir, opencode.NewAdapter()); configured {
 			return true
 		}
 	}
