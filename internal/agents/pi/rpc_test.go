@@ -1,17 +1,28 @@
 package pi
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
 
 func TestPiSubagentsRPCReadyAcceptsVersionOneCapabilities(t *testing.T) {
 	ready := `{
-  "event": "subagents:rpc:v1:ready",
   "version": 1,
+  "methods": ["ping", "status", "manage", "spawn", "steer", "interrupt", "stop", "resume"],
   "capabilities": {
-    "methods": ["ping", "status", "spawn", "interrupt", "stop"],
-    "events": {"asyncComplete": true}
+    "status": true,
+    "asyncSpawn": true,
+    "steer": true,
+    "interrupt": true,
+    "stop": true,
+    "resume": true
+  },
+  "events": {
+    "ready": "subagents:rpc:v1:ready",
+    "request": "subagents:rpc:v1:request",
+    "replyPrefix": "subagents:rpc:v1:reply:",
+    "asyncComplete": "subagent:async-complete"
   }
 }`
 
@@ -22,7 +33,7 @@ func TestPiSubagentsRPCReadyAcceptsVersionOneCapabilities(t *testing.T) {
 	if capabilities.Version != PiSubagentsRPCVersion {
 		t.Fatalf("capabilities.Version = %d, want %d", capabilities.Version, PiSubagentsRPCVersion)
 	}
-	if !capabilities.Supports("spawn") {
+	if !slices.Contains(capabilities.Methods, "spawn") {
 		t.Fatal("version-one capabilities did not retain spawn")
 	}
 }
@@ -35,27 +46,27 @@ func TestPiSubagentsRPCReadyRejectsUnversionedOrUnknownCapabilities(t *testing.T
 	}{
 		{
 			name: "missing version",
-			json: `{"event":"subagents:rpc:v1:ready","capabilities":{"methods":["ping","status","spawn","interrupt","stop"],"events":{"asyncComplete":true}}}`,
+			json: `{"methods":["ping","status","manage","spawn","steer","interrupt","stop","resume"],"capabilities":{"status":true,"asyncSpawn":true,"steer":true,"interrupt":true,"stop":true,"resume":true},"events":{"ready":"subagents:rpc:v1:ready","request":"subagents:rpc:v1:request","replyPrefix":"subagents:rpc:v1:reply:","asyncComplete":"subagent:async-complete"}}`,
 			want: "version",
 		},
 		{
 			name: "unknown version",
-			json: `{"event":"subagents:rpc:v1:ready","version":2,"capabilities":{"methods":["ping","status","spawn","interrupt","stop"],"events":{"asyncComplete":true}}}`,
+			json: `{"version":2,"methods":["ping","status","manage","spawn","steer","interrupt","stop","resume"],"capabilities":{"status":true,"asyncSpawn":true,"steer":true,"interrupt":true,"stop":true,"resume":true},"events":{"ready":"subagents:rpc:v1:ready","request":"subagents:rpc:v1:request","replyPrefix":"subagents:rpc:v1:reply:","asyncComplete":"subagent:async-complete"}}`,
 			want: "version",
 		},
 		{
 			name: "missing required method",
-			json: `{"event":"subagents:rpc:v1:ready","version":1,"capabilities":{"methods":["ping","status"],"events":{"asyncComplete":true}}}`,
+			json: `{"version":1,"methods":["ping","status","manage","steer","interrupt","stop","resume"],"capabilities":{"status":true,"asyncSpawn":true,"steer":true,"interrupt":true,"stop":true,"resume":true},"events":{"ready":"subagents:rpc:v1:ready","request":"subagents:rpc:v1:request","replyPrefix":"subagents:rpc:v1:reply:","asyncComplete":"subagent:async-complete"}}`,
 			want: "spawn",
 		},
 		{
 			name: "legacy event",
-			json: `{"event":"pi-subagents:ready","version":1,"capabilities":{"methods":["ping","status","spawn","interrupt","stop"],"events":{"asyncComplete":true}}}`,
+			json: `{"event":"pi-subagents:ready","version":1,"methods":["ping","status","manage","spawn","steer","interrupt","stop","resume"],"capabilities":{"status":true,"asyncSpawn":true,"steer":true,"interrupt":true,"stop":true,"resume":true},"events":{"ready":"subagents:rpc:v1:ready","request":"subagents:rpc:v1:request","replyPrefix":"subagents:rpc:v1:reply:","asyncComplete":"subagent:async-complete"}}`,
 			want: "event",
 		},
 		{
 			name: "trailing JSON",
-			json: `{"event":"subagents:rpc:v1:ready","version":1,"capabilities":{"methods":["ping","status","spawn","interrupt","stop"],"events":{"asyncComplete":true}}} {}`,
+			json: `{"version":1,"methods":["ping","status","manage","spawn","steer","interrupt","stop","resume"],"capabilities":{"status":true,"asyncSpawn":true,"steer":true,"interrupt":true,"stop":true,"resume":true},"events":{"ready":"subagents:rpc:v1:ready","request":"subagents:rpc:v1:request","replyPrefix":"subagents:rpc:v1:reply:","asyncComplete":"subagent:async-complete"}} {}`,
 			want: "trailing",
 		},
 	}

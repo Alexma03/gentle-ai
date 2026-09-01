@@ -1,6 +1,7 @@
 package pi
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -32,7 +33,7 @@ func TestAdapterAcceptsCanonicalPiSubagentsProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AcceptSubagentsRPCResponse() error = %v", err)
 	}
-	if capabilities.Version != PiSubagentsRPCVersion || !capabilities.Supports("resume") {
+	if capabilities.Version != PiSubagentsRPCVersion || !slices.Contains(capabilities.Methods, "resume") {
 		t.Fatalf("capabilities = %#v, want canonical Nicobailon v1", capabilities)
 	}
 }
@@ -43,7 +44,7 @@ func TestAdapterRejectsAbsentMalformedWrongVersionIncompleteAndRetiredPiSubagent
 		response PiSubagentsRPCProviderResponse
 		want     string
 	}{
-		{name: "absent", want: "ready payload"},
+		{name: "absent", response: PiSubagentsRPCProviderResponse{Package: piSubagentsPackageSpec}, want: "ready payload"},
 		{name: "malformed", response: PiSubagentsRPCProviderResponse{Package: piSubagentsPackageSpec, Ready: []byte("{")}, want: "invalid JSON"},
 		{name: "wrong version", response: PiSubagentsRPCProviderResponse{Package: piSubagentsPackageSpec, Ready: []byte(strings.Replace(canonicalPiSubagentsRPCReady, `"version": 1`, `"version": 2`, 1))}, want: "version"},
 		{name: "incomplete", response: PiSubagentsRPCProviderResponse{Package: piSubagentsPackageSpec, Ready: []byte(strings.Replace(canonicalPiSubagentsRPCReady, `"resume"`, `"not-resume"`, 1))}, want: "resume"},
