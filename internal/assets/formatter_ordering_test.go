@@ -57,8 +57,7 @@ func TestRequiredChecksFailClosedWhenFormatFails(t *testing.T) {
 		// section slicing honest: a job this list does not know about gets
 		// swallowed into its predecessor's section, and its own guard step
 		// then reads as the predecessor bypassing the format gate.
-		{id: "darwin-runtime", next: "organic-runtime-e2e"},
-		{id: "organic-runtime-e2e", next: "e2e-tests"},
+		{id: "darwin-runtime", next: "e2e-tests"},
 		{id: "e2e-tests"},
 	}
 	for _, job := range jobs {
