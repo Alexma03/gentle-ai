@@ -15,13 +15,13 @@ Bases: PR1 base=feature/tracker branch; PR2 base=PR1 branch; PR3 base=PR2; PR4 b
 - U4/PR4 Contracts/release; proof root format/vet/test plus bench build/vet/test; N/A parity; rollback generated contracts/pin pair.
 
 ## Phase 1: Foundation
-- [ ] 1.1 RED repo-selector cases: equivalent roots, non-repo, escape, symlink ambiguity (`internal/cli`, CodeGraph; D:none; P:failures).
-- [ ] 1.2 Implement canonical roots, managed paths, backup/Pi sync (`internal/components/codegraph/`, `internal/cli/codegraph.go`; D:1.1; P:tests).
-- [ ] 1.3 RED commit cases: staged, `commit -a`, empty-index review (`internal/cli/review_*_test.go`; D:none; P:failures).
-- [ ] 1.4 Preserve commit semantics in candidate capture/selection (review CLI; D:1.3; P:tests).
-- [ ] 1.5 Add locked `MigrationReport`, mapping, unresolved gate, restore (`internal/state/migrate.go`, `state.go`, `internal/model/`; D:1.2; P:migration/restore).
-- [ ] 1.6 Expand five-client registry/consumers (`internal/agents/{registry,factory,interface}.go`, catalog/system; D:1.5; P:catalog tests).
-- [ ] 1.7 Verify CodeGraph enabled/unavailable doctor and parity (CodeGraph/Pi tests; D:1.2; P:focused tests).
+- [x] 1.1 RED repo-selector cases: equivalent roots, non-repo, escape, symlink ambiguity (`internal/cli`, CodeGraph; D:none; P:failures).
+- [x] 1.2 Implement canonical roots, managed paths, backup/Pi sync (`internal/components/codegraph/`, `internal/cli/codegraph.go`; D:1.1; P:tests).
+- [x] 1.3 RED commit cases: staged, `commit -a`, empty-index review (`internal/cli/review_*_test.go`; D:none; P:failures).
+- [x] 1.4 Preserve commit semantics in candidate capture/selection (review CLI; D:1.3; P:tests).
+- [x] 1.5 Add locked `MigrationReport`, mapping, unresolved gate, restore (`internal/state/migrate.go`, `state.go`, `internal/model/`; D:1.2; P:migration/restore).
+- [x] 1.6 Expand five-client registry/consumers (`internal/agents/{registry,factory,interface}.go`, catalog/system; D:1.5; P:catalog tests).
+- [x] 1.7 Verify CodeGraph enabled/unavailable doctor and parity (CodeGraph/Pi tests; D:1.2; P:focused tests).
 
 ## Phase 2: Retained Clients
 - [ ] 2.1 Preserve Antigravity `.gemini/GEMINI.md`; remove Gemini CLI selection (adapter/model/catalog tests; D:1.6; P:tests).
