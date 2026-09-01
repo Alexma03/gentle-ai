@@ -308,7 +308,7 @@ func TestConfigRootsForBackup_WithDefaultRegistryCoversCreatedDirs(t *testing.T)
 	// Create two agent config dirs.
 	dirs := []string{
 		filepath.Join(home, ".claude"),
-		filepath.Join(home, ".config", "opencode"),
+		filepath.Join(home, ".codex"),
 	}
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0o755); err != nil {

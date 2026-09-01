@@ -68,24 +68,7 @@ func TestDefaultRegistrySupportedAgentsMatchesFactoryAgents(t *testing.T) {
 		t.Fatalf("NewDefaultRegistry() returned error: %v", err)
 	}
 
-	want := []model.AgentID{
-		model.AgentAntigravity,
-		model.AgentClaudeCode,
-		model.AgentCodex,
-		model.AgentCursor,
-		model.AgentGeminiCLI,
-		model.AgentHermes,
-		model.AgentKilocode,
-		model.AgentKimi,
-		model.AgentKiroIDE,
-		model.AgentOpenClaw,
-		model.AgentOpenCode,
-		model.AgentPi,
-		model.AgentQwenCode,
-		model.AgentTrae,
-		model.AgentVSCodeCopilot,
-		model.AgentWindsurf,
-	}
+	want := []model.AgentID{model.AgentAntigravity, model.AgentClaudeCode, model.AgentCodex, model.AgentCursor, model.AgentPi}
 
 	if got := registry.SupportedAgents(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("SupportedAgents() = %v, want %v", got, want)
@@ -103,19 +86,15 @@ func TestFactoryResolvesHermesAdapter(t *testing.T) {
 	}
 }
 
-func TestDefaultRegistryIncludesHermes(t *testing.T) {
+func TestDefaultRegistryExcludesHermesUntilMigration(t *testing.T) {
 	registry, err := NewDefaultRegistry()
 	if err != nil {
 		t.Fatalf("NewDefaultRegistry() returned error: %v", err)
 	}
 
 	adapter, ok := registry.Get(model.AgentHermes)
-	if !ok {
-		t.Fatalf("registry missing %s adapter", model.AgentHermes)
-	}
-
-	if got := adapter.Agent(); got != model.AgentHermes {
-		t.Fatalf("registry adapter.Agent() = %q, want %q", got, model.AgentHermes)
+	if ok || adapter != nil {
+		t.Fatalf("default registry unexpectedly exposed retired %s adapter", model.AgentHermes)
 	}
 }
 

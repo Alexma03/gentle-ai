@@ -38,10 +38,9 @@ func TestScanConfigs_ReturnsAllKnownAgentsWithExistsFlag(t *testing.T) {
 
 	configs := ScanConfigs(home)
 
-	// Must return at least as many entries as the registry has adapters with
-	// a non-empty GlobalConfigDir. Currently 16 agents are supported.
-	if len(configs) < 16 {
-		t.Fatalf("ScanConfigs() returned %d entries, want >= 16; got %v", len(configs), configs)
+	// The scan is driven by the exact retained five-client registry.
+	if len(configs) != 5 {
+		t.Fatalf("ScanConfigs() returned %d entries, want 5; got %v", len(configs), configs)
 	}
 
 	// Find claude — must be Exists=true.
@@ -83,22 +82,11 @@ func TestScanConfigs_AgentFieldMatchesModelAgentID(t *testing.T) {
 
 	// These are the AgentID string values the TUI switch statements check.
 	knownAgents := map[string]bool{
-		"claude-code":    false,
-		"opencode":       false,
-		"kilocode":       false,
-		"gemini-cli":     false,
-		"cursor":         false,
-		"vscode-copilot": false,
-		"codex":          false,
-		"antigravity":    false,
-		"windsurf":       false,
-		"kimi":           false,
-		"qwen-code":      false,
-		"kiro-ide":       false,
-		"openclaw":       false,
-		"pi":             false,
-		"trae-ide":       false,
-		"hermes":         false,
+		"claude-code": false,
+		"codex":       false,
+		"cursor":      false,
+		"antigravity": false,
+		"pi":          false,
 	}
 
 	for _, c := range configs {
@@ -149,7 +137,7 @@ func TestScanConfigs_IsDirectorySetForExistingDirs(t *testing.T) {
 	home := t.TempDir()
 
 	// Create two agent dirs.
-	for _, rel := range []string{".claude", ".config/opencode"} {
+	for _, rel := range []string{".claude", ".codex"} {
 		if err := os.MkdirAll(filepath.Join(home, rel), 0o755); err != nil {
 			t.Fatalf("MkdirAll(%q): %v", rel, err)
 		}
@@ -157,7 +145,7 @@ func TestScanConfigs_IsDirectorySetForExistingDirs(t *testing.T) {
 
 	configs := ScanConfigs(home)
 
-	claudeFound, opencodeFound := false, false
+	claudeFound, codexFound := false, false
 	for _, c := range configs {
 		switch c.Agent {
 		case "claude-code":
@@ -165,8 +153,8 @@ func TestScanConfigs_IsDirectorySetForExistingDirs(t *testing.T) {
 			if !c.Exists || !c.IsDirectory {
 				t.Errorf("claude-code: Exists=%v IsDirectory=%v, want both true", c.Exists, c.IsDirectory)
 			}
-		case "opencode":
-			opencodeFound = true
+		case "codex":
+			codexFound = true
 			if !c.Exists || !c.IsDirectory {
 				t.Errorf("opencode: Exists=%v IsDirectory=%v, want both true", c.Exists, c.IsDirectory)
 			}
@@ -176,8 +164,8 @@ func TestScanConfigs_IsDirectorySetForExistingDirs(t *testing.T) {
 	if !claudeFound {
 		t.Error("ScanConfigs() missing claude-code entry")
 	}
-	if !opencodeFound {
-		t.Error("ScanConfigs() missing opencode entry")
+	if !codexFound {
+		t.Error("ScanConfigs() missing codex entry")
 	}
 }
 
