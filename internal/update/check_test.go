@@ -216,93 +216,6 @@ func TestDetectInstalledVersionFallbackPathsNoFallbackDefined(t *testing.T) {
 	}
 }
 
-func TestDetectInstalledVersionFromOpenCodeNodeModulePackageJSON(t *testing.T) {
-	home := t.TempDir()
-	pkgDir := filepath.Join(home, ".config", "opencode", "node_modules", "opencode-sdd-engram-manage")
-	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(pkgDir, "package.json"), []byte(`{"version":"1.1.7"}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	origHome := userHomeDir
-	userHomeDir = func() (string, error) { return home, nil }
-	t.Cleanup(func() { userHomeDir = origHome })
-
-	tool := ToolInfo{Name: "sdd-engram-plugin", NpmPackage: "opencode-sdd-engram-manage"}
-	if got := detectInstalledVersion(context.Background(), tool, "dev"); got != "1.1.7" {
-		t.Fatalf("detectInstalledVersion() = %q, want 1.1.7", got)
-	}
-}
-
-func TestDetectInstalledVersionFromOpenCodePackageJSONDependency(t *testing.T) {
-	home := t.TempDir()
-	opencodeDir := filepath.Join(home, ".config", "opencode")
-	if err := os.MkdirAll(opencodeDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(opencodeDir, "package.json"), []byte(`{"dependencies":{"opencode-sdd-engram-manage":"^1.3.3"}}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	origHome := userHomeDir
-	userHomeDir = func() (string, error) { return home, nil }
-	t.Cleanup(func() { userHomeDir = origHome })
-
-	tool := ToolInfo{Name: "sdd-engram-plugin", NpmPackage: "opencode-sdd-engram-manage"}
-	if got := detectInstalledVersion(context.Background(), tool, "dev"); got != "1.3.3" {
-		t.Fatalf("detectInstalledVersion() = %q, want 1.3.3", got)
-	}
-}
-
-func TestCheckSingleToolOpenCodePluginRegisteredNotMaterialized(t *testing.T) {
-	home := t.TempDir()
-	opencodeDir := filepath.Join(home, ".config", "opencode")
-	if err := os.MkdirAll(opencodeDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(opencodeDir, "tui.json"), []byte(`{"plugin":["opencode-sdd-engram-manage"]}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	origHome := userHomeDir
-	origClient := httpClient
-	t.Cleanup(func() {
-		userHomeDir = origHome
-		httpClient = origClient
-	})
-	userHomeDir = func() (string, error) { return home, nil }
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(githubRelease{TagName: "v1.2.3", HTMLURL: "https://example.test/release"})
-	}))
-	defer server.Close()
-	httpClient = server.Client()
-	httpClient.Transport = &testTransport{server: server}
-
-	tool := ToolInfo{
-		Name:          "opencode-sdd-engram-manage",
-		Owner:         "owner",
-		Repo:          "repo",
-		InstallMethod: InstallOpenCodePlugin,
-		NpmPackage:    "opencode-sdd-engram-manage",
-	}
-
-	result := checkSingleTool(context.Background(), tool, "dev", system.PlatformProfile{})
-	if result.Status != RegisteredNotMaterialized {
-		t.Fatalf("status = %q, want %q", result.Status, RegisteredNotMaterialized)
-	}
-	if result.InstalledVersion != "" {
-		t.Fatalf("InstalledVersion = %q, want empty while package.json is missing", result.InstalledVersion)
-	}
-	if !strings.Contains(strings.ToLower(result.UpdateHint), "restart or reload opencode") {
-		t.Fatalf("UpdateHint should tell the user to restart/reload OpenCode, got %q", result.UpdateHint)
-	}
-	if !strings.Contains(result.UpdateHint, "peer dependency") {
-		t.Fatalf("UpdateHint should mention checking logs for dependency errors, got %q", result.UpdateHint)
-	}
-}
-
 func TestCheckSingleToolGentleAIBetaComparesMainHead(t *testing.T) {
 	t.Setenv("GENTLE_AI_CHANNEL", "beta")
 
@@ -1001,14 +914,11 @@ func TestCheckAll(t *testing.T) {
 		}
 		return mockCmd("false")
 	}
-	pluginHome := t.TempDir()
-	userHomeDir = func() (string, error) { return pluginHome, nil }
-
 	profile := system.PlatformProfile{OS: "darwin", PackageManager: "brew", Supported: true}
 	results := CheckAll(context.Background(), "1.5.0", profile)
 
-	if len(results) != 4 {
-		t.Fatalf("len(results) = %d, want 4", len(results))
+	if len(results) != 2 {
+		t.Fatalf("len(results) = %d, want 2", len(results))
 	}
 
 	// gentle-ai: 1.5.0 local == 1.5.0 remote → UpToDate
@@ -1017,8 +927,6 @@ func TestCheckAll(t *testing.T) {
 	// engram: 0.3.2 local < 0.4.0 remote → UpdateAvailable
 	assertResult(t, results[1], "engram", UpdateAvailable, "0.3.2", "0.4.0")
 
-	assertResult(t, results[2], "opencode-subagent-statusline", NotInstalled, "", "0.4.0")
-	assertResult(t, results[3], "opencode-sdd-engram-manage", NotInstalled, "", "1.1.7")
 }
 
 func TestCheckSingleTool_EngramUsesBinaryReleaseChannel(t *testing.T) {
@@ -1398,18 +1306,16 @@ func TestParseVersionFromOutput(t *testing.T) {
 
 // TestRegistryContents verifies the registry has all expected tools.
 func TestRegistryContents(t *testing.T) {
-	if len(Tools) != 4 {
-		t.Fatalf("len(Tools) = %d, want 4", len(Tools))
+	if len(Tools) != 2 {
+		t.Fatalf("len(Tools) = %d, want 2", len(Tools))
 	}
 
 	expected := map[string]struct {
 		owner string
 		repo  string
 	}{
-		"gentle-ai":                    {owner: "Gentleman-Programming", repo: "gentle-ai"},
-		"engram":                       {owner: "Gentleman-Programming", repo: "engram"},
-		"opencode-subagent-statusline": {owner: "Joaquinvesapa", repo: "sub-agent-statusline"},
-		"opencode-sdd-engram-manage":   {owner: "j0k3r-dev-rgl", repo: "sdd-engram-plugin"},
+		"gentle-ai": {owner: "Gentleman-Programming", repo: "gentle-ai"},
+		"engram":    {owner: "Gentleman-Programming", repo: "engram"},
 	}
 
 	for _, tool := range Tools {
@@ -1436,9 +1342,6 @@ func TestRegistryContents(t *testing.T) {
 	}
 	if Tools[1].ReleaseTagPattern != `^v[0-9]+\.[0-9]+\.[0-9]+$` {
 		t.Fatalf("engram ReleaseTagPattern = %q, want binary v* channel pattern", Tools[1].ReleaseTagPattern)
-	}
-	if Tools[2].NpmPackage == "" || Tools[3].NpmPackage == "" {
-		t.Fatalf("OpenCode plugin tools should declare NpmPackage")
 	}
 }
 

@@ -29,8 +29,6 @@ func updateHint(tool ToolInfo, profile system.PlatformProfile) string {
 		return gentleAIHint(profile)
 	case "engram":
 		return engramHint(profile)
-	case "opencode-subagent-statusline", "opencode-sdd-engram-manage":
-		return "gentle-ai upgrade updates ~/.config/opencode npm deps, clears this plugin's @latest cache, then requires OpenCode restart/reload"
 	default:
 		return ""
 	}
@@ -41,14 +39,6 @@ func updateHintForOwnership(tool ToolInfo, profile system.PlatformProfile, owner
 		return fmt.Sprintf("brew upgrade --%s %s", ownership, tool.Name)
 	}
 	return updateHint(tool, profile)
-}
-
-func openCodeRegisteredNotMaterializedHint(tool ToolInfo) string {
-	pkg := strings.TrimSpace(tool.NpmPackage)
-	if pkg == "" {
-		pkg = tool.Name
-	}
-	return fmt.Sprintf("registered in ~/.config/opencode/tui.json; pending npm dependency materialization for %s. Run gentle-ai upgrade to install/update ~/.config/opencode dependencies, then restart or reload OpenCode; if it stays pending, check OpenCode logs for package or peer dependency errors.", pkg)
 }
 
 // gentleAIHint is the stable-channel instruction only. When the checker

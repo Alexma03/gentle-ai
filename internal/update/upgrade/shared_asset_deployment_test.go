@@ -7,7 +7,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/claude"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/assets"
 )
 
@@ -41,7 +41,7 @@ func embeddedSharedFileNames(t *testing.T) []string {
 // preserves and restores it instead of dropping it.
 func TestManagedSkillBackupPathsCoverEveryEmbeddedSharedFile(t *testing.T) {
 	home := t.TempDir()
-	adapter := opencode.NewAdapter()
+	adapter := claude.NewAdapter()
 
 	paths := managedSkillBackupPaths(home, adapter, io.Discard)
 	got := make(map[string]struct{}, len(paths))
