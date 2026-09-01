@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	piagent "github.com/gentleman-programming/gentle-ai/v2/internal/agents/pi"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/filemerge"
 )
 
@@ -314,7 +313,7 @@ func TestPiCodeGraphRefreshRestoresMissingOwnedChild(t *testing.T) {
 
 func TestPiCodeGraphPathsExcludesUnsafeManifestPaths(t *testing.T) {
 	home := t.TempDir()
-	paths := piagent.CodeGraphPaths(home)
+	paths := piCodeGraphPaths(home)
 	outside := filepath.Join(t.TempDir(), "outside.json")
 	escapedDir := filepath.Join(paths.AgentDir, "escaped")
 	escaped := filepath.Join(escapedDir, "child.md")

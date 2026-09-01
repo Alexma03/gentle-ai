@@ -71,8 +71,8 @@ func renderCommunityToolResultDetails(b *strings.Builder, results []codegraph.Re
 }
 
 func toolName(id model.CommunityToolID) string {
-	if def, ok := codegraph.DefinitionFor(id); ok {
-		return def.Name
+	if id == codeGraphDefinition.ID {
+		return codeGraphDefinition.Name
 	}
 	return string(id)
 }

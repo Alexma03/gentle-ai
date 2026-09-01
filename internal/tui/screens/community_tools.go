@@ -9,6 +9,24 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/tui/styles"
 )
 
+type communityToolDefinition struct {
+	ID          model.CommunityToolID
+	Name        string
+	RepoURL     string
+	Description string
+}
+
+var codeGraphDefinition = communityToolDefinition{
+	ID:          model.CommunityToolCodeGraph,
+	Name:        "CodeGraph",
+	RepoURL:     "https://github.com/colbymchenry/codegraph",
+	Description: "Code graph indexing and MCP wiring for supported coding agents",
+}
+
+func communityToolDefinitions() []communityToolDefinition {
+	return []communityToolDefinition{codeGraphDefinition}
+}
+
 func RenderCommunityTools(selected []model.CommunityToolID, cursor int, statuses []codegraph.Status, loading bool, statusErr error) string {
 	var b strings.Builder
 	b.WriteString(styles.TitleStyle.Render("Community Tools/Plugins"))
@@ -35,7 +53,7 @@ func RenderCommunityTools(selected []model.CommunityToolID, cursor int, statuses
 	}
 
 	row := 0
-	for _, def := range codegraph.Definitions() {
+	for _, def := range communityToolDefinitions() {
 		checkbox := "[ ]"
 		if selectedSet[def.ID] {
 			checkbox = "[x]"
@@ -71,7 +89,7 @@ func RenderCommunityTools(selected []model.CommunityToolID, cursor int, statuses
 }
 
 func CommunityToolsOptionCount() int {
-	return len(codegraph.Definitions())*2 + 2
+	return len(communityToolDefinitions())*2 + 2
 }
 
 func RenderCommunityToolInstalling(selected []model.CommunityToolID, spinner string, statuses []codegraph.Status) string {
@@ -132,15 +150,15 @@ func renderCommunityToolStatus(b *strings.Builder, status codegraph.Status) {
 }
 
 func statusName(id model.CommunityToolID) string {
-	if def, ok := codegraph.DefinitionFor(id); ok {
-		return def.Name
+	if id == codeGraphDefinition.ID {
+		return codeGraphDefinition.Name
 	}
 	return string(id)
 }
 
 func selectedCommunityToolNames(selected []model.CommunityToolID) []string {
-	namesByID := make(map[model.CommunityToolID]string, len(codegraph.Definitions()))
-	for _, def := range codegraph.Definitions() {
+	namesByID := make(map[model.CommunityToolID]string, len(communityToolDefinitions()))
+	for _, def := range communityToolDefinitions() {
 		namesByID[def.ID] = def.Name
 	}
 

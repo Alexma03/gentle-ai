@@ -103,8 +103,23 @@ var osGetwdFn = os.Getwd
 var osExecutableFn = os.Executable
 var osRemoveFn = os.Remove
 var execCommandFn = exec.Command
-var communityToolInstallFn = codegraph.InstallByID
-var communityToolStatusFn = codegraph.DetectStatusByID
+
+// CommunityToolID remains in the selection/state schema for rollback
+// compatibility, but CodeGraph owns the only retained implementation. Keep
+// this compatibility seam at the TUI boundary instead of carrying a generic
+// one-item component registry inside codegraph.
+var communityToolInstallFn = func(id model.CommunityToolID, workspaceDir string, runner codegraph.Runner) (codegraph.Result, error) {
+	if id != model.CommunityToolCodeGraph {
+		return codegraph.Result{}, fmt.Errorf("community tool %q is no longer supported", id)
+	}
+	return codegraph.Install(homeDir(), workspaceDir, runner, codegraph.DetectorFunc(exec.LookPath))
+}
+var communityToolStatusFn = func(id model.CommunityToolID, home string, detector codegraph.Detector) codegraph.Status {
+	if id != model.CommunityToolCodeGraph {
+		return codegraph.Status{Tool: id}
+	}
+	return codegraph.DetectStatus(home, detector)
+}
 
 // readCurrentAssignmentsFn is a package-level variable so tests can override
 // how current model assignments are read from opencode.json. It wraps
@@ -4585,8 +4600,18 @@ func openCodePluginUninstallInstalledFromTUI(home string) []model.OpenCodeCommun
 	return out
 }
 
-func communityToolDefinitions() []codegraph.Definition {
-	return codegraph.Definitions()
+type communityToolDefinition struct {
+	ID      model.CommunityToolID
+	Name    string
+	RepoURL string
+}
+
+func communityToolDefinitions() []communityToolDefinition {
+	return []communityToolDefinition{{
+		ID:      model.CommunityToolCodeGraph,
+		Name:    "CodeGraph",
+		RepoURL: "https://github.com/colbymchenry/codegraph",
+	}}
 }
 
 func opencodepluginRepoURLs() []string {

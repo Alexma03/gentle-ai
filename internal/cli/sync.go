@@ -715,7 +715,7 @@ func syncBackupTargets(homeDir, workspaceDir string, selection model.Selection, 
 		}
 	}
 	if selection.HasCodeGraph() {
-		for _, path := range codegraph.ManagedPaths(homeDir) {
+		for _, path := range codegraph.CodeGraphManagedPaths(homeDir) {
 			paths[path] = struct{}{}
 		}
 	}
@@ -937,7 +937,7 @@ func (s *codeGraphGuidanceSyncStep) Run() (runErr error) {
 		}
 	}()
 
-	status := codegraph.DetectStatusByID(model.CommunityToolCodeGraph, s.homeDir, codegraph.DetectorFunc(cmdLookPath))
+	status := codegraph.DetectStatus(s.homeDir, codegraph.DetectorFunc(cmdLookPath))
 	if status.CLI == codegraph.AvailabilityAvailable && codegraph.NeedsOpenCodeCodeGraphReconcile(s.homeDir) {
 		reconciled, err := codegraph.ReconcileOpenCodeCodeGraph(s.homeDir, s.runner)
 		if err != nil {
@@ -1022,13 +1022,13 @@ func (s componentSyncStep) Run() error {
 
 	switch s.component {
 	case model.ComponentCodeGraph:
-		before, err := snapshotSyncFiles(codegraph.ManagedPaths(s.homeDir))
+		before, err := snapshotSyncFiles(codegraph.CodeGraphManagedPaths(s.homeDir))
 		if err != nil {
 			return err
 		}
 		status := codegraph.DetectStatus(s.homeDir, codegraph.DetectorFunc(cmdLookPath))
-		if status.CLI == codegraph.AvailabilityAvailable && codegraph.NeedsOpenCodeReconcile(s.homeDir) {
-			reconciled, err := codegraph.ReconcileOpenCode(s.homeDir, codeGraphHomeRunner{homeDir: s.homeDir})
+		if status.CLI == codegraph.AvailabilityAvailable && codegraph.NeedsOpenCodeCodeGraphReconcile(s.homeDir) {
+			reconciled, err := codegraph.ReconcileOpenCodeCodeGraph(s.homeDir, codeGraphHomeRunner{homeDir: s.homeDir})
 			if err != nil {
 				_ = restoreSyncFiles(before)
 				return fmt.Errorf("sync OpenCode CodeGraph wiring: %w", err)
@@ -1037,13 +1037,13 @@ func (s componentSyncStep) Run() error {
 				s.countChanged(boolToInt(reconciled.Changed), reconciled.Files...)
 			}
 		}
-		res, configured, err := codegraph.RefreshGuidanceIfConfigured(s.homeDir, codegraph.DetectorFunc(cmdLookPath))
+		res, configured, err := codegraph.RefreshCodeGraphGuidanceIfConfigured(s.homeDir, codegraph.DetectorFunc(cmdLookPath))
 		if err != nil {
 			_ = restoreSyncFiles(before)
 			return fmt.Errorf("sync CodeGraph guidance: %w", err)
 		}
 		if !configured {
-			res, err = codegraph.CleanLegacyGuidance(s.homeDir)
+			res, err = codegraph.CleanLegacyCodeGraphGuidance(s.homeDir)
 			if err != nil {
 				_ = restoreSyncFiles(before)
 				return fmt.Errorf("sync legacy CodeGraph guidance cleanup: %w", err)

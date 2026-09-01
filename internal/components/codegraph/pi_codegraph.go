@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	piagent "github.com/gentleman-programming/gentle-ai/v2/internal/agents/pi"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/filemerge"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
 )
@@ -162,7 +161,7 @@ func ReconcilePiCodeGraph(options PiCodeGraphOptions) (result PiCodeGraphResult,
 	if !options.Selected {
 		return UninstallPiCodeGraph(options.HomeDir)
 	}
-	paths := piagent.CodeGraphPaths(options.HomeDir)
+	paths := piCodeGraphPaths(options.HomeDir)
 	manifest, err := readPiCodeGraphManifest(paths.Manifest)
 	if err != nil {
 		return result, err
@@ -186,7 +185,7 @@ func ReconcilePiCodeGraph(options PiCodeGraphOptions) (result PiCodeGraphResult,
 	if err = restoreMissingPiChildren(manifest.Children, journal, changed); err != nil {
 		return result, err
 	}
-	children, err := piagent.DiscoverCodeGraphChildren(options.HomeDir, options.WorkspaceDir)
+	children, err := discoverPiCodeGraphChildren(options.HomeDir, options.WorkspaceDir)
 	if err != nil {
 		return result, err
 	}
@@ -250,7 +249,7 @@ func ReconcilePiCodeGraph(options PiCodeGraphOptions) (result PiCodeGraphResult,
 		}
 		result.Children = append(result.Children, child)
 	}
-	effectiveMCPPath, effectiveErr := piagent.EffectiveCodeGraphMCPPath(options.HomeDir, options.WorkspaceDir)
+	effectiveMCPPath, effectiveErr := effectivePiCodeGraphMCPPath(options.HomeDir, options.WorkspaceDir)
 	if effectiveErr != nil {
 		return result, effectiveErr
 	}
@@ -665,8 +664,8 @@ func PiCodeGraphConfigured(homeDir, workspaceDir string) (bool, string) {
 }
 
 func inspectPiCodeGraph(homeDir, workspaceDir string) (bool, string, []PiCodeGraphChild) {
-	paths := piagent.CodeGraphPaths(homeDir)
-	children, err := piagent.DiscoverCodeGraphChildren(homeDir, workspaceDir)
+	paths := piCodeGraphPaths(homeDir)
+	children, err := discoverPiCodeGraphChildren(homeDir, workspaceDir)
 	if err != nil {
 		return false, err.Error(), nil
 	}
@@ -707,7 +706,7 @@ func inspectPiCodeGraph(homeDir, workspaceDir string) (bool, string, []PiCodeGra
 
 // PiCodeGraphPaths returns only files Gentle AI may reconcile or remove.
 func PiCodeGraphPaths(homeDir, workspaceDir string) []string {
-	paths := piagent.CodeGraphPaths(homeDir)
+	paths := piCodeGraphPaths(homeDir)
 	result := []string{paths.MCPConfig, paths.Manifest}
 	if manifest, err := readPiCodeGraphManifest(paths.Manifest); err == nil {
 		allowedRoots := piCodeGraphAllowedRoots(paths, workspaceDir)
@@ -720,7 +719,7 @@ func PiCodeGraphPaths(homeDir, workspaceDir string) []string {
 			}
 		}
 	}
-	children, err := piagent.DiscoverCodeGraphChildren(homeDir, workspaceDir)
+	children, err := discoverPiCodeGraphChildren(homeDir, workspaceDir)
 	if err != nil {
 		return result
 	}
@@ -750,7 +749,7 @@ func ValidatePiCodeGraphRoot(root, homeDir string) error {
 
 // RefreshPiCodeGraphIfConfigured repairs selected Pi integration after sync.
 func RefreshPiCodeGraphIfConfigured(homeDir, workspaceDir string) (PiCodeGraphResult, bool, error) {
-	paths := piagent.CodeGraphPaths(homeDir)
+	paths := piCodeGraphPaths(homeDir)
 	if _, err := os.Stat(paths.Manifest); os.IsNotExist(err) {
 		return PiCodeGraphResult{}, false, nil
 	} else if err != nil {
@@ -763,7 +762,7 @@ func RefreshPiCodeGraphIfConfigured(homeDir, workspaceDir string) (PiCodeGraphRe
 // UninstallPiCodeGraph removes only manifest-owned entries. Drifted child files
 // are preserved and surfaced for manual review.
 func UninstallPiCodeGraph(homeDir string) (result PiCodeGraphResult, err error) {
-	paths := piagent.CodeGraphPaths(homeDir)
+	paths := piCodeGraphPaths(homeDir)
 	data, err := os.ReadFile(paths.Manifest)
 	if os.IsNotExist(err) {
 		return PiCodeGraphResult{}, nil
@@ -1010,7 +1009,7 @@ func (j *piJournal) restore() error {
 	return errors.Join(restoreErrors...)
 }
 
-func piCodeGraphAllowedRoots(paths piagent.CodeGraphPathSet, workspace string) []string {
+func piCodeGraphAllowedRoots(paths piCodeGraphPathSet, workspace string) []string {
 	roots := []string{paths.AgentDir, filepath.Dir(paths.Manifest)}
 	if workspace != "" {
 		roots = append(roots, workspace)

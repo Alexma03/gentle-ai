@@ -72,7 +72,7 @@ func TestExcludedAgentsNeverEnterCodeGraphSurfaces(t *testing.T) {
 			if _, ok := reg.Get(id); ok {
 				t.Fatalf("retired adapter %q entered default registry", id)
 			}
-			status := DetectStatusByID(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) { return "/bin/codegraph", nil }))
+			status := DetectStatus(home, DetectorFunc(func(string) (string, error) { return "/bin/codegraph", nil }))
 			if slices.ContainsFunc(status.Agents, func(agent AgentStatus) bool { return agent.Agent == id }) {
 				t.Fatalf("excluded agent entered status: %#v", status.Agents)
 			}
@@ -185,7 +185,7 @@ func TestCodeGraphRollbackRestoresBytesModesAndRemovesCreatedFiles(t *testing.T)
 	if err := os.Chmod(global, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, err := InstallWithHome(model.CommunityToolCodeGraph, "", home, RunnerFunc(func(string, ...string) error {
+	_, err := Install(home, "", RunnerFunc(func(string, ...string) error {
 		mustWrite(t, global, `{"mcpServers":{"codegraph":{"command":"codegraph"}}}`)
 		mustWrite(t, prompt, "created")
 		return errors.New("upstream failed")
@@ -238,7 +238,7 @@ func TestCodeGraphRollbackAfterGuidanceAndPostconditionFailures(t *testing.T) {
 			global := filepath.Join(home, ".claude.json")
 			mustWrite(t, global, `{"sibling":true}`)
 			tt.setup(t, home)
-			_, err := InstallWithHome(model.CommunityToolCodeGraph, "", home, RunnerFunc(func(name string, args ...string) error {
+			_, err := Install(home, "", RunnerFunc(func(name string, args ...string) error {
 				return tt.run(t, home, name, args...)
 			}), DetectorFunc(func(string) (string, error) { return "/bin/codegraph", nil }))
 			if err == nil {

@@ -69,11 +69,15 @@ var (
 	cmdLookPath                  = exec.LookPath
 	streamCommandOutput          = true
 	goEnv                        = defaultGoEnv
-	installCommunityTool         = codegraph.InstallByID
-	installCommunityToolWithHome = codegraph.InstallWithHome
-	installCodeGraph             = codegraph.Install
-	injectSDD                    = sdd.Inject
-	pathEnvEntries               = func(profile system.PlatformProfile) []string {
+	installCommunityToolWithHome = func(tool model.CommunityToolID, workspaceDir, homeDir string, runner codegraph.Runner, detector codegraph.Detector) (codegraph.Result, error) {
+		if tool != model.CommunityToolCodeGraph {
+			return codegraph.Result{}, fmt.Errorf("community tool %q is no longer supported", tool) // refusal:by-design operator-knowledge: legacy community-tool selections must be explicitly resolved during state migration before CodeGraph can run
+		}
+		return codegraph.Install(homeDir, workspaceDir, runner, detector)
+	}
+	installCodeGraph = codegraph.Install
+	injectSDD        = sdd.Inject
+	pathEnvEntries   = func(profile system.PlatformProfile) []string {
 		return splitPathForOS(os.Getenv("PATH"), profile.OS)
 	}
 	addUserPath          = system.AddToUserPath
@@ -1324,9 +1328,12 @@ type communityToolInstallStep struct {
 func (s communityToolInstallStep) ID() string { return s.id }
 
 func (s communityToolInstallStep) Run() error {
+	if s.tool != model.CommunityToolCodeGraph {
+		return fmt.Errorf("community tool %q is no longer supported", s.tool) // refusal:by-design operator-knowledge: legacy community-tool selections must be explicitly resolved during state migration before CodeGraph can run
+	}
 	result, err := installCommunityToolWithHome(s.tool, s.workspaceDir, s.homeDir, codegraph.RunnerFunc(runCommand), codegraph.DetectorFunc(cmdLookPath))
 	if err != nil {
-		return fmt.Errorf("install community tool %q: %w", s.tool, err)
+		return fmt.Errorf("install CodeGraph: %w", err)
 	}
 	if result.PiCodeGraph != nil && s.state != nil {
 		s.state.piCodeGraph = result.PiCodeGraph
@@ -2066,7 +2073,7 @@ func backupTargets(homeDir, workspaceDir string, scope InstallScope, selection m
 		}
 	}
 	if selection.HasCodeGraph() {
-		for _, path := range codegraph.ManagedPaths(homeDir) {
+		for _, path := range codegraph.CodeGraphManagedPaths(homeDir) {
 			paths[path] = struct{}{}
 		}
 	}
@@ -2169,7 +2176,7 @@ func componentPathsWithWorkspace(homeDir, workspaceDir string, selection model.S
 
 func componentPathsWithWorkspaceScoped(homeDir, workspaceDir string, scope InstallScope, selection model.Selection, adapters []agents.Adapter, component model.ComponentID) []string {
 	if component == model.ComponentCodeGraph {
-		return codegraph.ManagedPaths(homeDir)
+		return codegraph.CodeGraphManagedPaths(homeDir)
 	}
 	paths := []string{}
 	for _, adapter := range adapters {

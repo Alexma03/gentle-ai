@@ -11,7 +11,6 @@ import (
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/opencode"
-	piagent "github.com/gentleman-programming/gentle-ai/v2/internal/agents/pi"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/catalog"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
@@ -31,15 +30,6 @@ const (
 	AgentStatusConfigured  AgentStatusKind = "configured"
 	AgentStatusMissing     AgentStatusKind = "missing"
 )
-
-type Definition struct {
-	ID          model.CommunityToolID
-	Name        string
-	PackageName string
-	CommandName string
-	RepoURL     string
-	Description string
-}
 
 type Result struct {
 	Tool          model.CommunityToolID
@@ -92,50 +82,13 @@ var (
 	codeGraphWSL             = defaultCodeGraphWSL
 )
 
-var definitions = []Definition{
-	{
-		ID:          model.CommunityToolCodeGraph,
-		Name:        "CodeGraph",
-		PackageName: "@colbymchenry/codegraph@latest",
-		CommandName: "codegraph",
-		RepoURL:     "https://github.com/colbymchenry/codegraph",
-		Description: "Code graph indexing and MCP wiring for supported coding agents",
-	},
-}
-
-func Definitions() []Definition {
-	out := make([]Definition, len(definitions))
-	copy(out, definitions)
-	return out
-}
-
-func DefinitionFor(id model.CommunityToolID) (Definition, bool) {
-	for _, def := range definitions {
-		if def.ID == id {
-			return def, true
-		}
-	}
-	return Definition{}, false
-}
-
-func InstallByID(id model.CommunityToolID, workspaceDir string, runner Runner) (Result, error) {
-	return InstallWithHome(id, workspaceDir, defaultHomeDir(), runner, DetectorFunc(exec.LookPath))
-}
-
-func InstallWithHome(id model.CommunityToolID, workspaceDir string, homeDir string, runner Runner, detector Detector) (Result, error) {
+func Install(homeDir, workspaceDir string, runner Runner, detector Detector) (Result, error) {
 	if runner == nil {
-		return Result{}, fmt.Errorf("community tool runner is not configured")
-	}
-	def, ok := DefinitionFor(id)
-	if !ok {
-		return Result{}, fmt.Errorf("unknown community tool %q", id)
-	}
-	if def.ID != model.CommunityToolCodeGraph {
-		return Result{}, fmt.Errorf("community tool %q is not supported", id)
+		return Result{}, fmt.Errorf("CodeGraph runner is not configured")
 	}
 
-	result := Result{Tool: id}
-	before := DetectStatusByID(id, homeDir, detector)
+	result := Result{Tool: model.CommunityToolCodeGraph}
+	before := DetectStatus(homeDir, detector)
 	result.StatusBefore = &before
 	snapshots, err := snapshotCodeGraphPaths(CodeGraphManagedPaths(homeDir))
 	if err != nil {
@@ -155,7 +108,7 @@ func InstallWithHome(id model.CommunityToolID, workspaceDir string, homeDir stri
 		if err != nil {
 			return rollback(err)
 		}
-		guidanceResult, err := InjectCodeGraphGuidanceIfSelected(homeDir, []model.CommunityToolID{id})
+		guidanceResult, err := InjectCodeGraphGuidanceIfSelected(homeDir, []model.CommunityToolID{model.CommunityToolCodeGraph})
 		if err != nil {
 			return rollback(err)
 		}
@@ -167,7 +120,7 @@ func InstallWithHome(id model.CommunityToolID, workspaceDir string, homeDir stri
 		if piResult != nil {
 			result.ManualActions = append(result.ManualActions, piResult.ManualActions...)
 		}
-		after := DetectStatusByID(id, homeDir, detector)
+		after := DetectStatus(homeDir, detector)
 		result.StatusAfter = &after
 		if err := validateCodeGraphInstallStatus(after); err != nil {
 			return rollback(err)
@@ -225,7 +178,7 @@ func InstallWithHome(id model.CommunityToolID, workspaceDir string, homeDir stri
 			return rollback(fmt.Errorf("run %q: %w", strings.Join(command, " "), err))
 		}
 		if before.CLI != AvailabilityAvailable && index == 0 {
-			afterPackageInstall := DetectStatusByID(id, homeDir, detector)
+			afterPackageInstall := DetectStatus(homeDir, detector)
 			result.StatusAfter = &afterPackageInstall
 			if afterPackageInstall.CLI != AvailabilityAvailable {
 				return rollback(fmt.Errorf("CodeGraph package installation did not leave a runnable codegraph CLI available"))
@@ -235,7 +188,7 @@ func InstallWithHome(id model.CommunityToolID, workspaceDir string, homeDir stri
 	if _, err := ReconcileOpenCodeCodeGraph(homeDir, runner); err != nil {
 		return rollback(err)
 	}
-	if _, err := InjectCodeGraphGuidanceIfSelected(homeDir, []model.CommunityToolID{id}); err != nil {
+	if _, err := InjectCodeGraphGuidanceIfSelected(homeDir, []model.CommunityToolID{model.CommunityToolCodeGraph}); err != nil {
 		return rollback(err)
 	}
 	piResult, err := reconcileDetectedPiCodeGraph(homeDir, workspaceDir)
@@ -246,7 +199,7 @@ func InstallWithHome(id model.CommunityToolID, workspaceDir string, homeDir stri
 	if piResult != nil {
 		result.ManualActions = append(result.ManualActions, piResult.ManualActions...)
 	}
-	after := DetectStatusByID(id, homeDir, detector)
+	after := DetectStatus(homeDir, detector)
 	result.StatusAfter = &after
 	if err := validateCodeGraphInstallStatus(after); err != nil {
 		return rollback(err)
@@ -284,7 +237,7 @@ func codeGraphCanRepairWithoutFullInstall(homeDir string, status Status) bool {
 }
 
 func reconcileDetectedPiCodeGraph(homeDir, workspaceDir string) (*PiCodeGraphResult, error) {
-	paths := piagent.CodeGraphPaths(homeDir)
+	paths := piCodeGraphPaths(homeDir)
 	if _, err := os.Stat(paths.AgentDir); os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {
@@ -317,17 +270,12 @@ func validateCodeGraphInstallStatus(status Status) error {
 	return nil
 }
 
-func DetectStatusByID(id model.CommunityToolID, homeDir string, detector Detector) Status {
-	status := Status{Tool: id, CLI: AvailabilityMissing}
-	def, ok := DefinitionFor(id)
-	if !ok || id != model.CommunityToolCodeGraph {
-		status.FollowUps = append(status.FollowUps, fmt.Sprintf("status detection for %q is not implemented", id))
-		return status
-	}
+func DetectStatus(homeDir string, detector Detector) Status {
+	status := Status{Tool: model.CommunityToolCodeGraph, CLI: AvailabilityMissing}
 	if detector == nil {
 		detector = DetectorFunc(exec.LookPath)
 	}
-	if path, err := detector.LookPath(def.CommandName); err == nil && strings.TrimSpace(path) != "" && codeGraphCLIUsable(path) {
+	if path, err := detector.LookPath("codegraph"); err == nil && strings.TrimSpace(path) != "" && codeGraphCLIUsable(path) {
 		status.CLI = AvailabilityAvailable
 		status.CLIPath = path
 	}
@@ -471,7 +419,7 @@ func hasCodeGraphWiring(homeDir string, adapter agents.Adapter) (bool, string, s
 }
 
 func piCodeGraphStatusPath(homeDir string) string {
-	return piagent.CodeGraphPaths(homeDir).Manifest
+	return piCodeGraphPaths(homeDir).Manifest
 }
 
 func hasDetectedCodeGraphToolWiring(homeDir string) bool {
@@ -506,21 +454,6 @@ func agentDisplayName(id model.AgentID) string {
 		}
 	}
 	return string(id)
-}
-
-func defaultHomeDir() string {
-	if h, err := os.UserHomeDir(); err == nil && h != "" {
-		return h
-	}
-	return os.Getenv("HOME")
-}
-
-func CodeGraphCommands() [][]string {
-	return codeGraphCommands("npm", nil)
-}
-
-func CodeGraphCommandsForDetector(detector Detector) ([][]string, error) {
-	return CodeGraphCommandsForDetectorAndTargets(detector, nil)
 }
 
 func CodeGraphCommandsForDetectorAndTargets(detector Detector, targets []string) ([][]string, error) {

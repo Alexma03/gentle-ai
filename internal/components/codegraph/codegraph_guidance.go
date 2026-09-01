@@ -89,12 +89,12 @@ func RefreshCodeGraphGuidanceIfConfigured(homeDir string, detector Detector) (Gu
 }
 
 func hasAvailableCodeGraphGuidance(homeDir string, detector Detector) bool {
-	status := DetectStatusByID(model.CommunityToolCodeGraph, homeDir, detector)
+	status := DetectStatus(homeDir, detector)
 	return status.CLI == AvailabilityAvailable && HasAnyCodeGraphGuidance(homeDir)
 }
 
 func HasConfiguredCodeGraph(homeDir string, detector Detector) bool {
-	status := DetectStatusByID(model.CommunityToolCodeGraph, homeDir, detector)
+	status := DetectStatus(homeDir, detector)
 	if status.CLI != AvailabilityAvailable {
 		return false
 	}

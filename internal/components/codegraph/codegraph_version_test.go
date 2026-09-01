@@ -6,8 +6,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 )
 
 func TestParseCodeGraphVersion(t *testing.T) {
@@ -82,7 +80,7 @@ func TestInstallDropsBlindTargetsWhenInstalledCodeGraphPredatesTheContract(t *te
 	home := installHomeWithTwoNativeTargets(t)
 	stubCodeGraphVersion(t, "0.9.3", true)
 
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(string, ...string) error {
+	result, err := Install(home, "/work/project", RunnerFunc(func(string, ...string) error {
 		mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
 		mustWrite(t, filepath.Join(home, ".cursor", "mcp.json"), `{"mcpServers":{"codegraph":{"command":"codegraph"}}}`)
 		return nil
@@ -104,7 +102,7 @@ func TestInstallKeepsExplicitTargetsWhenInstalledCodeGraphMeetsTheContract(t *te
 	home := installHomeWithTwoNativeTargets(t)
 	stubCodeGraphVersion(t, codeGraphUpstreamVersion, true)
 
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(string, ...string) error {
+	result, err := Install(home, "/work/project", RunnerFunc(func(string, ...string) error {
 		mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
 		mustWrite(t, filepath.Join(home, ".cursor", "mcp.json"), `{"mcpServers":{"codegraph":{"command":"codegraph"}}}`)
 		return nil
@@ -126,7 +124,7 @@ func TestInstallKeepsExplicitTargetsWhenVersionProbeCannotDetermineAVersion(t *t
 	home := installHomeWithTwoNativeTargets(t)
 	stubCodeGraphVersion(t, "", false)
 
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(string, ...string) error {
+	result, err := Install(home, "/work/project", RunnerFunc(func(string, ...string) error {
 		mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
 		mustWrite(t, filepath.Join(home, ".cursor", "mcp.json"), `{"mcpServers":{"codegraph":{"command":"codegraph"}}}`)
 		return nil
@@ -151,7 +149,7 @@ func TestInstallProbesTheResolvedCLIPathNotABareName(t *testing.T) {
 	}
 	t.Cleanup(func() { codeGraphInstalledVersion = previous })
 
-	if _, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(string, ...string) error {
+	if _, err := Install(home, "/work/project", RunnerFunc(func(string, ...string) error {
 		mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
 		mustWrite(t, filepath.Join(home, ".cursor", "mcp.json"), `{"mcpServers":{"codegraph":{"command":"codegraph"}}}`)
 		return nil
@@ -175,7 +173,7 @@ func TestInstallSkipsTheVersionProbeWhenTheCLIIsNotYetInstalled(t *testing.T) {
 	t.Cleanup(func() { codeGraphInstalledVersion = previous })
 
 	available := false
-	if _, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(string, ...string) error {
+	if _, err := Install(home, "/work/project", RunnerFunc(func(string, ...string) error {
 		available = true
 		mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
 		mustWrite(t, filepath.Join(home, ".cursor", "mcp.json"), `{"mcpServers":{"codegraph":{"command":"codegraph"}}}`)
@@ -202,7 +200,7 @@ func TestInstallCarriesTheVersionGapNoteThroughTheRollbackPath(t *testing.T) {
 	home := installHomeWithTwoNativeTargets(t)
 	stubCodeGraphVersion(t, "0.9.3", true)
 
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(string, ...string) error {
+	result, err := Install(home, "/work/project", RunnerFunc(func(string, ...string) error {
 		return errors.New("upstream install rejected the invocation")
 	}), DetectorFunc(func(string) (string, error) { return "/bin/codegraph", nil }))
 	if err == nil {

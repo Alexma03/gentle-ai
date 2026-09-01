@@ -73,47 +73,37 @@ func runCodeGraphTestHelper(mode string) {
 	}
 }
 
-func TestDefinitionsIncludesCodeGraph(t *testing.T) {
-	def, ok := DefinitionFor(model.CommunityToolCodeGraph)
-	if !ok {
-		t.Fatal("CodeGraph definition not found")
-	}
-	if def.PackageName != "@colbymchenry/codegraph@latest" || def.CommandName != "codegraph" {
-		t.Fatalf("CodeGraph definition = %#v", def)
-	}
-}
-
 func TestCodeGraphCommands(t *testing.T) {
 	want := [][]string{
 		{"npm", "install", "-g", "@colbymchenry/codegraph@latest"},
 		{"codegraph", "install", "--yes"},
 	}
-	if got := CodeGraphCommands(); !reflect.DeepEqual(got, want) {
-		t.Fatalf("CodeGraphCommands() = %#v, want %#v", got, want)
+	if got := codeGraphCommands("npm", nil); !reflect.DeepEqual(got, want) {
+		t.Fatalf("codeGraphCommands() = %#v, want %#v", got, want)
 	}
-	for _, command := range CodeGraphCommands() {
+	for _, command := range codeGraphCommands("npm", nil) {
 		if strings.Contains(strings.Join(command, " "), "codegraph init") {
-			t.Fatalf("CodeGraphCommands() includes project init command: %#v", command)
+			t.Fatalf("codeGraphCommands() includes project init command: %#v", command)
 		}
 	}
 }
 
 func TestCodeGraphCommandsForDetectorUsesPnpmWhenNpmIsUnavailable(t *testing.T) {
-	commands, err := CodeGraphCommandsForDetector(DetectorFunc(func(name string) (string, error) {
+	commands, err := CodeGraphCommandsForDetectorAndTargets(DetectorFunc(func(name string) (string, error) {
 		if name == "pnpm" {
 			return "/bin/pnpm", nil
 		}
 		return "", errors.New("not found")
-	}))
+	}), nil)
 	if err != nil {
-		t.Fatalf("CodeGraphCommandsForDetector() error = %v", err)
+		t.Fatalf("CodeGraphCommandsForDetectorAndTargets() error = %v", err)
 	}
 	want := [][]string{
 		{"pnpm", "add", "-g", "@colbymchenry/codegraph@latest"},
 		{"codegraph", "install", "--yes"},
 	}
 	if !reflect.DeepEqual(commands, want) {
-		t.Fatalf("CodeGraphCommandsForDetector() = %#v, want %#v", commands, want)
+		t.Fatalf("CodeGraphCommandsForDetectorAndTargets() = %#v, want %#v", commands, want)
 	}
 }
 
@@ -124,14 +114,14 @@ func TestCodeGraphCommandsForDetectorReportsUnusablePnpmGlobalBin(t *testing.T) 
 	}
 	t.Cleanup(func() { codeGraphPnpmGlobalBin = previous })
 
-	_, err := CodeGraphCommandsForDetector(DetectorFunc(func(name string) (string, error) {
+	_, err := CodeGraphCommandsForDetectorAndTargets(DetectorFunc(func(name string) (string, error) {
 		if name == "pnpm" {
 			return "/bin/pnpm", nil
 		}
 		return "", errors.New("not found")
-	}))
+	}), nil)
 	if err == nil {
-		t.Fatal("CodeGraphCommandsForDetector() error = nil, want unusable pnpm global bin error")
+		t.Fatal("CodeGraphCommandsForDetectorAndTargets() error = nil, want unusable pnpm global bin error")
 	}
 	for _, want := range []string{"pnpm global installs are not ready", "pnpm setup", "not in PATH"} {
 		if !strings.Contains(err.Error(), want) {
@@ -141,26 +131,26 @@ func TestCodeGraphCommandsForDetectorReportsUnusablePnpmGlobalBin(t *testing.T) 
 }
 
 func TestCodeGraphCommandsForDetectorPrefersNpmWhenBothExist(t *testing.T) {
-	commands, err := CodeGraphCommandsForDetector(DetectorFunc(func(name string) (string, error) {
+	commands, err := CodeGraphCommandsForDetectorAndTargets(DetectorFunc(func(name string) (string, error) {
 		if name == "npm" || name == "pnpm" {
 			return "/bin/" + name, nil
 		}
 		return "", errors.New("not found")
-	}))
+	}), nil)
 	if err != nil {
-		t.Fatalf("CodeGraphCommandsForDetector() error = %v", err)
+		t.Fatalf("CodeGraphCommandsForDetectorAndTargets() error = %v", err)
 	}
 	if got := commands[0]; !reflect.DeepEqual(got, []string{"npm", "install", "-g", "@colbymchenry/codegraph@latest"}) {
-		t.Fatalf("CodeGraphCommandsForDetector()[0] = %#v, want npm install", got)
+		t.Fatalf("CodeGraphCommandsForDetectorAndTargets()[0] = %#v, want npm install", got)
 	}
 }
 
 func TestCodeGraphCommandsForDetectorFailsWhenNpmAndPnpmAreMissing(t *testing.T) {
-	_, err := CodeGraphCommandsForDetector(DetectorFunc(func(string) (string, error) {
+	_, err := CodeGraphCommandsForDetectorAndTargets(DetectorFunc(func(string) (string, error) {
 		return "", errors.New("not found")
-	}))
+	}), nil)
 	if err == nil || !strings.Contains(err.Error(), "npm") || !strings.Contains(err.Error(), "pnpm") {
-		t.Fatalf("CodeGraphCommandsForDetector() error = %v, want npm/pnpm requirement", err)
+		t.Fatalf("CodeGraphCommandsForDetectorAndTargets() error = %v, want npm/pnpm requirement", err)
 	}
 }
 
@@ -176,7 +166,7 @@ func TestInstallUsesPnpmWhenNpmIsUnavailable(t *testing.T) {
 
 	var commands []string
 	installed := false
-	_, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", t.TempDir(), RunnerFunc(func(name string, args ...string) error {
+	_, err := Install(t.TempDir(), "/work/project", RunnerFunc(func(name string, args ...string) error {
 		commands = append(commands, strings.Join(append([]string{name}, args...), " "))
 		installed = true
 		return nil
@@ -203,7 +193,7 @@ func TestInstallWithHomeReportsPiChildClassifications(t *testing.T) {
 	mustWrite(t, filepath.Join(home, ".pi", "agent", "subagents", "worker.md"), "---\ntools: bash\n---\nwork\n")
 	installed := false
 	var commands []string
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "", home, RunnerFunc(func(name string, args ...string) error {
+	result, err := Install(home, "", RunnerFunc(func(name string, args ...string) error {
 		commands = append(commands, strings.Join(append([]string{name}, args...), " "))
 		installed = true
 		return nil
@@ -232,7 +222,7 @@ func TestInstallWithHomeReportsWorkspaceChildAndOwnershipTarget(t *testing.T) {
 	mustWrite(t, target, "---\ntools: bash\n---\nworkspace work\n")
 
 	installed := false
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, workspace, home, RunnerFunc(func(string, ...string) error {
+	result, err := Install(home, workspace, RunnerFunc(func(string, ...string) error {
 		installed = true
 		return nil
 	}), DetectorFunc(func(string) (string, error) {
@@ -262,7 +252,7 @@ func TestInstallWithHomeReportsEffectiveMCPAdapterSchema(t *testing.T) {
 	mustWrite(t, filepath.Join(home, ".pi", "agent", "settings.json"), `{}`)
 	mustWrite(t, filepath.Join(home, ".pi", "agent", "subagents", "worker.md"), "---\ntools: bash\n---\nwork\n")
 	installed := false
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "", home, RunnerFunc(func(string, ...string) error {
+	result, err := Install(home, "", RunnerFunc(func(string, ...string) error {
 		installed = true
 		return nil
 	}), DetectorFunc(func(string) (string, error) {
@@ -288,7 +278,7 @@ func TestInstallWithHomeFailsClosedForEmptyPiSettingsWithoutMCPProcess(t *testin
 	t.Cleanup(func() { piCodeGraphEffectiveMCPProbe = previous })
 
 	installed := false
-	_, err := InstallWithHome(model.CommunityToolCodeGraph, "", home, RunnerFunc(func(string, ...string) error {
+	_, err := Install(home, "", RunnerFunc(func(string, ...string) error {
 		installed = true
 		return nil
 	}), DetectorFunc(func(string) (string, error) {
@@ -361,7 +351,7 @@ func TestCodeGraphGuidanceInjectsForRepresentativeAgents(t *testing.T) {
 	mustWrite(t, filepath.Join(home, ".pi", "agent", "settings.json"), `{}`)
 
 	installed := false
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(string, ...string) error {
+	result, err := Install(home, "/work/project", RunnerFunc(func(string, ...string) error {
 		installed = true
 		mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
 		return nil
@@ -696,7 +686,7 @@ func TestUnselectedCodeGraphDoesNotInjectGuidance(t *testing.T) {
 func TestInstallRunsCommandsAndReturnsLazyProjectIndexManualAction(t *testing.T) {
 	var ran []string
 	installed := false
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", t.TempDir(), RunnerFunc(func(name string, args ...string) error {
+	result, err := Install(t.TempDir(), "/work/project", RunnerFunc(func(name string, args ...string) error {
 		ran = append(ran, append([]string{name}, args...)...)
 		installed = true
 		return nil
@@ -739,7 +729,7 @@ func TestInstallLeavesPiPendingWhenAdapterHealthIsNotMachineVerifiable(t *testin
 	})
 
 	installed := false
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "", home, RunnerFunc(func(string, ...string) error {
+	result, err := Install(home, "", RunnerFunc(func(string, ...string) error {
 		installed = true
 		return nil
 	}), DetectorFunc(func(string) (string, error) {
@@ -773,7 +763,7 @@ func TestDetectStatusReportsCLIAndPerAgentWiring(t *testing.T) {
 		"<!-- /gentle-ai:codegraph-guidance -->",
 	}, "\n"))
 
-	status := DetectStatusByID(model.CommunityToolCodeGraph, home, DetectorFunc(func(name string) (string, error) {
+	status := DetectStatus(home, DetectorFunc(func(name string) (string, error) {
 		if name != "codegraph" {
 			t.Fatalf("LookPath(%q), want codegraph", name)
 		}
@@ -797,7 +787,7 @@ func TestDetectStatusRecognizesCursorJSONCWiring(t *testing.T) {
 }`)
 	mustWrite(t, filepath.Join(home, ".cursor", "rules", "gentle-ai.mdc"), "<!-- gentle-ai:codegraph-guidance -->\nmanaged\n<!-- /gentle-ai:codegraph-guidance -->\n")
 
-	status := DetectStatusByID(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) {
+	status := DetectStatus(home, DetectorFunc(func(string) (string, error) {
 		return "/bin/codegraph", nil
 	}))
 	cursor := findAgentStatus(t, status, model.AgentCursor)
@@ -811,7 +801,7 @@ func TestDetectStatusRejectsNonCanonicalClaudeWiring(t *testing.T) {
 	mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"./codegraph"}}}`)
 	mustWrite(t, filepath.Join(home, ".claude", "CLAUDE.md"), "<!-- gentle-ai:codegraph-guidance -->\nmanaged\n<!-- /gentle-ai:codegraph-guidance -->\n")
 
-	status := DetectStatusByID(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) {
+	status := DetectStatus(home, DetectorFunc(func(string) (string, error) {
 		return "/bin/codegraph", nil
 	}))
 	claude := findAgentStatus(t, status, model.AgentClaudeCode)
@@ -926,7 +916,7 @@ func TestInstallUsesUnifiedAntigravityConfigWithoutMigratedMarker(t *testing.T) 
 	mustWrite(t, unifiedPath, `{"mcpServers":{"user":{"command":"other"}}}`)
 	mustWrite(t, filepath.Join(home, ".gemini", "antigravity-cli", "settings.json"), `{}`)
 
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(name string, args ...string) error {
+	result, err := Install(home, "/work/project", RunnerFunc(func(name string, args ...string) error {
 		command := strings.Join(append([]string{name}, args...), " ")
 		if command != "codegraph install --target antigravity --location global --yes" {
 			t.Fatalf("command = %q, want targeted Antigravity install", command)
@@ -961,7 +951,7 @@ func TestInstallRepairsRelativeAntigravityCommand(t *testing.T) {
 	mustWrite(t, filepath.Join(home, ".gemini", "antigravity-cli", "settings.json"), `{}`)
 	mustWrite(t, filepath.Join(home, ".gemini", "settings.json"), `{"mcpServers":{"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
 
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(name string, args ...string) error {
+	result, err := Install(home, "/work/project", RunnerFunc(func(name string, args ...string) error {
 		command := strings.Join(append([]string{name}, args...), " ")
 		if command != "codegraph install --target antigravity --location global --yes" {
 			t.Fatalf("command = %q, want targeted Antigravity repair", command)
@@ -994,7 +984,7 @@ func TestInstallRecordsTargetedOpenCodeReconciliation(t *testing.T) {
 	mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
 	mustWrite(t, filepath.Join(home, ".claude", "CLAUDE.md"), "<!-- gentle-ai:codegraph-guidance -->\nmanaged\n<!-- /gentle-ai:codegraph-guidance -->\n")
 
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(string, ...string) error {
+	result, err := Install(home, "/work/project", RunnerFunc(func(string, ...string) error {
 		mustWrite(t, settingsPath, `{"mcp":{"codegraph":{"type":"local","command":["codegraph","serve","--mcp"],"enabled":true}}}`)
 		mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
 		return nil
@@ -1014,7 +1004,7 @@ func TestInstallRunsFullReconcileWhenAnotherAgentIsMissing(t *testing.T) {
 	mustWrite(t, settingsPath, `{}`)
 	mustWrite(t, filepath.Join(home, ".claude", "settings.json"), `{}`)
 
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(string, ...string) error {
+	result, err := Install(home, "/work/project", RunnerFunc(func(string, ...string) error {
 		mustWrite(t, settingsPath, `{"mcp":{"codegraph":{"type":"local","command":["codegraph","serve","--mcp"],"enabled":true}}}`)
 		mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
 		return nil
@@ -1034,7 +1024,7 @@ func TestDetectStatusReportsCodexMissingWhenConfigHasCodeGraphButGuidanceIsMissi
 		`command = "codegraph"`,
 	}, "\n"))
 
-	status := DetectStatusByID(model.CommunityToolCodeGraph, home, DetectorFunc(func(name string) (string, error) {
+	status := DetectStatus(home, DetectorFunc(func(name string) (string, error) {
 		if name != "codegraph" {
 			t.Fatalf("LookPath(%q), want codegraph", name)
 		}
@@ -1052,7 +1042,7 @@ func TestDetectStatusReportsCodexMissingWhenConfigHasCodeGraphButGuidanceIsMissi
 }
 
 func TestDetectStatusReportsMissingCLIThroughMock(t *testing.T) {
-	status := DetectStatusByID(model.CommunityToolCodeGraph, t.TempDir(), DetectorFunc(func(string) (string, error) {
+	status := DetectStatus(t.TempDir(), DetectorFunc(func(string) (string, error) {
 		return "", errors.New("not found")
 	}))
 	if status.CLI != AvailabilityMissing {
@@ -1064,7 +1054,7 @@ func TestDetectStatusReportsPiRuntimeMissingWhenAppendSystemHasNoMarker(t *testi
 	home := t.TempDir()
 	mustWrite(t, filepath.Join(home, ".pi", "agent", "settings.json"), `{}`)
 
-	status := DetectStatusByID(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) {
+	status := DetectStatus(home, DetectorFunc(func(string) (string, error) {
 		return "/bin/codegraph", nil
 	}))
 	pi := findAgentStatus(t, status, model.AgentPi)
@@ -1085,7 +1075,7 @@ func TestDetectStatusRejectsPiParentMarkerAsCapabilityEvidence(t *testing.T) {
 		"<!-- /gentle-ai:codegraph-guidance -->",
 	}, "\n"))
 
-	status := DetectStatusByID(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) {
+	status := DetectStatus(home, DetectorFunc(func(string) (string, error) {
 		return "/bin/codegraph", nil
 	}))
 	pi := findAgentStatus(t, status, model.AgentPi)
@@ -1101,7 +1091,7 @@ func TestDetectStatusReportsPiChildClassifications(t *testing.T) {
 	if _, err := ReconcilePiCodeGraph(PiCodeGraphOptions{HomeDir: home, Selected: true}); err != nil {
 		t.Fatal(err)
 	}
-	status := DetectStatusByID(model.CommunityToolCodeGraph, home, DetectorFunc(func(string) (string, error) { return "/bin/codegraph", nil }))
+	status := DetectStatus(home, DetectorFunc(func(string) (string, error) { return "/bin/codegraph", nil }))
 	pi := findAgentStatus(t, status, model.AgentPi)
 	if len(pi.Children) != 1 || pi.Children[0].Classification != PiChildCompatible {
 		t.Fatalf("Pi classifications = %#v", pi.Children)
@@ -1140,7 +1130,7 @@ func TestInjectCodeGraphGuidanceDoesNotUsePiParentMarker(t *testing.T) {
 }
 
 func TestInstallFailsWhenPostInstallContractStillMissing(t *testing.T) {
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", t.TempDir(), RunnerFunc(func(string, ...string) error {
+	result, err := Install(t.TempDir(), "/work/project", RunnerFunc(func(string, ...string) error {
 		return nil
 	}), DetectorFunc(func(string) (string, error) {
 		return "", errors.New("not found")
@@ -1172,7 +1162,7 @@ func TestInstallSkipsWhenCodeGraphAlreadyReconciled(t *testing.T) {
 	mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"codegraph"}}}`)
 
 	calls := 0
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(string, ...string) error {
+	result, err := Install(home, "/work/project", RunnerFunc(func(string, ...string) error {
 		calls++
 		return nil
 	}), DetectorFunc(func(string) (string, error) {
@@ -1200,7 +1190,7 @@ func TestInstallRefreshesOldCodeGraphGuidanceMarker(t *testing.T) {
 		"<!-- /gentle-ai:codegraph-guidance -->",
 	}, "\n"))
 
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(string, ...string) error {
+	result, err := Install(home, "/work/project", RunnerFunc(func(string, ...string) error {
 		mustWrite(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"codegraph":{"command":"codegraph","args":["serve","--mcp"]}}}`)
 		return nil
 	}), DetectorFunc(func(string) (string, error) {
@@ -1232,7 +1222,7 @@ func TestInstallRepairsMissingCLIWhenAgentMarkerExists(t *testing.T) {
 
 	var commands []string
 	installed := false
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(name string, args ...string) error {
+	result, err := Install(home, "/work/project", RunnerFunc(func(name string, args ...string) error {
 		commands = append(commands, strings.Join(append([]string{name}, args...), " "))
 		installed = true
 		return nil
@@ -1265,7 +1255,7 @@ func TestDetectStatusRejectsWSLWindowsNPMShimWithoutExecutingIt(t *testing.T) {
 		return "", false
 	}
 
-	status := DetectStatusByID(model.CommunityToolCodeGraph, t.TempDir(), DetectorFunc(func(string) (string, error) {
+	status := DetectStatus(t.TempDir(), DetectorFunc(func(string) (string, error) {
 		return "/mnt/c/Users/alan/AppData/Roaming/npm/codegraph", nil
 	}))
 	if status.CLI != AvailabilityMissing || status.CLIPath != "" {
@@ -1288,7 +1278,7 @@ func TestDetectStatusAdmitsLinuxCLIPathsWithoutRequiringFiles(t *testing.T) {
 		"/home/alan/AppData/Roaming/npm/codegraph",
 	} {
 		t.Run(path, func(t *testing.T) {
-			status := DetectStatusByID(model.CommunityToolCodeGraph, t.TempDir(), DetectorFunc(func(string) (string, error) {
+			status := DetectStatus(t.TempDir(), DetectorFunc(func(string) (string, error) {
 				return path, nil
 			}))
 			if status.CLI != AvailabilityAvailable || status.CLIPath != path {
@@ -1320,7 +1310,7 @@ func TestInstallRejectsWSLWindowsNPMShimAfterPackageInstall(t *testing.T) {
 	}
 
 	var runnerCalls []string
-	result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(name string, args ...string) error {
+	result, err := Install(home, "/work/project", RunnerFunc(func(name string, args ...string) error {
 		runnerCalls = append(runnerCalls, strings.Join(append([]string{name}, args...), " "))
 		if name != "npm" {
 			return errors.New("CodeGraph runner must not receive a rejected shim")
@@ -1345,7 +1335,7 @@ func TestInstallRejectsWSLWindowsNPMShimAfterPackageInstall(t *testing.T) {
 
 func TestInstallFailurePaths(t *testing.T) {
 	t.Run("nil runner", func(t *testing.T) {
-		result, err := InstallByID(model.CommunityToolCodeGraph, "/work/project", nil)
+		result, err := Install(t.TempDir(), "/work/project", nil, nil)
 		if err == nil {
 			t.Fatal("Install() error = nil, want configured runner error")
 		}
@@ -1354,19 +1344,9 @@ func TestInstallFailurePaths(t *testing.T) {
 		}
 	})
 
-	t.Run("unknown tool", func(t *testing.T) {
-		result, err := InstallByID(model.CommunityToolID("missing-tool"), "/work/project", RunnerFunc(func(string, ...string) error { return nil }))
-		if err == nil || !strings.Contains(err.Error(), "unknown community tool") {
-			t.Fatalf("Install() error = %v, want unknown tool error", err)
-		}
-		if result.Tool != "" || len(result.CommandsRun) != 0 {
-			t.Fatalf("result = %#v, want empty result", result)
-		}
-	})
-
 	t.Run("command runner failure preserves attempted command", func(t *testing.T) {
 		boom := errors.New("npm failed")
-		result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", t.TempDir(), RunnerFunc(func(string, ...string) error { return boom }), DetectorFunc(func(string) (string, error) {
+		result, err := Install(t.TempDir(), "/work/project", RunnerFunc(func(string, ...string) error { return boom }), DetectorFunc(func(string) (string, error) {
 			return "", errors.New("not found")
 		}))
 		if !errors.Is(err, boom) {
@@ -1387,7 +1367,7 @@ func TestInstallFailurePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 		calls := 0
-		result, err := InstallWithHome(model.CommunityToolCodeGraph, "/work/project", home, RunnerFunc(func(string, ...string) error {
+		result, err := Install(home, "/work/project", RunnerFunc(func(string, ...string) error {
 			calls++
 			if calls == 2 {
 				return boom

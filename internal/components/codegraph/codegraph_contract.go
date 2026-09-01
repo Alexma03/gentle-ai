@@ -49,10 +49,6 @@ func reconciledCompatibility(id model.AgentID, target string) codeGraphCompatibi
 	return codeGraphCompatibility{Agent: id, Strategy: codeGraphReconciled, Target: target, OwnedPaths: codeGraphOwnedPaths, Postcondition: codeGraphPostcondition}
 }
 
-func excludedCompatibility(id model.AgentID) codeGraphCompatibility {
-	return codeGraphCompatibility{Agent: id, Strategy: codeGraphExcluded}
-}
-
 func codeGraphCompatibilityFor(id model.AgentID) (codeGraphCompatibility, bool) {
 	compatibility, ok := codeGraphCompatibilityTable[id]
 	return compatibility, ok
