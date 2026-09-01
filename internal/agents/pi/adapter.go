@@ -18,29 +18,30 @@ import (
 )
 
 const (
-	piMCPAdapterPackage         = "npm:pi-mcp-adapter"
-	piMCPAdapterPackageSpec     = "npm:pi-mcp-adapter"
-	piMCPAdapterDependency      = "pi-mcp-adapter"
-	piMCPAdapterVersion         = "2.6.0"
-	piMCPAdapterVersionRange    = "^2.6.0"
-	piAppendSystemFile          = "APPEND_SYSTEM.md"
-	piEngramMCPConfigFile       = "mcp.json"
-	piSettingsFile              = "settings.json"
-	piNPMDirectory              = "npm"
-	piNPMPackageFile            = "package.json"
-	piSubagentsJ0k3rPackageSpec = "npm:pi-subagents-j0k3r"
+	piMCPAdapterPackage      = "npm:pi-mcp-adapter"
+	piMCPAdapterPackageSpec  = "npm:pi-mcp-adapter"
+	piMCPAdapterDependency   = "pi-mcp-adapter"
+	piMCPAdapterVersion      = "2.6.0"
+	piMCPAdapterVersionRange = "^2.6.0"
+	piAppendSystemFile       = "APPEND_SYSTEM.md"
+	piEngramMCPConfigFile    = "mcp.json"
+	piSettingsFile           = "settings.json"
+	piNPMDirectory           = "npm"
+	piNPMPackageFile         = "package.json"
+	piSubagentsPackageSpec   = "npm:pi-subagents"
 )
 
 var legacyPiSubagentPackageIdentities = map[string]struct{}{
-	"npm:pi-subagents":          {},
-	"vendor/pi-subagents":       {},
-	"vendor/pi-subagents-fixed": {},
+	"npm:pi-subagents-j0k3r":      {},
+	"npm:@tintinweb/pi-subagents": {},
+	"vendor/pi-subagents":         {},
+	"vendor/pi-subagents-fixed":   {},
 }
 
 var piWalkDir = filepath.WalkDir
 
 func piSubagentsInstallCommand(system.PlatformProfile) []string {
-	return []string{"pi", "install", piSubagentsJ0k3rPackageSpec}
+	return []string{"pi", "install", piSubagentsPackageSpec}
 }
 
 type statResult struct {
@@ -392,13 +393,26 @@ func readPiJSONObject(path string) (map[string]any, error) {
 
 func appendPiPackage(existing any, desired string) []any {
 	packages := piPackagesAsSlice(existing)
-	filtered := make([]any, 0, len(packages)+1)
+	filtered := make([]any, 0, len(packages)+2)
+	canonicalSeen := false
+	desiredIdentity := piPackageIdentity(desired)
 	for _, pkg := range packages {
 		identity := piPackageIdentity(pkg)
-		if identity == piMCPAdapterPackage || isLegacyPiSubagentPackage(identity) {
+		if identity == piMCPAdapterPackage || isRetiredPiSubagentPackage(identity) || identity == desiredIdentity {
+			continue
+		}
+		if identity == piSubagentsPackageSpec {
+			if canonicalSeen {
+				continue
+			}
+			canonicalSeen = true
+			filtered = append(filtered, piSubagentsPackageSpec)
 			continue
 		}
 		filtered = append(filtered, pkg)
+	}
+	if !canonicalSeen {
+		filtered = append(filtered, piSubagentsPackageSpec)
 	}
 	return append(filtered, desired)
 }
@@ -441,6 +455,9 @@ func piPackageIdentity(pkg any) string {
 	if strings.HasPrefix(source, piMCPAdapterPackage+"@") || source == piMCPAdapterPackage {
 		return piMCPAdapterPackage
 	}
+	if strings.HasPrefix(source, piSubagentsPackageSpec+"@") || source == piSubagentsPackageSpec {
+		return piSubagentsPackageSpec
+	}
 	for legacy := range legacyPiSubagentPackageIdentities {
 		if source == legacy || strings.HasPrefix(source, legacy+"@") {
 			return legacy
@@ -450,6 +467,10 @@ func piPackageIdentity(pkg any) string {
 }
 
 func isLegacyPiSubagentPackage(identity string) bool {
+	return isRetiredPiSubagentPackage(identity)
+}
+
+func isRetiredPiSubagentPackage(identity string) bool {
 	_, ok := legacyPiSubagentPackageIdentities[identity]
 	return ok
 }

@@ -300,7 +300,7 @@ func TestAdapterInstallCommandSequenceUsesSameSubagentsPackageForWindows(t *test
 		t.Fatalf("InstallCommand() error = %v", err)
 	}
 
-	want := []string{"pi", "install", "npm:pi-subagents-j0k3r"}
+	want := []string{"pi", "install", "npm:pi-subagents"}
 	if !reflect.DeepEqual(commands[4], want) {
 		t.Fatalf("InstallCommand()[4] = %#v, want %#v", commands[4], want)
 	}
@@ -327,7 +327,7 @@ func TestAdapterInstallCommandSequenceUsesNpmForEngramInitWhenPnpmIsAvailable(t 
 	}
 }
 
-func TestMergePiSettingsFileRemovesLegacySubagentPackages(t *testing.T) {
+func TestMergePiSettingsFileRetainsCanonicalAndRemovesRetiredSubagentPackages(t *testing.T) {
 	home := t.TempDir()
 	settingsPath := filepath.Join(home, ".pi", "agent", "settings.json")
 	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
@@ -341,6 +341,7 @@ func TestMergePiSettingsFileRemovesLegacySubagentPackages(t *testing.T) {
     "vendor/pi-subagents",
     "vendor/pi-subagents-fixed@0.0.1",
     "npm:pi-subagents-j0k3r",
+    "npm:@tintinweb/pi-subagents@0.18.0",
     "npm:other@1.0.0"
   ]
 }`
@@ -363,14 +364,29 @@ func TestMergePiSettingsFileRemovesLegacySubagentPackages(t *testing.T) {
 		t.Fatalf("Unmarshal(settings) error = %v", err)
 	}
 
-	for _, forbidden := range []string{"npm:pi-subagents", "npm:pi-subagents@1.0.0", "vendor/pi-subagents", "vendor/pi-subagents-fixed@0.0.1"} {
+	for _, forbidden := range []string{"npm:pi-subagents@1.0.0", "vendor/pi-subagents", "vendor/pi-subagents-fixed@0.0.1", "npm:pi-subagents-j0k3r", "npm:@tintinweb/pi-subagents@0.18.0"} {
 		for _, pkg := range settings.Packages {
 			if pkg == forbidden {
 				t.Fatalf("packages still contains legacy subagent package %q: %#v", forbidden, settings.Packages)
 			}
 		}
 	}
-	if !reflect.DeepEqual(settings.Packages, []string{"npm:pi-subagents-j0k3r", "npm:other@1.0.0", "npm:pi-mcp-adapter"}) {
+	if !reflect.DeepEqual(settings.Packages, []string{"npm:pi-subagents", "npm:other@1.0.0", "npm:pi-mcp-adapter"}) {
 		t.Fatalf("packages = %#v", settings.Packages)
+	}
+}
+
+func TestPiSubagentsRetiredIdentitiesAreRejected(t *testing.T) {
+	for _, identity := range []string{
+		"npm:pi-subagents-j0k3r",
+		"npm:@tintinweb/pi-subagents",
+	} {
+		if !isRetiredPiSubagentPackage(identity) {
+			t.Errorf("isRetiredPiSubagentPackage(%q) = false, want true", identity)
+		}
+	}
+
+	if isRetiredPiSubagentPackage("npm:pi-subagents") {
+		t.Fatal("canonical npm:pi-subagents was classified as retired")
 	}
 }
