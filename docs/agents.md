@@ -102,7 +102,7 @@ For the full Pi command and package reference, see [Pi Agent](pi.md).
 
 - **Detection**: gentle-ai detects Pi from the `pi` binary on `PATH` and its config root at `~/.pi`.
 - **Install**: Pi must already be installed. gentle-ai then installs the full Pi support stack with:
-  - `pi install npm:gentle-pi`
+  - `pi install git:github.com/Alexma03/gentle-pi@custom/main`
   - `pi install npm:gentle-engram`
   - `pi install npm:pi-mcp-adapter`
   - `npm exec --yes --package gentle-engram@latest -- pi-engram init`
@@ -111,7 +111,7 @@ For the full Pi command and package reference, see [Pi Agent](pi.md).
   - `pi install npm:@juicesharp/rpiv-todo`
   - `pi install npm:pi-btw`
 - **`gentle-pi` package**: adds the Gentleman harness for Pi: SDD/OpenSpec workflow, strict TDD guidance, safety defaults, `/gentle-ai:*` commands, skill assets, prompts, SDD agents, and SDD chains. On normal `session_start`, it copies project assets into `.pi/agents/`, `.pi/chains/`, and `.pi/gentle-ai/support/` without overwriting local files unless the Pi recovery command uses `--force`. Starting Pi with `pi -ns` skips startup skill loading/hooks, so that automatic refresh does not run in that mode.
-- **Package metadata**: latest verified `gentle-pi` version is `0.2.6`; npm lists `alan_buscaglia` as maintainer, with source at [Gentleman-Programming/gentle-pi](https://github.com/Gentleman-Programming/gentle-pi) and package docs at [npm: gentle-pi](https://www.npmjs.com/package/gentle-pi).
+- **Package metadata**: this fork installs `git:github.com/Alexma03/gentle-pi@custom/main` ([Alexma03/gentle-pi](https://github.com/Alexma03/gentle-pi)), not the npm registry package.
 - **Persona command**: `gentle-pi` owns Pi persona switching through `/gentleman:persona` (`/gentle-ai:persona` remains a compatibility alias). It switches between `gentleman` and `neutral`, saves `.pi/gentle-ai/persona.json`, and may require `/reload` or a new Pi session for the active prompt to refresh.
 - **Model assignment command**: `gentle-pi` owns Pi model selection through `/gentleman:models` (`/gentle-ai:models` remains a compatibility alias). It opens a Pi-native modal for project, user, and built-in agents, prioritizes SDD agents, saves `.pi/gentle-ai/models.json`, and applies overrides into `.pi/agents/*.md` or `.pi/settings.json`.
 - **`gentle-engram` package**: adds persistent Engram memory for Pi. It captures sessions, exposes Engram MCP tools through `pi-mcp-adapter`, and degrades safely when the local `engram` binary is missing.

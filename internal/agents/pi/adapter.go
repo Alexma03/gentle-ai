@@ -29,6 +29,8 @@ const (
 	piNPMPackageFile         = "package.json"
 	piSubagentsPackageSpec   = "npm:pi-subagents"
 	piCodingAgentDirEnv      = "PI_CODING_AGENT_DIR"
+	// GentlePiPackageSpec installs this fork's Pi harness, not the npm registry package.
+	GentlePiPackageSpec = "git:github.com/Alexma03/gentle-pi@custom/main"
 )
 
 func piSubagentsInstallCommand(system.PlatformProfile) []string {
@@ -80,7 +82,7 @@ func (a *Adapter) CapabilityManifest() capabilitymanifest.AgentCapabilityManifes
 
 func (a *Adapter) InstallCommand(profile system.PlatformProfile) ([][]string, error) {
 	return [][]string{
-		{"pi", "install", "npm:gentle-pi"},
+		{"pi", "install", GentlePiPackageSpec},
 		{"pi", "install", "npm:gentle-engram"},
 		{"pi", "install", "npm:pi-mcp-adapter"},
 		a.engramInitCommand(),

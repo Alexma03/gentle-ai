@@ -95,7 +95,7 @@ func hasPiAgentInInstallPlan(plan planner.ResolvedPlan, selection model.Selectio
 
 func piInstallCommands() []string {
 	return []string{
-		"pi install npm:gentle-pi",
+		"pi install git:github.com/Alexma03/gentle-pi@custom/main",
 		"pi install npm:gentle-engram",
 		"pi install npm:pi-mcp-adapter",
 		"npm exec --yes --package gentle-engram@latest -- pi-engram init",
