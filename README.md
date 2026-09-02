@@ -50,10 +50,9 @@ Implementation routing does not decide review strength, and per-action test, bui
 git clone --branch custom/main https://github.com/Alexma03/gentle-ai.git
 cd gentle-ai
 ./scripts/install-personal.sh
-gentle-ai sync
 ```
 
-The installer builds the current checkout with the declared upstream module identity and atomically writes the binary to `${GOBIN:-$HOME/.local/bin}`. To update later, pull `custom/main` and run the script again. This is the supported self-update path on macOS, Linux, and WSL. On native Windows, build `./cmd/gentle-ai` from the fork checkout and replace the current executable after it exits.
+The installer builds the current checkout with the declared upstream module identity, resolves its destination from `--install-dir`, `GENTLE_AI_INSTALL_DIR`, `GOBIN`, or the Go environment, and atomically installs the binary. It then verifies that `command -v gentle-ai` resolves that exact file. Follow the absolute `Run exactly: …/gentle-ai sync` invocation it prints; if another binary shadows the fork, the installer fails closed and prints the same safe invocation. To update later, pull `custom/main` and run the script again. This is the supported self-update path on macOS, Linux, and WSL. On native Windows, build `./cmd/gentle-ai` from the fork checkout and replace the current executable after it exits.
 
 `gentle-ai upgrade` never replaces this fork with an upstream release. It reports Gentle AI as manually managed while still upgrading other managed tools.
 

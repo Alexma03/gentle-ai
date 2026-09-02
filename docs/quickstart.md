@@ -52,10 +52,9 @@ Install and update from the fork checkout:
 git clone --branch custom/main https://github.com/Alexma03/gentle-ai.git
 cd gentle-ai
 ./scripts/install-personal.sh
-gentle-ai sync
 ```
 
-For later updates, run `git pull --ff-only origin custom/main` in that checkout and rerun `./scripts/install-personal.sh`. Do not run the upstream installer or upstream `go install` command: either would replace the personal fork binary. `gentle-ai upgrade` skips self-upgrade with a manual hint and still manages the remaining registered tools.
+The installer proves which `gentle-ai` command is active. Run only the exact absolute `…/gentle-ai sync` invocation it prints. If another installation shadows the fork, activation fails closed but the same absolute invocation remains safe. For later updates, run `git pull --ff-only origin custom/main` in that checkout and rerun `./scripts/install-personal.sh`. Do not run the upstream installer or upstream `go install` command: either would replace the personal fork binary. `gentle-ai upgrade` skips self-upgrade with a manual hint and still manages the remaining registered tools.
 
 ## Run
 
