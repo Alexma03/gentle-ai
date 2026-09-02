@@ -19,8 +19,8 @@ func PresetOptions() []model.PresetID {
 var presetDescriptions = map[model.PresetID]string{
 	model.PresetMinimal:       "Just Engram persistent memory across sessions",
 	model.PresetEcosystemOnly: "Memory + SDD + skills + docs",
-	model.PresetFullGentleman: "Dev Stack plus managed themes and logo polish",
-	model.PresetCustom:        "Choose each component manually: memory, persona, themes, logo, and more",
+	model.PresetFullGentleman: "Dev Stack plus the full managed workflow",
+	model.PresetCustom:        "Choose each component manually",
 }
 
 var presetLabels = map[model.PresetID]string{

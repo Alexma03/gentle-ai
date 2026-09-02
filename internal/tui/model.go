@@ -1860,19 +1860,6 @@ func (m Model) confirmSelection() (tea.Model, tea.Cmd) {
 			next++
 
 			if m.Cursor == next {
-				m.CommunityToolsStandalone = true
-				m.CommunityToolResults = nil
-				m.CommunityToolErr = nil
-				m.CommunityToolStatuses = nil
-				m.CommunityToolStatusErr = nil
-				m.CommunityToolStatusLoading = true
-				m.Selection.CommunityTools = nil
-				m.setScreen(ScreenCommunityTools)
-				return m, m.startCommunityToolStatusDetection()
-			}
-			next++
-
-			if m.Cursor == next {
 				return m, tea.Quit
 			}
 		}
@@ -3983,7 +3970,7 @@ func (m Model) shouldShowSkillPickerScreen() bool {
 }
 
 func (m Model) shouldShowCommunityToolsScreen() bool {
-	return m.InstallFlowActive && !m.CommunityToolsStandalone
+	return false
 }
 
 func (m *Model) buildDependencyPlan() {

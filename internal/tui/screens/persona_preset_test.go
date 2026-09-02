@@ -13,7 +13,7 @@ func TestRenderPersonaClarifiesCustomKeepsExistingPersona(t *testing.T) {
 	if !strings.Contains(out, "custom") {
 		t.Fatalf("RenderPersona missing custom option; output:\n%s", out)
 	}
-	if !strings.Contains(out, "Do not install a managed persona; choose themes/logo on the next screens") {
+	if !strings.Contains(out, "Do not install a managed persona") {
 		t.Fatalf("RenderPersona missing custom persona clarification; output:\n%s", out)
 	}
 	if strings.Contains(out, "Bring your own persona instructions") {

@@ -53,7 +53,6 @@ func WelcomeOptions(updateResults []update.UpdateResult, updateCheckDone bool, s
 	opts = append(opts, "Reset review store")
 	opts = append(opts, "Receipt-Driven Development")
 	opts = append(opts, "Managed uninstall")
-	opts = append(opts, "Community Tools/Plugins")
 	opts = append(opts, "Quit")
 
 	return opts
@@ -68,13 +67,9 @@ func RenderWelcomeWithWidth(cursor int, version string, updateBanner string, upd
 }
 
 func RenderWelcomeWithAdvisory(cursor int, version string, updateBanner string, updateResults []update.UpdateResult, updateCheckDone bool, showProfiles bool, profileCount int, hasEngines bool, width int, height int, advisory WelcomeAdvisory) string {
-	render := func(includeLogo, includeOptional, compact bool) string {
+	render := func(includeOptional, compact bool) string {
 		var b strings.Builder
 
-		if includeLogo {
-			b.WriteString(styles.RenderLogo())
-			b.WriteString("\n\n")
-		}
 		if !compact {
 			b.WriteString(styles.SubtextStyle.Render(styles.Tagline(version)))
 			b.WriteString("\n")
@@ -91,15 +86,12 @@ func RenderWelcomeWithAdvisory(cursor int, version string, updateBanner string, 
 			}
 		}
 
-		if !compact && includeLogo {
-			b.WriteString("\n")
-		}
 		if compact {
 			b.WriteString(renderWelcomeText(styles.HeadingStyle, "Menu", width))
 		} else {
 			b.WriteString(styles.HeadingStyle.Render("Menu"))
 		}
-		if compact || !includeLogo {
+		if compact {
 			b.WriteString("\n")
 		} else {
 			b.WriteString("\n\n")
@@ -109,9 +101,6 @@ func RenderWelcomeWithAdvisory(cursor int, version string, updateBanner string, 
 			b.WriteString(renderWelcomeOptions(options, cursor, width))
 		} else {
 			b.WriteString(renderOptions(options, cursor))
-		}
-		if !compact && includeLogo {
-			b.WriteString("\n")
 		}
 		if compact {
 			b.WriteString(renderWelcomeText(styles.HelpStyle, welcomeHelpText, width))
@@ -132,16 +121,10 @@ func RenderWelcomeWithAdvisory(cursor int, version string, updateBanner string, 
 			(height <= 0 || lipgloss.Height(view) <= height)
 	}
 
-	view := render(true, true, false)
+	view := render(true, false)
 	if !fitsViewport(view) {
-		// The logo is optional chrome; keep the menu and controls visible when
-		// the measured terminal viewport cannot hold the full welcome screen.
-		view = render(false, true, false)
-	}
-	if !fitsViewport(view) {
-		// Drop optional chrome and the frame only after measuring the logo-free view.
-		// The complete menu, primary action, and help line remain visible.
-		view = render(false, false, true)
+		// Drop optional chrome and the frame after measuring the full view.
+		view = render(false, true)
 	}
 	if !fitsViewport(view) {
 		// A viewport shorter than the compact menu still needs a safe, actionable

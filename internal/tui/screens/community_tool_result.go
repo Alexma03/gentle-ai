@@ -11,7 +11,7 @@ import (
 
 func RenderCommunityToolResult(results []codegraph.Result, err error) string {
 	var b strings.Builder
-	b.WriteString(styles.TitleStyle.Render("Community Tools/Plugins"))
+	b.WriteString(styles.TitleStyle.Render("Legacy CodeGraph migration"))
 	b.WriteString("\n\n")
 
 	if err != nil {
