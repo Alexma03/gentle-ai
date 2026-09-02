@@ -2,16 +2,24 @@ package update
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"gopkg.in/yaml.v3"
+)
+
+var (
+	releasePolicyValidatorOnce sync.Once
+	releasePolicyValidatorPath string
+	releasePolicyValidatorErr  error
 )
 
 func TestOfficialReleaseOmitsUnsignedWindowsDistribution(t *testing.T) {
@@ -446,11 +454,33 @@ func newReleasePolicyFixture(t *testing.T) string {
 }
 
 func runReleasePolicy(root string) ([]byte, error) {
+	releasePolicyValidatorOnce.Do(func() {
+		packageDir, err := os.Getwd()
+		if err != nil {
+			releasePolicyValidatorErr = err
+			return
+		}
+		dir, err := os.MkdirTemp("", "gentle-ai-release-policy-")
+		if err != nil {
+			releasePolicyValidatorErr = err
+			return
+		}
+		releasePolicyValidatorPath = filepath.Join(dir, "validator")
+		build := exec.Command("go", "build", "-o", releasePolicyValidatorPath, "./internal/releasepolicycmd")
+		build.Dir = filepath.Clean(filepath.Join(packageDir, "..", ".."))
+		if output, err := build.CombinedOutput(); err != nil {
+			releasePolicyValidatorErr = fmt.Errorf("build release policy validator: %w: %s", err, output)
+		}
+	})
+	if releasePolicyValidatorErr != nil {
+		return nil, releasePolicyValidatorErr
+	}
 	command := exec.Command("bash", filepath.Join("scripts", "verify-release-distribution-policy.sh"))
 	command.Dir = root
 	command.Env = append(os.Environ(),
 		"RELEASE_POLICY_SNAPSHOT_MARKER="+releasePolicyMarkerPath(root),
 		"RELEASE_POLICY_SNAPSHOT_RUN_ID="+releasePolicyRunID,
+		"RELEASE_POLICY_VALIDATOR="+releasePolicyValidatorPath,
 	)
 	return command.CombinedOutput()
 }
