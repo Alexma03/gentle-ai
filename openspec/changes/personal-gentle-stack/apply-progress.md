@@ -339,7 +339,7 @@ A fresh bounded `gpt-5.6-luna` / max audit inspected only Phase 4. Its first pas
 
 ### Native Attempt Evidence
 
-The first exact root verification failed only on the seven stale generated goldens. Native settlement recorded failed evidence revision `sha256:d4e2ed1a0121656c89f20bbbe7f09596f81d3eed0ab73d5059b76693ac1e84ca` and returned `proceed`. The corrected attempt was reacquired under the same original objective with token `sha256:bab0fce6909c46223a2adb3123c874ac63c7e4f02d4beb68a8d9f8b63c0d73c0`; final passed settlement must remediate that failed evidence revision and is parent/runtime-ledger evidence, not a caller-authored counter.
+The first exact root verification failed only on the seven stale generated goldens. Native settlement recorded failed evidence revision `sha256:d4e2ed1a0121656c89f20bbbe7f09596f81d3eed0ab73d5059b76693ac1e84ca` and returned `proceed`. The corrected attempt was reacquired under the same original objective with token `sha256:bab0fce6909c46223a2adb3123c874ac63c7e4f02d4beb68a8d9f8b63c0d73c0`. Passed settlement request `6ad7a0bd-8e1a-4b63-8bc2-15b4e1f85145` recorded fresh evidence revision `sha256:fe5e761be6414e66242d2e624273c529e1486388942a471ac3e47ca03c1c24c1`, explicitly remediated the failed revision, and returned `state: complete`. This is runtime-ledger evidence, not a caller-authored counter.
 
 ### Publication Handoff and Caveats
 
