@@ -62,8 +62,9 @@ Available subagents (all installed in `~/.cursor/agents/`):
 
 | Subagent | File | Purpose |
 |----------|------|---------|
-| `sdd-init` | `sdd-init.md` | Initialize SDD context; detect stack, bootstrap persistence |
+| `sdd-init` | `sdd-init.md` | Initialize SDD context; detect stack, bootstrap persistence. Delegate-only — never wait for the user to invoke it. |
 | `sdd-explore` | `sdd-explore.md` | Investigate codebase; no files created |
+| `sdd-research` | `sdd-research.md` | Record fail-closed research outcomes when that lane is selected |
 | `sdd-propose` | `sdd-propose.md` | Draft the change proposal |
 | `sdd-spec` | `sdd-spec.md` | Write requirements and acceptance scenarios |
 | `sdd-design` | `sdd-design.md` | Write architecture and file-change design |
@@ -71,6 +72,7 @@ Available subagents (all installed in `~/.cursor/agents/`):
 | `sdd-apply` | `sdd-apply.md` | Implement tasks; check off as it goes |
 | `sdd-verify` | `sdd-verify.md` | Validate implementation against specs |
 | `sdd-archive` | `sdd-archive.md` | Sync delta specs and archive completed change |
+| `sdd-onboard` | `sdd-onboard.md` | Guided end-to-end SDD walkthrough on the real codebase |
 
 Each subagent runs in its own context window and returns a **structured result**. Collect the result, update DAG state, and present the summary to the user before triggering the next phase.
 
@@ -145,23 +147,28 @@ SDD is the structured planning layer for substantial changes.
 
 ### Commands
 
-Skills (appear in autocomplete):
+Cursor does not install user-facing `/sdd-*` slash commands. The user never types them and they do not appear in autocomplete. The user speaks in natural language. You decide two things, then dispatch:
 
-- `/sdd-init` → initialize SDD context; detects stack, bootstraps persistence
-- `/sdd-explore <topic>` → investigate an idea; reads codebase, compares approaches; no files created
-- `/sdd-status [change]` → read-only structured status for active change, artifacts, tasks, and next action
-- `/sdd-apply [change]` → implement tasks in batches; checks off items as it goes
-- `/sdd-verify [change]` → validate implementation against specs; reports CRITICAL / WARNING / SUGGESTION
-- `/sdd-archive [change]` → close a change and persist final state in the active artifact store
-- `/sdd-onboard` → guided end-to-end walkthrough of SDD using your real codebase
+1. **Agent** — which named subagent from the table above to invoke, or none for direct inline work.
+2. **Type** — execution topology: direct inline, delegated direct worker, or an SDD phase.
 
-Meta-commands (type directly — orchestrator handles them, won't appear in autocomplete):
+Do not tell the user to type a slash command. `sdd-init` is delegate-only (`user-invocable: false`); run it yourself when the init guard requires it.
 
-- `/sdd-new <change>` → start a new change by invoking `sdd-explore` then `sdd-propose` subagents
-- `/sdd-continue [change]` → run the next dependency-ready phase via the appropriate subagent
-- `/sdd-ff <name>` → fast-forward planning: invoke `sdd-propose` → `sdd-spec` → `sdd-design` → `sdd-tasks` in sequence
+Phase names you may select (map user intent onto these; they are not user commands):
 
-`/sdd-new`, `/sdd-continue`, and `/sdd-ff` are meta-commands handled by YOU. Do NOT invoke them as skills. You orchestrate the subagent sequence yourself.
+- `sdd-init` — initialize SDD context; detect stack, bootstrap persistence
+- `sdd-explore` — investigate an idea; no files created
+- `sdd-research` — record fail-closed research outcomes when the lane is selected
+- `sdd-status` — read-only structured status (native status engine / CLI, not a subagent)
+- `sdd-apply` / `sdd-verify` / `sdd-archive` / `sdd-onboard` — as in the subagent table
+
+Pipeline sequences you compose (not agents, not user commands):
+
+- new change → `sdd-explore` then `sdd-propose`
+- continue → next dependency-ready phase
+- fast-forward planning → `sdd-propose` → `sdd-spec` → `sdd-design` → `sdd-tasks`
+
+Keep using the names `/sdd-new`, `/sdd-continue`, and `/sdd-ff` only as internal shorthand later in this prompt. They are not Cursor commands. You orchestrate the subagent sequence yourself.
 
 ### Native SDD Dispatcher Guard
 
@@ -302,7 +309,9 @@ Read this table at session start (or before first SDD/Judgment-Day delegation), 
 
 | Phase | Default Model | Reason |
 |-------|---------------|--------|
+| sdd-init | haiku | Detect stack, bootstrap persistence |
 | sdd-explore | sonnet | Reads code, structural - not architectural |
+| sdd-research | sonnet | Fail-closed evidence record |
 | sdd-propose | opus | Architectural decisions |
 | sdd-spec | sonnet | Structured writing |
 | sdd-design | opus | Architecture decisions |
@@ -310,6 +319,7 @@ Read this table at session start (or before first SDD/Judgment-Day delegation), 
 | sdd-apply | sonnet | Implementation |
 | sdd-verify | sonnet | Validation against spec |
 | sdd-archive | haiku | Copy and close |
+| sdd-onboard | sonnet | Guided walkthrough on the real codebase |
 | default | sonnet | SDD/JD phase fallback |
 
 <!-- /gentle-ai:sdd-model-assignments -->
@@ -372,7 +382,9 @@ Each phase has explicit read/write rules:
 
 | Phase | Reads | Writes |
 |-------|-------|--------|
+| `sdd-init` | nothing | project context |
 | `sdd-explore` | nothing | `explore` |
+| `sdd-research` | exploration (required when selected) | `research` + `preproposal` |
 | `sdd-propose` | exploration (optional) | `proposal` |
 | `sdd-spec` | proposal (required) | `spec` |
 | `sdd-design` | proposal (required) | `design` |
@@ -380,6 +392,7 @@ Each phase has explicit read/write rules:
 | `sdd-apply` | tasks + spec + design + **apply-progress (if exists)** | `apply-progress` |
 | `sdd-verify` | spec + tasks + **apply-progress** | `verify-report` |
 | `sdd-archive` | all artifacts | `archive-report` |
+| `sdd-onboard` | project context | onboard progress per phase |
 
 For phases with required dependencies, sub-agent reads directly from the backend — orchestrator passes artifact references (topic keys or file paths), NOT content itself.
 
