@@ -58,12 +58,9 @@ func TestExecuteSkipsManuallyManagedToolWithoutBackupOrExecution(t *testing.T) {
 		return backup.Manifest{}, nil
 	}
 
+	tool := update.Tools[0]
 	report := Execute(context.Background(), []update.UpdateResult{{
-		Tool: update.ToolInfo{
-			Name:              "gentle-ai",
-			InstallMethod:     update.InstallBinary,
-			ManualUpgradeHint: "build from the Alexma03 fork checkout",
-		},
+		Tool:             tool,
 		InstalledVersion: "1.0.0",
 		LatestVersion:    "1.1.0",
 		Status:           update.UpdateAvailable,
@@ -72,8 +69,25 @@ func TestExecuteSkipsManuallyManagedToolWithoutBackupOrExecution(t *testing.T) {
 	if len(report.Results) != 1 || report.Results[0].Status != UpgradeSkipped {
 		t.Fatalf("Execute() results = %#v, want one skipped manual tool", report.Results)
 	}
-	if report.Results[0].ManualHint != "build from the Alexma03 fork checkout" || report.BackupID != "" {
+	if report.Results[0].ManualHint != tool.ManualUpgradeHint || report.BackupID != "" {
 		t.Fatalf("Execute() report = %#v, want manual hint and no backup", report)
+	}
+}
+
+func TestExecutePersonalRegistryHintWinsForNonExecutableStatuses(t *testing.T) {
+	tool := update.Tools[0]
+	for _, status := range []update.UpdateStatus{update.DevBuild, update.VersionUnknown} {
+		t.Run(string(status), func(t *testing.T) {
+			report := Execute(context.Background(), []update.UpdateResult{{
+				Tool: tool, InstalledVersion: string(status), LatestVersion: "2.0.0", Status: status,
+			}}, system.PlatformProfile{OS: "linux"}, t.TempDir(), false)
+			if len(report.Results) != 1 || report.Results[0].Status != UpgradeSkipped {
+				t.Fatalf("Execute() results = %#v, want one skipped result", report.Results)
+			}
+			if report.Results[0].ManualHint != tool.ManualUpgradeHint {
+				t.Fatalf("ManualHint = %q, want personal registry hint %q", report.Results[0].ManualHint, tool.ManualUpgradeHint)
+			}
+		})
 	}
 }
 

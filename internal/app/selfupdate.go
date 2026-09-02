@@ -131,6 +131,10 @@ func selfUpdate(ctx context.Context, version string, profile system.PlatformProf
 	if target == nil || target.Status != update.UpdateAvailable {
 		return nil
 	}
+	if target.Tool.ManualUpgradeHint != "" {
+		_, _ = fmt.Fprintf(stdout, "self-update: %s\n", target.Tool.ManualUpgradeHint)
+		return nil
+	}
 
 	// Prompt the user before applying — unconditional (GENTLE_AI_CONFIRM_UPDATE removed).
 	// When --yes / GENTLE_AI_YES=1, substitute an auto-accept stub so scripted

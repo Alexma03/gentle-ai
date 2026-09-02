@@ -57,8 +57,14 @@ func CheckFiltered(ctx context.Context, currentVersion string, profile system.Pl
 }
 
 // checkSingleTool checks a single tool: detects local version, fetches remote, compares.
-func checkSingleTool(ctx context.Context, tool ToolInfo, currentBuildVersion string, profile system.PlatformProfile) UpdateResult {
-	result := UpdateResult{Tool: tool}
+func checkSingleTool(ctx context.Context, tool ToolInfo, currentBuildVersion string, profile system.PlatformProfile) (result UpdateResult) {
+	result = UpdateResult{Tool: tool}
+	defer func() {
+		if tool.ManualUpgradeHint != "" {
+			result.UpdateHint = tool.ManualUpgradeHint
+			result.ReleaseURL = ""
+		}
+	}()
 	homebrewOwnership := HomebrewNone
 	if profile.PackageManager == "brew" {
 		var err error
@@ -184,7 +190,12 @@ func applyBetaMainHeadStatus(result UpdateResult, localVersion string, commit gi
 	// that delivers main@<sha> is `go install ...@main`. The per-OS stable
 	// hint would silently replace this beta build with the latest stable
 	// release (issue #2323).
-	result.UpdateHint = GentleAISourceInstallCommand(result.LatestVersion)
+	if result.Tool.ManualUpgradeHint != "" {
+		result.UpdateHint = result.Tool.ManualUpgradeHint
+		result.ReleaseURL = ""
+	} else {
+		result.UpdateHint = GentleAISourceInstallCommand(result.LatestVersion)
+	}
 
 	if strings.TrimSpace(localVersion) == "" {
 		result.Status = VersionUnknown

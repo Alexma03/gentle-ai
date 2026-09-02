@@ -111,6 +111,28 @@ func TestSelfUpdate_SkipWhenDevVersion(t *testing.T) {
 	}
 }
 
+func TestSelfUpdatePersonalForkReportsManualPolicyWithoutPrompt(t *testing.T) {
+	unsetEnv(t, envNoSelfUpdate)
+	unsetEnv(t, envSelfUpdateDone)
+	tool := update.Tools[0]
+	stubs := swapSelfUpdateDeps(t, []update.UpdateResult{{
+		Tool: tool, InstalledVersion: "1.0.0", LatestVersion: "2.0.0", Status: update.UpdateAvailable,
+	}}, upgrade.UpgradeReport{})
+	originalPrompt := promptFn
+	t.Cleanup(func() { promptFn = originalPrompt })
+	promptFn = func(io.Writer, io.Reader, string, string) (bool, error) {
+		t.Fatal("manually managed personal fork must not prompt for automatic replacement")
+		return false, nil
+	}
+	var output bytes.Buffer
+	if err := selfUpdate(context.Background(), "1.0.0", stubProfile(), &output); err != nil {
+		t.Fatal(err)
+	}
+	if stubs.upgradeCalled != 0 || !strings.Contains(output.String(), tool.ManualUpgradeHint) {
+		t.Fatalf("selfUpdate() calls=%d output=%q, want manual hint without upgrade", stubs.upgradeCalled, output.String())
+	}
+}
+
 func TestSelfUpdate_SkipWhenOptOut(t *testing.T) {
 	setEnv(t, envNoSelfUpdate, "1")
 	unsetEnv(t, envSelfUpdateDone)

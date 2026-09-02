@@ -497,26 +497,34 @@ func ExecuteWithOptions(ctx context.Context, results []update.UpdateResult, prof
 
 	// Dev-build tools: always UpgradeSkipped with a source-build hint.
 	for _, r := range devBuilds {
+		manualHint := r.Tool.ManualUpgradeHint
+		if manualHint == "" {
+			manualHint = fmt.Sprintf("source build — upgrade manually or install a release binary from https://github.com/Gentleman-Programming/%s/releases", r.Tool.Repo)
+		}
 		toolResults = append(toolResults, ToolUpgradeResult{
 			ToolName:   r.Tool.Name,
 			OldVersion: r.InstalledVersion,
 			NewVersion: r.LatestVersion,
 			Method:     effectiveMethod(r.Tool, profile),
 			Status:     UpgradeSkipped,
-			ManualHint: fmt.Sprintf("source build — upgrade manually or install a release binary from https://github.com/Gentleman-Programming/%s/releases", r.Tool.Repo),
+			ManualHint: manualHint,
 		})
 	}
 
 	// VersionUnknown tools: surface them as skipped so the user gets a clear hint
 	// instead of a silent omission from the upgrade report.
 	for _, r := range versionUnknowns {
+		manualHint := r.Tool.ManualUpgradeHint
+		if manualHint == "" {
+			manualHint = fmt.Sprintf("installed binary was found but its version could not be determined — check `%s` and reinstall if it is a stale source/dev build", detectCommandHint(r.Tool))
+		}
 		toolResults = append(toolResults, ToolUpgradeResult{
 			ToolName:   r.Tool.Name,
 			OldVersion: r.InstalledVersion,
 			NewVersion: r.LatestVersion,
 			Method:     effectiveMethod(r.Tool, profile),
 			Status:     UpgradeSkipped,
-			ManualHint: fmt.Sprintf("installed binary was found but its version could not be determined — check `%s` and reinstall if it is a stale source/dev build", detectCommandHint(r.Tool)),
+			ManualHint: manualHint,
 		})
 	}
 
