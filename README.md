@@ -1,40 +1,9 @@
-<div align="center">
+# Gentle-AI — Personal Fork
 
-<img width="3276" height="1280" alt="Gentle-AI neon rose banner" src="docs/assets/brand/gentle-ai-banner.png" />
-
-<h1>Gentle-AI</h1>
-
-<p><strong>Gentle-AI — Ecosystem, Frameworks, Workflows for AI coding agents.</strong></p>
-
-<p>
-<a href="https://github.com/Gentleman-Programming/gentle-ai/releases"><img src="https://img.shields.io/github/v/release/Gentleman-Programming/gentle-ai" alt="Release"></a>
-<a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
-<img src="https://img.shields.io/badge/Go-1.25.10+-00ADD8?logo=go&logoColor=white" alt="Go 1.25.10+">
-<img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey" alt="Platform">
-</p>
-
-</div>
-
----
+A focused configurator for Claude Code, Codex, Cursor, Antigravity, and Pi. This fork retains Context7, CodeGraph, Engram, SDD, and the NicoBailon `pi-subagents` integration while removing presentation and community-catalog surfaces that are not part of the personal workflow.
 
 > [!IMPORTANT]
-> **Receipt-Driven Development (RDD) is opt-in and provides bounded review evidence.** `v2.2.0` was the historical release where that path became supported after RDD began in `v1.47.0`: small work stays direct, broader implementation is delegated, SDD stays optional, and once RDD is enabled every route can converge on structural proof and an informational bounded-review outcome. Ordinary repository policy owns delivery. RDD is off until you enable it with `gentle-ai review mode enable --scope global`.
->
-> The current stable release is [`v2.3.0`](https://github.com/Gentleman-Programming/gentle-ai/releases/tag/v2.3.0). `@latest` is the stable channel:
->
-> ```bash
-> go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@latest
-> ```
->
-> To opt into the current prerelease, [`v2.4.0-rc.1`](https://github.com/Gentleman-Programming/gentle-ai/releases/tag/v2.4.0-rc.1), install its exact tag:
->
-> ```bash
-> go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@v2.4.0-rc.1
-> ```
->
-> Use `@main` only for unreleased development changes. See the [full RDD version policy](docs/quickstart.md#version-policy).
->
-> Note the `/v2` suffix: Go requires it for major version 2 and above. Releases before `v2.0.0` use the unsuffixed import path.
+> This repository keeps the upstream Go module path for source compatibility. Do not use an upstream release installer to update this personal build: that would replace it with Gentleman-Programming's binary. Build and install from this fork checkout with `./scripts/install-personal.sh`; the built-in updater intentionally skips self-upgrade and continues updating other managed tools.
 
 ## What It Does
 
@@ -75,137 +44,22 @@ Implementation routing does not decide review strength, and per-action test, bui
 
 ## Quick Start
 
-### Install (recommended)
-
-> [!NOTE]
-> `gentle-ai install` requires Node.js 18+ and npm on every platform (it warns if either is missing). See [Prerequisites](docs/quickstart.md#prerequisites) for your distro's install hint.
-
-**macOS / Linux**
+### Install this fork
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.sh | bash
+git clone --branch custom/main https://github.com/Alexma03/gentle-ai.git
+cd gentle-ai
+./scripts/install-personal.sh
+gentle-ai sync
 ```
 
-**Windows (PowerShell)**
+The installer builds the current checkout with the declared upstream module identity and atomically writes the binary to `${GOBIN:-$HOME/.local/bin}`. To update later, pull `custom/main` and run the script again. This is the supported self-update path on macOS, Linux, and WSL. On native Windows, build `./cmd/gentle-ai` from the fork checkout and replace the current executable after it exits.
 
-```powershell
-go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@latest
-```
-
-> [!WARNING]
-> Windows source builds and CI/runtime tests remain supported, but official Windows binary distribution and Scoop are temporarily unavailable. Windows installation and upgrades require Go 1.25.10+ and fail closed to source-install guidance; they never download an unsigned Gentle AI executable or execute a remote update script.
-
-> [!IMPORTANT]
-> After replacing or upgrading the `gentle-ai` binary, run `gentle-ai sync` to refresh its managed assets. See the [sync and upgrade reference](docs/usage.md#sync).
+`gentle-ai upgrade` never replaces this fork with an upstream release. It reports Gentle AI as manually managed while still upgrading other managed tools.
 
 ### Configure project context
 
-Once your agents are configured, open your AI agent in a project and run these two commands to register the project context:
-
-| Command                            | What it does                                                                | When to re-run                                                                 |
-| ---------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `/sdd-init`                        | Detects stack, testing capabilities, activates Strict TDD Mode if available | When your project adds/removes test frameworks, or first time in a new project |
-| `gentle-ai skill-registry refresh` | Scans installed skills and project conventions, builds the registry         | After installing/removing skills, or first time in a new project               |
-
-Run `gentle-ai doctor` at any time for a read-only health check of your ecosystem (tool binaries, `state.json`, Engram reachability, disk space).
-
-<details>
-<summary><strong>Alternative install and scope options</strong></summary>
-
-**Homebrew (macOS / Linux)**
-
-```bash
-brew tap gentleman-programming/tap
-brew trust --formula gentleman-programming/tap/gentle-ai  # one-time, if Homebrew requires trust
-brew install gentle-ai
-```
-
-To install several tools from this tap, you can instead run `brew trust gentleman-programming/tap`. This broader option trusts all current and future formulas, casks, and external commands published in the tap.
-
-**Go install: stable channel (any platform with Go 1.25.10+)**
-
-```bash
-go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@latest
-```
-
-Note the `/v2` in the module path: Go requires it for major version 2 and
-above. Releases before `v2.0.0` use the unsuffixed path.
-
-**Scoop (Windows)** — temporarily unavailable while official Windows binary distribution is held for public-trust Authenticode signing. Use the Windows `go install` command above.
-
-By default, `gentle-ai install` writes agent-scoped files to each selected agent's global config directory. To keep the Gentleman stack isolated to one project, run:
-
-```bash
-gentle-ai install --scope=workspace
-```
-
-Workspace scope applies to selected agents for agent-scoped files such as system prompts, skills, SDD agents, and persona files. Global-only integrations remain global by design.
-
-**Unreleased development channel (`main`)** — use only to test changes that are not part of a release. The managed beta installer tracks `main`; it requires Go 1.25.10+:
-
-```bash
-# macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.sh | bash -s -- --channel beta
-
-# Windows (PowerShell)
-$env:GENTLE_AI_CHANNEL="beta"; go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@main
-```
-
-To update a beta installation later, preserve the beta channel:
-
-```bash
-# macOS / Linux
-GENTLE_AI_CHANNEL=beta gentle-ai upgrade
-
-# Windows (PowerShell)
-$env:GENTLE_AI_CHANNEL="beta"; gentle-ai upgrade
-```
-
-> [!NOTE]
-> **Beta upgrades & Go proxy caching**: On macOS, Linux, and Windows with Go on `PATH`, `gentle-ai upgrade` advances the `gentle-ai` binary from `main` and refreshes managed tools (Engram, plugins, etc.). If you re-run an installer instead, pass beta explicitly because both installers default to stable:
->
-> ```bash
-> # macOS / Linux
-> curl -fsSL https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.sh | bash -s -- --channel beta
->
-> # Windows (PowerShell)
-> $env:GENTLE_AI_CHANNEL="beta"; irm https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.ps1 | iex
-> ```
->
-> If a manual `go install ...@main` does not pick up recent commits because `proxy.golang.org` is stale, bypass it with `GOPROXY=direct go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@main` (PowerShell: `$env:GOPROXY="direct"; go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@main`).
-
-### RDD version policy
-
-Receipt-Driven Development (RDD) started in `gentle-ai` `v1.47.0` on 2026-07-10, with the first bounded native review transactions, and became the supported stable path in `v2.2.0`. Those are historical milestones; the negotiated public review contract was published in `v2.1.6`.
-
-The current stable release is [`v2.3.0`](https://github.com/Gentleman-Programming/gentle-ai/releases/tag/v2.3.0). The current prerelease is [`v2.4.0-rc.1`](https://github.com/Gentleman-Programming/gentle-ai/releases/tag/v2.4.0-rc.1). `main` is unreleased development.
-
-**Stable channel (`@latest`, currently `v2.3.0`)**
-
-```bash
-go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@latest
-gentle-ai version
-```
-
-**Prerelease channel (`v2.4.0-rc.1`)**
-
-```bash
-go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@v2.4.0-rc.1
-gentle-ai version
-```
-
-**Unreleased development (`main`)**
-
-```bash
-go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@main
-gentle-ai version
-```
-
-The managed installer tracks the channel's latest version and does not accept an arbitrary release pin. Use `go install` when reproducibility requires an exact version.
-
-</details>
-
----
+After installation, run `gentle-ai install` and select only the runtimes and components you use. Run `gentle-ai doctor` for a read-only health check and `gentle-ai sync` after replacing the binary.
 
 ## Core Workflow
 

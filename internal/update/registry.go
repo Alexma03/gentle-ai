@@ -29,7 +29,8 @@ var Tools = []ToolInfo{
 		// deliberately NOT a general opt-in to go-install: effectiveMethod routes
 		// gentle-ai on Linux/macOS to InstallBinary regardless of this field, so
 		// those platforms keep the minisign-verified release download.
-		GoImportPath: "github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai",
+		GoImportPath:      "github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai",
+		ManualUpgradeHint: "personal fork — update the custom/main checkout, then run ./scripts/install-personal.sh",
 	},
 	{
 		Name:              "engram",

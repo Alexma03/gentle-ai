@@ -69,6 +69,7 @@ func registryGentleAI(t *testing.T) update.ToolInfo {
 	t.Helper()
 	for _, tool := range update.Tools {
 		if tool.Name == "gentle-ai" {
+			tool.ManualUpgradeHint = ""
 			return tool
 		}
 	}

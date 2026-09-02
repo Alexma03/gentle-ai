@@ -42,6 +42,41 @@ func makeResult(name string, status update.UpdateStatus, oldVer, newVer string, 
 	}
 }
 
+func TestExecuteSkipsManuallyManagedToolWithoutBackupOrExecution(t *testing.T) {
+	originalExec := execCommand
+	originalSnapshot := snapshotCreator
+	t.Cleanup(func() {
+		execCommand = originalExec
+		snapshotCreator = originalSnapshot
+	})
+	execCommand = func(string, ...string) *exec.Cmd {
+		t.Fatal("manual tool must not execute an upgrade command")
+		return nil
+	}
+	snapshotCreator = func(string, []string) (backup.Manifest, error) {
+		t.Fatal("manual tool must not create an upgrade backup")
+		return backup.Manifest{}, nil
+	}
+
+	report := Execute(context.Background(), []update.UpdateResult{{
+		Tool: update.ToolInfo{
+			Name:              "gentle-ai",
+			InstallMethod:     update.InstallBinary,
+			ManualUpgradeHint: "build from the Alexma03 fork checkout",
+		},
+		InstalledVersion: "1.0.0",
+		LatestVersion:    "1.1.0",
+		Status:           update.UpdateAvailable,
+	}}, system.PlatformProfile{OS: "linux"}, t.TempDir(), false)
+
+	if len(report.Results) != 1 || report.Results[0].Status != UpgradeSkipped {
+		t.Fatalf("Execute() results = %#v, want one skipped manual tool", report.Results)
+	}
+	if report.Results[0].ManualHint != "build from the Alexma03 fork checkout" || report.BackupID != "" {
+		t.Fatalf("Execute() report = %#v, want manual hint and no backup", report)
+	}
+}
+
 // --- TestExecute_NoopWhenNothingIsExecutable ---
 
 // TestExecute_NoopWhenNothingIsExecutable verifies that Execute returns an empty
