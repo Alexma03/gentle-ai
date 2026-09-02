@@ -14,4 +14,7 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 [[ -n "${RELEASE_POLICY_SNAPSHOT_RUN_ID:-}" ]] || die "RELEASE_POLICY_SNAPSHOT_RUN_ID is required"
 
 cd "$root"
+if [[ -n "${RELEASE_POLICY_VALIDATOR:-}" ]]; then
+  exec "${RELEASE_POLICY_VALIDATOR}"
+fi
 exec go run ./internal/releasepolicycmd

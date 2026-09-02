@@ -35,91 +35,26 @@
 
 - Git 2.38+.
 - Go 1.25.10+ (for building from source).
-- Node.js 18+ and npm: `gentle-ai install` checks these as required prerequisites on every platform and prints a warning with a distro-specific install hint (see above) if either is missing — regardless of which agents/components you select. It does not install them for you, and it does not install agent runtimes either: if a selected agent isn't detected, `gentle-ai install` refuses and prints the exact `npm install -g` (or equivalent) command for you to run yourself. Node.js/npm are strictly required if you select the CodeGraph community tool, which gentle-ai does install via `npm install -g`.
+- Node.js 18+ and npm: `gentle-ai install` checks these as required prerequisites on every platform and prints a warning with a distro-specific install hint (see above) if either is missing — regardless of which agents/components you select. It does not install them for you, and it does not install agent runtimes either: if a selected agent isn't detected, `gentle-ai install` refuses and prints the exact `npm install -g` (or equivalent) command for you to run yourself. Node.js/npm are required when CodeGraph is selected as a first-class component; Gentle AI installs it via `npm install -g`.
 - Pi installed and available as `pi` on `PATH` if you select the Pi agent.
 
 ### Windows
 
-- Go 1.25.10+, because Windows installs and upgrades through `go install`.
-  Official Windows binaries and the Scoop bucket are temporarily unavailable
-  while publicly trusted Authenticode signing is provisioned, so nothing
-  unsigned is ever fetched. With Go on `PATH`, `gentle-ai upgrade` updates
-  itself automatically by running `go install …/cmd/gentle-ai@vX.Y.Z` pinned to
-  the release tag and verified against the Go checksum database; without Go it
-  fails closed and just prints that command. See [platforms.md](platforms.md)
-  and the
-  [restoration gate](release-signing.md#windows-distribution-restoration-gate).
+- Go 1.25.10+ is required to build the fork checkout.
+- The repository keeps the upstream module path for source compatibility, so `go install github.com/Alexma03/...` is not supported.
+- Build `./cmd/gentle-ai` in the `Alexma03/gentle-ai` `custom/main` checkout, then replace the inactive executable. The built-in updater deliberately skips Gentle AI itself.
 
-```powershell
-# Stable channel (`@latest`, currently v2.3.0)
-go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@latest
+## Personal Fork Update Policy
 
-# Opt-in prerelease (v2.4.0-rc.1)
-go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@v2.4.0-rc.1
-```
-
-Both commands use the `/v2` module path. Go requires that suffix for major
-version 2 and above.
-
-## Version Policy
-
-Receipt-Driven Development (RDD) began in `v1.47.0` on 2026-07-10, and `v2.2.0` made it the supported stable path. Those are historical milestones. The negotiated public review contract was published in `v2.1.6`.
-
-The current stable release is [`v2.3.0`](https://github.com/Gentleman-Programming/gentle-ai/releases/tag/v2.3.0). `@latest` explicitly tracks this stable channel. The current opt-in prerelease is [`v2.4.0-rc.1`](https://github.com/Gentleman-Programming/gentle-ai/releases/tag/v2.4.0-rc.1). `@main` installs unreleased development changes.
-
-### Install the stable channel
+Install and update from the fork checkout:
 
 ```bash
-go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@latest
-gentle-ai version
+git clone --branch custom/main https://github.com/Alexma03/gentle-ai.git
+cd gentle-ai
+./scripts/install-personal.sh
 ```
 
-### Install the opt-in prerelease
-
-```bash
-go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@v2.4.0-rc.1
-gentle-ai version
-```
-
-### Install unreleased development changes
-
-Only use `main` when testing changes that are not part of a release yet:
-
-```bash
-# macOS / Linux
-go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@main
-gentle-ai version
-
-# Windows (PowerShell)
-$env:GENTLE_AI_CHANNEL="beta"; go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@main
-gentle-ai version
-```
-
-To update a beta installation later, preserve the beta channel:
-
-```bash
-# macOS / Linux
-GENTLE_AI_CHANNEL=beta gentle-ai upgrade
-
-# Windows (PowerShell)
-$env:GENTLE_AI_CHANNEL="beta"; gentle-ai upgrade
-```
-
-`gentle-ai upgrade` advances the `gentle-ai` binary from `main` and refreshes managed tools on macOS, Linux, and Windows with Go on `PATH`.
-
-If you re-run an installer, pass beta explicitly because both installers default to stable:
-
-```bash
-# macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.sh | bash -s -- --channel beta
-
-# Windows (PowerShell)
-$env:GENTLE_AI_CHANNEL="beta"; irm https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.ps1 | iex
-```
-
-> **Go module proxy cache**: `proxy.golang.org` can lag behind new commits on `main` for up to several hours. If manual `go install ...@main` does not update to the newest commit, bypass the cache with `GOPROXY=direct go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@main` (PowerShell: `$env:GOPROXY="direct"; go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@main`).
-
-The managed install scripts select the latest version for their chosen channel and do not accept arbitrary release pins. Use `go install` with an exact tag when you need a reproducible prerelease or stable version.
+The installer proves which `gentle-ai` command is active. Run only the exact absolute `…/gentle-ai sync` invocation it prints. If another installation shadows the fork, activation fails closed but the same absolute invocation remains safe. For later updates, run `git pull --ff-only origin custom/main` in that checkout and rerun `./scripts/install-personal.sh`. Do not run the upstream installer or upstream `go install` command: either would replace the personal fork binary. `gentle-ai upgrade` skips self-upgrade with a manual hint and still manages the remaining registered tools.
 
 ## Run
 

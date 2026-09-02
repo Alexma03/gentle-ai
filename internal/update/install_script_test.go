@@ -10,6 +10,21 @@ import (
 	"testing"
 )
 
+func TestUpstreamInstallersAreDisabledInPersonalFork(t *testing.T) {
+	for _, path := range []string{
+		filepath.Join("..", "..", "scripts", "install.sh"),
+		filepath.Join("..", "..", "scripts", "install.ps1"),
+	} {
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Contains(contents, []byte("PERSONAL_FORK_INSTALLER_DISABLED")) {
+			t.Fatalf("%s can still install an upstream Gentle AI binary", path)
+		}
+	}
+}
+
 func TestWindowsInstallScriptHasNoUTF8BOM(t *testing.T) {
 	path := filepath.Join("..", "..", "scripts", "install.ps1")
 	content, err := os.ReadFile(path)

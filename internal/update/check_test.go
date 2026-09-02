@@ -247,8 +247,8 @@ func TestCheckSingleToolGentleAIBetaComparesMainHead(t *testing.T) {
 	if result.LatestVersion != "main@972997650b51" {
 		t.Fatalf("LatestVersion = %q, want main@972997650b51", result.LatestVersion)
 	}
-	if !strings.Contains(result.ReleaseURL, "/compare/6eff4a1ba110...972997650b51") {
-		t.Fatalf("ReleaseURL = %q, want compare URL with local and remote commits", result.ReleaseURL)
+	if result.ReleaseURL != "" {
+		t.Fatalf("ReleaseURL = %q, want no upstream personal-fork action URL", result.ReleaseURL)
 	}
 }
 
@@ -283,8 +283,8 @@ func TestCheckSingleToolGentleAIPseudoVersionComparesMainHeadWithoutChannel(t *t
 	if result.LatestVersion != "main@b6872c69e3e4" {
 		t.Fatalf("LatestVersion = %q, want main@b6872c69e3e4", result.LatestVersion)
 	}
-	if !strings.Contains(result.ReleaseURL, "/compare/6eff4a1ba110...b6872c69e3e4") {
-		t.Fatalf("ReleaseURL = %q, want compare URL with local and remote commits", result.ReleaseURL)
+	if result.ReleaseURL != "" {
+		t.Fatalf("ReleaseURL = %q, want no upstream personal-fork action URL", result.ReleaseURL)
 	}
 }
 
@@ -393,8 +393,8 @@ func TestCheckSingleToolGentleAIStableVersionWithoutChannelComparesLatestRelease
 	if result.LatestVersion != "1.40.4" {
 		t.Fatalf("LatestVersion = %q, want 1.40.4", result.LatestVersion)
 	}
-	if result.ReleaseURL != "https://github.com/Gentleman-Programming/gentle-ai/releases/tag/v1.40.4" {
-		t.Fatalf("ReleaseURL = %q, want latest release URL", result.ReleaseURL)
+	if result.ReleaseURL != "" {
+		t.Fatalf("ReleaseURL = %q, want no upstream personal-fork action URL", result.ReleaseURL)
 	}
 }
 
@@ -431,7 +431,7 @@ func TestCheckSingleToolGentleAIBetaAcceptsLocalCommitPrefix(t *testing.T) {
 	}
 }
 
-func TestCheckSingleToolBrewOwnedGentleAIAdvertisesStableChannel(t *testing.T) {
+func TestCheckSingleToolBrewOwnedGentleAIAdvertisesStableChannelWithManualForkUpdate(t *testing.T) {
 	// A brew-owned install can only ever receive the tap's stable formula, so
 	// the checker must not advertise a main-head beta target it cannot deliver
 	// (issue #2323 / #2319 offer half: advertisement derived from the installer's
@@ -481,8 +481,8 @@ func TestCheckSingleToolBrewOwnedGentleAIAdvertisesStableChannel(t *testing.T) {
 	if result.Status != UpdateAvailable {
 		t.Fatalf("status = %q, want %q", result.Status, UpdateAvailable)
 	}
-	if result.UpdateHint != "brew upgrade --formula gentle-ai" {
-		t.Fatalf("UpdateHint = %q, want the brew instruction that delivers the advertised target", result.UpdateHint)
+	if result.UpdateHint != Tools[0].ManualUpgradeHint {
+		t.Fatalf("UpdateHint = %q, want personal fork guidance %q", result.UpdateHint, Tools[0].ManualUpgradeHint)
 	}
 }
 
@@ -521,12 +521,8 @@ func TestCheckSingleToolGentleAIBetaHintNamesAdvertisedTarget(t *testing.T) {
 	if result.LatestVersion != "main@972997650b51" {
 		t.Fatalf("LatestVersion = %q, want main@972997650b51", result.LatestVersion)
 	}
-	derived := GentleAISourceInstallCommand(result.LatestVersion)
-	if result.UpdateHint != derived {
-		t.Fatalf("UpdateHint = %q, want the instruction derived from the advertised target: %q", result.UpdateHint, derived)
-	}
-	if result.UpdateHint != "go install github.com/gentleman-programming/gentle-ai/v2/cmd/gentle-ai@main" {
-		t.Fatalf("UpdateHint = %q, want the go install @main command", result.UpdateHint)
+	if result.UpdateHint != Tools[0].ManualUpgradeHint {
+		t.Fatalf("UpdateHint = %q, want personal registry hint %q", result.UpdateHint, Tools[0].ManualUpgradeHint)
 	}
 }
 
@@ -601,8 +597,8 @@ func TestCheckSingleToolGentleAIBetaOlderLocalPseudoVersionStillOffered(t *testi
 	if result.LatestVersion != "main@aaaabbbbcccc" {
 		t.Fatalf("LatestVersion = %q, want main@aaaabbbbcccc", result.LatestVersion)
 	}
-	if !strings.Contains(result.ReleaseURL, "/compare/6eff4a1ba110...aaaabbbbcccc") {
-		t.Fatalf("ReleaseURL = %q, want compare URL with local and remote commits", result.ReleaseURL)
+	if result.ReleaseURL != "" {
+		t.Fatalf("ReleaseURL = %q, want no upstream personal-fork action URL", result.ReleaseURL)
 	}
 }
 
@@ -1076,6 +1072,28 @@ func TestUpdateHint(t *testing.T) {
 				t.Fatalf("updateHint(%q, %q) = %q, want %q", tc.tool.Name, tc.profile.OS, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestUpdateHintForOwnershipPrefersManualForkPolicy(t *testing.T) {
+	tool := ToolInfo{Name: "gentle-ai", ManualUpgradeHint: "update from the personal fork checkout"}
+	if got := updateHintForOwnership(tool, system.PlatformProfile{PackageManager: "brew"}, HomebrewFormula); got != tool.ManualUpgradeHint {
+		t.Fatalf("updateHintForOwnership() = %q, want manual fork policy %q", got, tool.ManualUpgradeHint)
+	}
+}
+
+func TestRegistryGentleAIManualHintSurvivesBetaStatus(t *testing.T) {
+	tool := Tools[0]
+	result := applyBetaMainHeadStatus(UpdateResult{
+		Tool:       tool,
+		UpdateHint: tool.ManualUpgradeHint,
+	}, "v1.2.3-0.20260901010101-abcdef123456", githubCommit{SHA: "fedcba654321"})
+
+	if result.Status != UpdateAvailable {
+		t.Fatalf("beta result status = %q, want %q", result.Status, UpdateAvailable)
+	}
+	if result.UpdateHint != tool.ManualUpgradeHint {
+		t.Fatalf("beta UpdateHint = %q, want personal registry hint %q", result.UpdateHint, tool.ManualUpgradeHint)
 	}
 }
 

@@ -34,6 +34,10 @@ type ToolInfo struct {
 	ReleaseTagPattern string        // optional regexp for selecting the correct GitHub release channel
 	InstallMethod     InstallMethod // how this tool is installed (used by upgrade executor)
 	GoImportPath      string        // for go-install tools (e.g. "github.com/.../cmd/engram")
+	// ManualUpgradeHint disables automatic upgrades for a tool and explains the
+	// supported manual path. This is intentionally data-driven so personal forks
+	// cannot be replaced by an upstream release through the generic executor.
+	ManualUpgradeHint string
 	// FallbackPaths returns a list of absolute paths to check when exec.LookPath
 	// fails. This covers the Windows scenario where AddToUserPath updates the
 	// registry but the running process PATH is stale after install. When a path

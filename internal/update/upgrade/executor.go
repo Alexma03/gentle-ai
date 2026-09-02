@@ -417,12 +417,17 @@ func ExecuteWithOptions(ctx context.Context, results []update.UpdateResult, prof
 	// states are included in the report as UpgradeSkipped so the upgrade flow never
 	// fails silently.
 	var executable []executableUpdate
+	var manuallyManaged []update.UpdateResult
 	var devBuilds []update.UpdateResult
 	var versionUnknowns []update.UpdateResult
 	for _, r := range results {
 		switch r.Status {
 		case update.UpdateAvailable:
-			executable = append(executable, executableUpdate{result: r})
+			if r.Tool.ManualUpgradeHint != "" {
+				manuallyManaged = append(manuallyManaged, r)
+			} else {
+				executable = append(executable, executableUpdate{result: r})
+			}
 		case update.DevBuild:
 			devBuilds = append(devBuilds, r)
 		case update.VersionUnknown:
@@ -432,7 +437,7 @@ func ExecuteWithOptions(ctx context.Context, results []update.UpdateResult, prof
 	}
 
 	// If nothing is executable, dev-built, or version-unknown, return empty report.
-	if len(executable) == 0 && len(devBuilds) == 0 && len(versionUnknowns) == 0 {
+	if len(executable) == 0 && len(manuallyManaged) == 0 && len(devBuilds) == 0 && len(versionUnknowns) == 0 {
 		return UpgradeReport{DryRun: dryRun}
 	}
 
@@ -481,30 +486,45 @@ func ExecuteWithOptions(ctx context.Context, results []update.UpdateResult, prof
 	}
 
 	// Build results slice: dev-build skips first (no exec), then executable tools.
-	toolResults := make([]ToolUpgradeResult, 0, len(executable)+len(devBuilds)+len(versionUnknowns)+len(preflightSkips))
+	toolResults := make([]ToolUpgradeResult, 0, len(executable)+len(manuallyManaged)+len(devBuilds)+len(versionUnknowns)+len(preflightSkips))
+
+	for _, r := range manuallyManaged {
+		toolResults = append(toolResults, ToolUpgradeResult{
+			ToolName: r.Tool.Name, OldVersion: r.InstalledVersion, NewVersion: r.LatestVersion,
+			Method: r.Tool.InstallMethod, Status: UpgradeSkipped, ManualHint: r.Tool.ManualUpgradeHint,
+		})
+	}
 
 	// Dev-build tools: always UpgradeSkipped with a source-build hint.
 	for _, r := range devBuilds {
+		manualHint := r.Tool.ManualUpgradeHint
+		if manualHint == "" {
+			manualHint = fmt.Sprintf("source build — upgrade manually or install a release binary from https://github.com/Gentleman-Programming/%s/releases", r.Tool.Repo)
+		}
 		toolResults = append(toolResults, ToolUpgradeResult{
 			ToolName:   r.Tool.Name,
 			OldVersion: r.InstalledVersion,
 			NewVersion: r.LatestVersion,
 			Method:     effectiveMethod(r.Tool, profile),
 			Status:     UpgradeSkipped,
-			ManualHint: fmt.Sprintf("source build — upgrade manually or install a release binary from https://github.com/Gentleman-Programming/%s/releases", r.Tool.Repo),
+			ManualHint: manualHint,
 		})
 	}
 
 	// VersionUnknown tools: surface them as skipped so the user gets a clear hint
 	// instead of a silent omission from the upgrade report.
 	for _, r := range versionUnknowns {
+		manualHint := r.Tool.ManualUpgradeHint
+		if manualHint == "" {
+			manualHint = fmt.Sprintf("installed binary was found but its version could not be determined — check `%s` and reinstall if it is a stale source/dev build", detectCommandHint(r.Tool))
+		}
 		toolResults = append(toolResults, ToolUpgradeResult{
 			ToolName:   r.Tool.Name,
 			OldVersion: r.InstalledVersion,
 			NewVersion: r.LatestVersion,
 			Method:     effectiveMethod(r.Tool, profile),
 			Status:     UpgradeSkipped,
-			ManualHint: fmt.Sprintf("installed binary was found but its version could not be determined — check `%s` and reinstall if it is a stale source/dev build", detectCommandHint(r.Tool)),
+			ManualHint: manualHint,
 		})
 	}
 

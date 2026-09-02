@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -294,7 +295,7 @@ func TestResolveSelectionAndRestoreMigrationAreReversible(t *testing.T) {
 	if string(content) != "original\n" {
 		t.Fatalf("restored managed path = %q", content)
 	}
-	if info, err := os.Stat(managed); err != nil || info.Mode().Perm() != 0o644 {
+	if info, err := os.Stat(managed); err != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0o644) {
 		t.Fatalf("restored managed mode = %v, want 0644", info)
 	}
 	restoredReport, err := ReadMigrationReport(home)

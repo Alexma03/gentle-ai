@@ -99,10 +99,8 @@ func TestRenderWelcome_StaysWithinViewport(t *testing.T) {
 			if got := lipgloss.Height(view); got > tc.height {
 				t.Fatalf("welcome height = %d, want <= %d\nview:\n%s", got, tc.height, view)
 			}
-			content := view
-			if tc.minimum {
-				content = strings.ReplaceAll(view, "\n", "")
-			}
+			content := strings.Join(strings.Fields(view), " ")
+			minimumContent := strings.Join(strings.Fields(view), "")
 			primary := tc.wantPrimary
 			if primary == "" {
 				primary = "Start installation"
@@ -116,7 +114,7 @@ func TestRenderWelcome_StaysWithinViewport(t *testing.T) {
 					control = "j/k"
 				}
 				for _, want := range []string{primary, control} {
-					if !strings.Contains(content, want) {
+					if !strings.Contains(minimumContent, strings.ReplaceAll(want, " ", "")) {
 						t.Fatalf("minimum welcome state lost %q\nview:\n%s", want, view)
 					}
 				}

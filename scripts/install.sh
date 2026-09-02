@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# PERSONAL_FORK_INSTALLER_DISABLED
+printf '%s\n' 'This upstream release installer is disabled in the Alexma03 personal fork.' >&2
+printf '%s\n' 'Clone or update custom/main, then run ./scripts/install-personal.sh.' >&2
+exit 2
+
 # ============================================================================
 # Gentle-AI — Install Script
 # Ecosystem, Frameworks, Workflows for AI coding agents.

@@ -21,6 +21,9 @@
 
 $ErrorActionPreference = "Stop"
 
+# PERSONAL_FORK_INSTALLER_DISABLED
+throw "This upstream release installer is disabled in the Alexma03 personal fork. Build from the custom/main checkout instead."
+
 # Ensure UTF-8 output so Unicode characters render correctly on all terminals.
 $null = & chcp 65001 2>$null
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}

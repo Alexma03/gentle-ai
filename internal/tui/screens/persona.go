@@ -18,7 +18,7 @@ var personaDescriptions = map[model.PersonaID]string{
 	// state that has not been migrated yet.
 	model.PersonaGentlemanNeutralArtifacts: "No regional conversation tone; English technical artifacts (legacy alias, remapped)",
 	model.PersonaNeutral:                   "No regional conversation tone; English technical artifacts",
-	model.PersonaCustom:                    "Do not install a managed persona; choose themes/logo on the next screens",
+	model.PersonaCustom:                    "Do not install a managed persona",
 }
 
 func RenderPersona(selected model.PersonaID, cursor int) string {

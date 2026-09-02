@@ -42,6 +42,55 @@ func makeResult(name string, status update.UpdateStatus, oldVer, newVer string, 
 	}
 }
 
+func TestExecuteSkipsManuallyManagedToolWithoutBackupOrExecution(t *testing.T) {
+	originalExec := execCommand
+	originalSnapshot := snapshotCreator
+	t.Cleanup(func() {
+		execCommand = originalExec
+		snapshotCreator = originalSnapshot
+	})
+	execCommand = func(string, ...string) *exec.Cmd {
+		t.Fatal("manual tool must not execute an upgrade command")
+		return nil
+	}
+	snapshotCreator = func(string, []string) (backup.Manifest, error) {
+		t.Fatal("manual tool must not create an upgrade backup")
+		return backup.Manifest{}, nil
+	}
+
+	tool := update.Tools[0]
+	report := Execute(context.Background(), []update.UpdateResult{{
+		Tool:             tool,
+		InstalledVersion: "1.0.0",
+		LatestVersion:    "1.1.0",
+		Status:           update.UpdateAvailable,
+	}}, system.PlatformProfile{OS: "linux"}, t.TempDir(), false)
+
+	if len(report.Results) != 1 || report.Results[0].Status != UpgradeSkipped {
+		t.Fatalf("Execute() results = %#v, want one skipped manual tool", report.Results)
+	}
+	if report.Results[0].ManualHint != tool.ManualUpgradeHint || report.BackupID != "" {
+		t.Fatalf("Execute() report = %#v, want manual hint and no backup", report)
+	}
+}
+
+func TestExecutePersonalRegistryHintWinsForNonExecutableStatuses(t *testing.T) {
+	tool := update.Tools[0]
+	for _, status := range []update.UpdateStatus{update.DevBuild, update.VersionUnknown} {
+		t.Run(string(status), func(t *testing.T) {
+			report := Execute(context.Background(), []update.UpdateResult{{
+				Tool: tool, InstalledVersion: string(status), LatestVersion: "2.0.0", Status: status,
+			}}, system.PlatformProfile{OS: "linux"}, t.TempDir(), false)
+			if len(report.Results) != 1 || report.Results[0].Status != UpgradeSkipped {
+				t.Fatalf("Execute() results = %#v, want one skipped result", report.Results)
+			}
+			if report.Results[0].ManualHint != tool.ManualUpgradeHint {
+				t.Fatalf("ManualHint = %q, want personal registry hint %q", report.Results[0].ManualHint, tool.ManualUpgradeHint)
+			}
+		})
+	}
+}
+
 // --- TestExecute_NoopWhenNothingIsExecutable ---
 
 // TestExecute_NoopWhenNothingIsExecutable verifies that Execute returns an empty

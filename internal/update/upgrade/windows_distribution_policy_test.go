@@ -80,6 +80,7 @@ func TestWindowsBetaGentleAIUpgradeUsesShippedRegistryGoTarget(t *testing.T) {
 	for _, candidate := range update.Tools {
 		if candidate.Name == "gentle-ai" {
 			tool = candidate
+			tool.ManualUpgradeHint = ""
 			break
 		}
 	}
