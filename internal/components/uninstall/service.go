@@ -358,6 +358,9 @@ func (s *Service) buildPlan(agentIDs []model.AgentID, componentIDs []model.Compo
 		for _, target := range codegraph.PiCodeGraphPaths(s.homeDir, s.workspaceDir) {
 			backupTargets[target] = struct{}{}
 		}
+		if piAdapter, ok := s.registry.Get(model.AgentPi); ok {
+			backupTargets[piAdapter.SystemPromptFile(s.homeDir)] = struct{}{}
+		}
 	}
 	orderedTargets := make([]string, 0, len(backupTargets))
 	for target := range backupTargets {
@@ -413,6 +416,28 @@ func (s *Service) executePlan(p plan, agentsToRemove []model.AgentID) (Result, e
 		} else {
 			result.ChangedFiles = append(result.ChangedFiles, piResult.Files...)
 			result.ManualActions = append(result.ManualActions, piResult.ManualActions...)
+		}
+
+		// Pi's SupportsSystemPrompt() gate keeps componentOperations() from
+		// ever queuing a rewrite for its SystemPromptFile, so a stale
+		// gentle-ai block left there by an older install is never cleaned up
+		// by the generic persona/SDD rewrite ops above. Retire it directly.
+		if piAdapter, ok := s.registry.Get(model.AgentPi); ok {
+			promptPath := piAdapter.SystemPromptFile(s.homeDir)
+			retireResult, retireErr := sdd.RetirePiSystemPromptBlocks(s.homeDir, piAdapter)
+			if retireErr != nil {
+				failures = append(failures, operationFailure{
+					path:   promptPath,
+					agents: []model.AgentID{model.AgentPi},
+					err:    fmt.Errorf("retire stale Pi system prompt blocks: %w", retireErr),
+				})
+			} else if retireResult.Changed {
+				if _, statErr := os.Stat(promptPath); os.IsNotExist(statErr) {
+					result.RemovedFiles = append(result.RemovedFiles, promptPath)
+				} else {
+					result.ChangedFiles = append(result.ChangedFiles, retireResult.Files...)
+				}
+			}
 		}
 	}
 
