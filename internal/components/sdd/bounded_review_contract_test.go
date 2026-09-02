@@ -261,6 +261,53 @@ func TestBoundedReviewContractRendersForAdvertisedRuntimes(t *testing.T) {
 	}
 }
 
+func TestPersonalGentleStackRetainedTemplatesKeepOneFinalCandidateAuthority(t *testing.T) {
+	wantAssets := map[model.AgentID]string{
+		model.AgentClaudeCode:  "claude/sdd-orchestrator.md",
+		model.AgentCodex:       "codex/sdd-orchestrator.md",
+		model.AgentCursor:      "cursor/sdd-orchestrator.md",
+		model.AgentAntigravity: "antigravity/sdd-orchestrator.md",
+		model.AgentPi:          "generic/sdd-orchestrator.md",
+	}
+
+	agents := catalog.AllAgents()
+	if len(agents) != len(wantAssets) {
+		t.Fatalf("retained template count = %d, want %d", len(agents), len(wantAssets))
+	}
+	for _, agent := range agents {
+		wantAsset, ok := wantAssets[agent.ID]
+		if !ok {
+			t.Errorf("retired client %q still has an orchestrator template", agent.ID)
+			continue
+		}
+		if got := sddOrchestratorAsset(agent.ID); got != wantAsset {
+			t.Errorf("orchestrator asset for %s = %q, want %q", agent.ID, got, wantAsset)
+		}
+
+		content := renderSDDOrchestratorAsset(agent.ID)
+		for _, want := range []string{
+			"Tasks and work units never create review authority or correction budgets.",
+			"The SDD edit-authority consent relay only constrains filesystem edit roots; it never grants review authority.",
+			"one immutable final-candidate correction transaction",
+			"inferential blockers share one read-only refuter batch",
+			"targeted validation",
+			"Runtime and review selection remain user-owned",
+		} {
+			if !strings.Contains(content, want) {
+				t.Errorf("rendered %s template missing final-candidate clause %q", agent.ID, want)
+			}
+		}
+		for _, forbidden := range []string{
+			"tasks grant review authority",
+			"work units grant correction budgets",
+		} {
+			if strings.Contains(content, forbidden) {
+				t.Errorf("rendered %s template retains task authority clause %q", agent.ID, forbidden)
+			}
+		}
+	}
+}
+
 func TestJudgmentDayReviewersUseNativeResultSchema(t *testing.T) {
 	for name, content := range map[string]string{
 		"rendered contract": judgmentDayReviewerContract(),
