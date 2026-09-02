@@ -37,7 +37,7 @@ func InjectPiPersona(rootDir string, persona model.PersonaID) (InjectionResult, 
 
 	mode := string(persona)
 	if mode == "" {
-		mode = string(model.PersonaGentleman)
+		mode = string(model.PersonaNeutral)
 	}
 	content, err := json.MarshalIndent(struct {
 		Mode string `json:"mode"`

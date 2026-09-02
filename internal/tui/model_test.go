@@ -374,6 +374,13 @@ func TestNewModelPiOnlyDetectionDefaultsToEngramOnly(t *testing.T) {
 	}
 }
 
+func TestNewModelDefaultsToNeutralPersona(t *testing.T) {
+	m := NewModel(system.DetectionResult{}, "dev")
+	if m.Selection.Persona != model.PersonaNeutral {
+		t.Fatalf("Persona = %q, want %q", m.Selection.Persona, model.PersonaNeutral)
+	}
+}
+
 func updateModel(m Model, msg tea.Msg) Model { next, _ := m.Update(msg); return next.(Model) }
 func installingModel(labels []string, runID uint64) Model {
 	m := NewModel(system.DetectionResult{}, "dev")
@@ -3018,7 +3025,7 @@ func TestPersonaScreenDoesNotRecomputeForCustomPreset(t *testing.T) {
 	m.Selection.Persona = model.PersonaGentleman
 	m.Selection.Components = nil
 
-	m.Cursor = 0 // PersonaGentleman
+	m.Cursor = 0 // PersonaNeutral
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	state := updated.(Model)
 

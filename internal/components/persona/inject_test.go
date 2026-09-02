@@ -358,6 +358,21 @@ func TestInjectPiPersonaWritesSelectedModeAndIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestInjectPiPersonaEmptyDefaultsToNeutral(t *testing.T) {
+	root := t.TempDir()
+	path := PiPersonaConfigPath(root)
+	if _, err := InjectPiPersona(root, ""); err != nil {
+		t.Fatalf("InjectPiPersona(empty) error = %v", err)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	if got, want := string(content), "{\n  \"mode\": \"neutral\"\n}\n"; got != want {
+		t.Fatalf("Pi persona config = %q, want %q", got, want)
+	}
+}
+
 func TestInjectPiPersonaCustomPreservesExistingConfig(t *testing.T) {
 	root := t.TempDir()
 	path := PiPersonaConfigPath(root)

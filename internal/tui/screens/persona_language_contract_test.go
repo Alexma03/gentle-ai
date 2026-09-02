@@ -15,6 +15,13 @@ func TestPersonaOptionsExcludeGentlemanNeutralArtifacts(t *testing.T) {
 	}
 }
 
+func TestPersonaOptionsLeadWithNeutral(t *testing.T) {
+	options := PersonaOptions()
+	if len(options) == 0 || options[0] != model.PersonaNeutral {
+		t.Fatalf("PersonaOptions()[0] = %v, want %q so Enter on the default screen keeps Neutral", options, model.PersonaNeutral)
+	}
+}
+
 // TestPersonaDescriptionsNeverReuseNeutral pins the invariant issue #833 is
 // actually about: "neutral" named two unrelated axes at once, artifact language
 // and conversational tone, so the selector could not be read unambiguously.
