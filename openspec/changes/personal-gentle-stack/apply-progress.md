@@ -223,3 +223,127 @@ A fresh bounded audit inspected only tasks 3.1–3.9, their acceptance criteria,
 ### Next Steps
 
 Proceed to parent-owned SDD verification for the cumulative change. Phase 4 tasks 4.1–4.5 remain unchecked and must not be inferred complete from this PR3 evidence.
+
+
+## PR4 Phase 4: Contracts and Release
+
+The PR1–PR3 records above are preserved unchanged. This cumulative section records completion of Phase 4 tasks 4.1–4.5 and the final integration evidence for the approved change.
+
+### Work Unit Evidence
+
+| Evidence | Required value | Result |
+| --- | --- | --- |
+| Work unit | U4 / PR4 Contracts/release | Complete for tasks 4.1–4.5. The retained runtimes remain Claude Code, Codex, Cursor, Google Antigravity, and Pi. Context7, Engram, and first-class CodeGraph remain supported; no retired runtime or marketplace surface was restored. |
+| Root/static verification | Exact repository checks | `go run ./internal/gofmtcheck` — PASS. `go vet ./...` — PASS. `go test ./... -count=1` — PASS. `./scripts/deadcode-ratchet.sh` — PASS (`no new unreachable functions`). |
+| Bench verification | Build, vet, tests, and real driven journeys | From `bench/`: `go build ./...`, `go vet ./...`, and `go test ./... -count=1` — PASS. Fresh locally built product and harness: portable corpus **56 completed, 0 unsupported, 0 failed**; provider-only `j105` **1 completed, 0 unsupported, 0 failed**; core plus transition axis **67 completed, 0 unsupported, 0 failed**. No interactive Pi process was launched. |
+| Companion Gentle Pi | Existing completed companion release work, not a duplicate implementation | Read-only verification at companion HEAD `1647a80c1c6aea1065c517630a512a3e0c98818b`: package `gentle-pi@2.3.0-rc.1`, Gentle AI `v2.5.0-rc.3`, SumDB `h1:zDmIUCSZxFowQQjR4IS+YhvHPKHABYKyRT3ytZi8Qj4=`, four pinned platform checksums, four generated runtime modules, 79 contract files, and CodeGraph extension/tests. Provider-contract, runtime-module, package-file, and focused Node verification passed. |
+| Rollback boundary | Exact independently reversible slice | Revert implementation commit `9d659e9a` and this PR4 evidence commit to return to the PR3 boundary `ed74fc32b3aa22517210fad0437ea9216e7e44a7`. The companion Gentle Pi work remains independently pinned at `1647a80c1c6aea1065c517630a512a3e0c98818b`; no install, publication, or runtime configuration was performed here. |
+
+### Completed Tasks
+
+- [x] 4.1 Updated exactly the five retained SDD orchestrator assets and their rendered goldens. Tasks and work units no longer create review authority or correction budgets; the separate SDD edit-authority consent relay remains intact and filesystem-scoped.
+- [x] 4.2 Preserved the existing single immutable final-candidate review transaction: deterministic severe blockers need no refuter, inferential blockers share one read-only batch, and targeted validation is limited to corroborated findings and the immutable correction delta.
+- [x] 4.3 Reused the completed companion Gentle Pi release work and verified its exact package/binary pin, SumDB record, and per-platform SHA256 values instead of creating a second implementation in Gentle AI.
+- [x] 4.4 Verified the companion generated Pi runtime modules, contracts, package manifest/file list, provider mirror, and CodeGraph extension. Added a direct Gentle AI Pi rendered-asset golden so parity does not rely on another client's wrapper.
+- [x] 4.5 Proved root, bench, driven-journey, immutable-review, and cross-platform containment checks. Worktree-local CodeGraph reports an up-to-date index.
+
+### Strict TDD Evidence
+
+| Task | RED | GREEN / REFACTOR |
+| --- | --- | --- |
+| 4.1 | `TestPersonalGentleStackRetainedTemplatesKeepOneFinalCandidateAuthority` failed for all five retained templates before the clauses existed. Restoring the pre-existing edit-authority guard while production text was absent also produced a deliberate RED across all five templates. | Added the final-candidate review-authority clause to exactly five assets, retained the separate edit-authority relay, regenerated affected goldens, and passed `go test ./internal/assets ./internal/components/sdd -count=1`. |
+| 4.2 | The new contract test initially exposed an incorrect conflation of edit authority and review authority. | Refactored the wording to remove only task-derived review authority/budget. Existing `reviewtransaction` tests for one bounded non-iterative flow, one shared fix batch, and contradiction escalation pass without changing the core transaction implementation. |
+| 4.3 | Companion history already contains its pin/install RED evidence; this repository intentionally did not invent duplicate production code. | Read-only companion pin checks and 117 focused Node tests passed against the completed companion commit. |
+| 4.4 | `TestPiRenderedOrchestratorGolden` failed because no direct Pi rendered golden existed. | Generated `testdata/golden/sdd-pi-orchestrator.golden`; the test and all affected generated-golden checks pass without update flags. Companion provider/runtime/package parity checks pass. |
+| 4.5 | The first exact root run failed only on seven stale generated goldens, establishing the final integration RED. | Regenerated through the supported update path, then ran every root, bench, focused containment, and driven command noninteractively to green. Temporary driven artifacts were removed. |
+
+### Exact Verification Evidence
+
+All commands below ran from `/home/alex/Projects/forks/gentle-ai-worktrees/pr4-final-integration` after the final correction and exited 0:
+
+```text
+go test ./internal/assets ./internal/components/sdd -count=1
+PASS
+
+go test ./internal/assets -run TestCoordinatorOrchestratorsCarrySDDEditAuthorityConsentRelay -count=1
+PASS
+
+go test ./internal/components/sdd -run 'TestPersonalGentleStack...|TestBoundedReview...|TestAuthorityFirst...' -count=1
+PASS
+
+go test ./internal/reviewtransaction -run 'Test(OrdinaryTransactionIsOneBoundedNonIterativeFlow|MultipleFrozenFindingsShareOneFixBatch|FinalVerificationContradictionEscalatesWithoutReopeningReviewBudgets)$' -count=1
+PASS
+
+go test ./internal/components/codegraph -run 'Test(CodeGraphNativeOwnedPaths|CodeGraphComponentExposesCanonicalStatusAndManagedPaths|PiCodeGraphRootValidationRejectsUnsafeRoots|PiCodeGraphPathsExcludesUnsafeManifestPaths|PiCodeGraphUninstallRejectsManifestPathEscapeAndMissingOwnedChildIsSuccess|PiCodeGraphUninstallRejectsSwappedSymlinkParent|DetectStatusRejectsWSLWindowsNPMShimWithoutExecutingIt|DetectStatusAdmitsLinuxCLIPathsWithoutRequiringFiles|InstallRejectsWSLWindowsNPMShimAfterPackageInstall)$' -count=1
+PASS
+
+go test ./internal/cli -run 'Test(RunCodeGraphInitRejectsUnsafeOrUnrecognizedRoots|CanonicalCodeGraphProjectRootAcceptsEquivalentGitRootForms|CanonicalCodeGraphProjectRootRejectsRelativeGitEscape|ReviewCandidatePreservesStagedAndUnstagedCommitState|ReviewCommittedOnlySelectorPreservesCommitAmSemantics|ReviewStagedProjectionPreservesEmptyIndex)$' -count=1
+PASS
+
+go run ./internal/gofmtcheck
+PASS
+
+go vet ./...
+PASS
+
+go test ./... -count=1
+PASS
+
+./scripts/deadcode-ratchet.sh
+PASS — no new unreachable functions
+
+(cd bench && go build ./...)
+PASS
+
+(cd bench && go vet ./...)
+PASS
+
+(cd bench && go test ./... -count=1)
+PASS
+
+fresh driven portable corpus
+PASS — 56 completed, 0 unsupported, 0 failed
+
+fresh driven provider-only j105
+PASS — 1 completed, 0 unsupported, 0 failed
+
+fresh driven core plus transition axis
+PASS — 67 completed, 0 unsupported, 0 failed
+```
+
+Worktree-local `codegraph status` after implementation reported 1,122 files, 20,800 nodes, 70,238 edges, and `Index is up to date`.
+
+### Companion Pin and Parity Evidence
+
+Read-only verification used `/home/alex/Projects/forks/gentle-pi-worktrees/pr4-release` at clean HEAD `1647a80c1c6aea1065c517630a512a3e0c98818b`:
+
+```text
+package: gentle-pi@2.3.0-rc.1
+Gentle AI pin: v2.5.0-rc.3
+SumDB: h1:zDmIUCSZxFowQQjR4IS+YhvHPKHABYKyRT3ytZi8Qj4=
+darwin/amd64 SHA256: 8aea61402abadc235645af0e2ad7a74a335337f7a32e52bbcf2ef6003304c7c5
+darwin/arm64 SHA256: 6e5c026e68c974787b71a7e25f346bb667322c97d5fec2a0d688bf331128d7fd
+linux/amd64 SHA256: b69da0a51b03f326147498ae465fc1ec52eff8427d579964eefad714c3f9bd87
+linux/arm64 SHA256: e69393bcf337db932a245fc79c87f3877a74b11800c35f4e002614379671b2d9
+pnpm run check:provider-contract: PASS — contract 1.1.0, 8 bundle entries, 2 baselines, acquisition field-test-local
+pnpm run check:runtime-modules: PASS — 4 modules
+node scripts/verify-package-files.mjs: PASS — 179 files, 69 exact byte-pinned contract artifacts
+focused Node tests: PASS — 117/117
+```
+
+The companion's prior cumulative evidence records its packed-package verification as passed. It was not rerun here because this task explicitly prohibited install execution and Pi launch. Release evidence remains intentionally pending until the published provider contract exists; published version/digest are null, and hosted macOS/Windows evidence remains external. A global pnpm warning that `trustLockfile` is ignored did not affect the checks.
+
+### Independent Audit
+
+A fresh bounded `gpt-5.6-luna` / max audit inspected only Phase 4. Its first pass found two concrete defects: the edit-authority relay had been incorrectly removed, and Pi lacked a direct rendered golden. Both were corrected. The same auditor rechecked the bounded diff and reported PASS: the relay is preserved, review authority is distinct and final-candidate scoped, direct Pi golden parity exists, no retired surface was restored, and skill resolution was `paths-injected`.
+
+### Native Attempt Evidence
+
+The first exact root verification failed only on the seven stale generated goldens. Native settlement recorded failed evidence revision `sha256:d4e2ed1a0121656c89f20bbbe7f09596f81d3eed0ab73d5059b76693ac1e84ca` and returned `proceed`. The corrected attempt was reacquired under the same original objective with token `sha256:bab0fce6909c46223a2adb3123c874ac63c7e4f02d4beb68a8d9f8b63c0d73c0`; final passed settlement must remediate that failed evidence revision and is parent/runtime-ledger evidence, not a caller-authored counter.
+
+### Publication Handoff and Caveats
+
+- Implementation commit: `9d659e9a` — `feat(sdd): finalize retained review contracts`.
+- No push, pull request, merge, tag, release, archive, install, local configuration change, or Pi process was performed.
+- The parent owns final SDD verification, GitHub publication, and local installation/configuration.
+- The only remaining release caveats are the companion's intentionally pending published-provider evidence and external hosted macOS/Windows evidence; they do not invalidate the completed local Phase 4 implementation and containment proof.

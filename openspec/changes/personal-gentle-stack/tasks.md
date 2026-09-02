@@ -42,8 +42,8 @@ Bases: PR1 base=feature/tracker branch; PR2 base=PR1 branch; PR3 base=PR2; PR4 b
 - [x] 3.9 Update docs, fixtures, goldens, bench journeys (`README.md`, `docs/`, `bench/`; D:3.8; P:root/bench tests).
 
 ## Phase 4: Contracts and Release
-- [ ] 4.1 Update five retained SDD templates/assets; remove task authority/budget (`internal/assets/`, SDD tests; D:2.2; P:parity).
-- [ ] 4.2 Preserve one immutable final-candidate correction transaction (`internal/cli/review*`, SDD tests; D:1.4; P:review tests).
-- [ ] 4.3 Pin Gentle Pi binary and checksums/SumDB (companion manifests; D:2.4; P:pin verification).
-- [ ] 4.4 Update generated Pi runtime/contracts/assets/package metadata and CodeGraph reconciliation (companion; D:4.3; P:parity/packed).
-- [ ] 4.5 Cross-platform containment; root `go run ./internal/gofmtcheck`, `go vet ./...`, `go test ./...`; bench `go build ./...`, `go vet ./...`, `go test ./...` [D:all; P:results].
+- [x] 4.1 Update five retained SDD templates/assets; remove task authority/budget (`internal/assets/`, SDD tests; D:2.2; P:parity).
+- [x] 4.2 Preserve one immutable final-candidate correction transaction (`internal/cli/review*`, SDD tests; D:1.4; P:review tests).
+- [x] 4.3 Pin Gentle Pi binary and checksums/SumDB (companion manifests; D:2.4; P:pin verification).
+- [x] 4.4 Update generated Pi runtime/contracts/assets/package metadata and CodeGraph reconciliation (companion; D:4.3; P:parity/packed).
+- [x] 4.5 Cross-platform containment; root `go run ./internal/gofmtcheck`, `go vet ./...`, `go test ./...`; bench `go build ./...`, `go vet ./...`, `go test ./...` [D:all; P:results].
