@@ -22,6 +22,19 @@ func TestNormalizePersonaRemapsGentlemanNeutralArtifacts(t *testing.T) {
 	}
 }
 
+func TestNormalizePersonaEmptyDefaultsToNeutral(t *testing.T) {
+	got, remapped, err := normalizePersona("")
+	if err != nil {
+		t.Fatalf("normalizePersona(%q) error = %v", "", err)
+	}
+	if got != model.PersonaNeutral {
+		t.Fatalf("normalizePersona(%q) = %q, want %q", "", got, model.PersonaNeutral)
+	}
+	if remapped {
+		t.Fatal("empty persona is the documented default, not a remap")
+	}
+}
+
 func TestNormalizePersonaDoesNotFlagCanonicalPersonas(t *testing.T) {
 	for _, value := range []string{"", "gentleman", "neutral", "custom"} {
 		_, remapped, err := normalizePersona(value)

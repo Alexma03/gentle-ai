@@ -8,7 +8,7 @@ import (
 )
 
 func PersonaOptions() []model.PersonaID {
-	return []model.PersonaID{model.PersonaGentleman, model.PersonaNeutral, model.PersonaCustom}
+	return []model.PersonaID{model.PersonaNeutral, model.PersonaGentleman, model.PersonaCustom}
 }
 
 var personaDescriptions = map[model.PersonaID]string{

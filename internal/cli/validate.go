@@ -87,16 +87,19 @@ func NormalizeInstallFlags(flags InstallFlags, detection system.DetectionResult)
 // gentleman-neutral-artifacts alias is remapped to the neutral persona.
 const personaAliasRemapNotice = `"gentleman-neutral-artifacts" now maps to "neutral". For a voseo conversation use --persona gentleman.`
 
+const personaGentlemanRemapNotice = `"gentleman" is no longer the install default; persisted state now maps to "neutral". For a voseo conversation use --persona gentleman.`
+
 // personaNoticeWriter is swappable in tests.
 var personaNoticeWriter io.Writer = os.Stderr
 
 // normalizePersona resolves a --persona flag or persisted state value.
-// The second return is true when the legacy gentleman-neutral-artifacts
-// alias was remapped to neutral: its name promised a neutral tone, so the
-// name now wins; users who want voseo have --persona gentleman.
+// An omitted value defaults to PersonaNeutral. The second return is true when
+// the legacy gentleman-neutral-artifacts alias was remapped to neutral: its
+// name promised a neutral tone, so the name now wins; users who want voseo
+// still pass --persona gentleman.
 func normalizePersona(value string) (model.PersonaID, bool, error) {
 	if strings.TrimSpace(value) == "" {
-		return model.PersonaGentleman, false, nil
+		return model.PersonaNeutral, false, nil
 	}
 
 	switch model.PersonaID(value) {

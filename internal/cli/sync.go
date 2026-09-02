@@ -1073,12 +1073,22 @@ func applyResolvedPersona(selection *model.Selection, persisted string) {
 	selection.Persona = model.PersonaNeutral
 }
 
-// migratePersistedPersonaAlias rewrites a persisted legacy
-// gentleman-neutral-artifacts persona to neutral, printing the remap notice
-// once. State that predates persona persistence, explicit gentleman state,
-// and unreadable state are untouched.
+// migratePersistedPersonaAlias rewrites persisted personas that this fork no
+// longer treats as the install default. The gentleman-neutral-artifacts alias
+// and a persisted gentleman value both become neutral. State that predates
+// persona persistence, explicit custom/neutral state, and unreadable state
+// are untouched. --persona gentleman still selects voseo on a fresh install.
 func migratePersistedPersonaAlias(homeDir string, persisted *state.InstallState, persistedErr error) error {
-	if persistedErr != nil || persisted == nil || persisted.Persona != string(model.PersonaGentlemanNeutralArtifacts) {
+	if persistedErr != nil || persisted == nil {
+		return nil
+	}
+	var notice string
+	switch persisted.Persona {
+	case string(model.PersonaGentlemanNeutralArtifacts):
+		notice = personaAliasRemapNotice
+	case string(model.PersonaGentleman):
+		notice = personaGentlemanRemapNotice
+	default:
 		return nil
 	}
 	persisted.Persona = string(model.PersonaNeutral)
@@ -1087,7 +1097,7 @@ func migratePersistedPersonaAlias(homeDir string, persisted *state.InstallState,
 	}
 	// Notice only after the rewrite is durably persisted: a failed write must
 	// not tell the user the remap happened.
-	fmt.Fprintln(personaNoticeWriter, personaAliasRemapNotice)
+	fmt.Fprintln(personaNoticeWriter, notice)
 	return nil
 }
 

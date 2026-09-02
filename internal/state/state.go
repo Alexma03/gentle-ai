@@ -99,9 +99,10 @@ type InstallState struct {
 
 	// Persona records the persona the user installed ("gentleman", "neutral",
 	// "custom"). Persisted so that `gentle-ai sync` regenerates the same persona
-	// the user originally chose instead of defaulting to Gentleman every time.
+	// the user originally chose instead of defaulting to Neutral every time.
 	// Empty for state files written before persona persistence was added —
-	// callers fall back to PersonaGentleman in that case.
+	// callers fall back to PersonaNeutral in that case. A persisted gentleman
+	// value is remapped to Neutral on sync.
 	Persona string `json:"persona,omitempty"`
 	// PersonaPresent distinguishes an omitted legacy field from an explicit
 	// empty persona, which must fail closed during sync validation.

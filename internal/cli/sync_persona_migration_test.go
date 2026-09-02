@@ -56,6 +56,34 @@ func TestMigratePersistedPersonaAliasSkipsUnreadableState(t *testing.T) {
 	}
 }
 
+func TestMigratePersistedPersonaRewritesGentlemanToNeutral(t *testing.T) {
+	var buf bytes.Buffer
+	previous := personaNoticeWriter
+	personaNoticeWriter = &buf
+	defer func() { personaNoticeWriter = previous }()
+
+	homeDir := t.TempDir()
+	persisted := state.InstallState{Persona: string(model.PersonaGentleman)}
+	if err := state.Write(homeDir, persisted); err != nil {
+		t.Fatalf("seed state: %v", err)
+	}
+
+	if err := migratePersistedPersonaAlias(homeDir, &persisted, nil); err != nil {
+		t.Fatalf("migratePersistedPersonaAlias() error = %v", err)
+	}
+
+	reread, err := state.Read(homeDir)
+	if err != nil {
+		t.Fatalf("re-read state: %v", err)
+	}
+	if reread.Persona != string(model.PersonaNeutral) {
+		t.Fatalf("persisted persona = %q, want %q", reread.Persona, model.PersonaNeutral)
+	}
+	if !strings.Contains(buf.String(), personaGentlemanRemapNotice) {
+		t.Fatalf("notice not printed; got %q", buf.String())
+	}
+}
+
 // TestApplyResolvedPersonaAliasResolution covers only what this change owns:
 // a persisted legacy alias resolves to neutral, valid persisted personas are
 // honored unchanged, an explicit selection wins over persisted state, and the
