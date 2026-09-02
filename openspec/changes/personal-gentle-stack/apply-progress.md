@@ -347,3 +347,40 @@ The first exact root verification failed only on the seven stale generated golde
 - No push, pull request, merge, tag, release, archive, install, local configuration change, or Pi process was performed.
 - The parent owns final SDD verification, GitHub publication, and local installation/configuration.
 - The only remaining release caveats are the companion's intentionally pending published-provider evidence and external hosted macOS/Windows evidence; they do not invalidate the completed local Phase 4 implementation and containment proof.
+
+### Post-PR4 CI Correction: Claude Network-None Proof
+
+CI on PRs #5 and #6 exposed one stale retirement reference after Phase 3: `e2e/Dockerfile.claude-network-none` still compiled the deleted `./e2e/organicruntime` package and selected the removed `TestClaudeProviderAdapterUsesPinnedNetworkNoneRuntime`. The surviving proof already lives in `internal/components/sdd/claude_review_network_none_e2e_test.go` as `TestClaudeReviewerTransportInNetworkNone`; it pins Claude Code 2.1.220 by SHA256, verifies the generated retained Claude reviewer transport, exercises complete and fail-closed evidence cases, rejects unknown result fields, and asserts the container has no external network route.
+
+Strict TDD evidence:
+
+```text
+go test ./internal/components/sdd -run TestClaudeNetworkNoneDockerfileTargetsRetainedSDDProof -count=1
+RED — Dockerfile missing the retained package/test target and retained all three retired target strings.
+
+go test ./internal/components/sdd -run 'TestClaude(NetworkNoneDockerfileTargetsRetainedSDDProof|ReviewerTransportInNetworkNone)$' -count=1 -v
+GREEN — Dockerfile contract passed; runtime proof skipped outside its explicit prebuilt-container environment as designed.
+```
+
+The correction compiles `./internal/components/sdd`, selects `TestClaudeReviewerTransportInNetworkNone`, and removes the obsolete organic test-binary build/environment variable. It does not restore `organicruntime` or any retired client/runtime surface.
+
+Exact post-correction verification:
+
+```text
+go run ./internal/gofmtcheck
+PASS
+
+go vet ./...
+PASS
+
+go test ./... -count=1
+PASS
+
+docker build -f e2e/Dockerfile.claude-network-none -t gentle-ai-claude-network-none:pr4-ci-fix .
+PASS — compiled the retained internal/components/sdd test binary and verified the pinned Claude download checksum.
+
+docker run --rm --pull=never --network none --cap-drop=ALL --security-opt=no-new-privileges --read-only --tmpfs /tmp:rw,noexec,nosuid,nodev,mode=1777 -e GENTLE_AI_PARENT_NETNS=<parent-netns> gentle-ai-claude-network-none:pr4-ci-fix
+PASS — TestClaudeReviewerTransportInNetworkNone and all seven subtests passed in 8.48s.
+```
+
+Correction commit: `ee5e180a` — `fix(ci): retarget Claude network-none proof`. Rollback is this commit plus its evidence commit; the prior PR4 boundary remains `dc857c589b93b5c91cc7672c7c9c6da8260179a3`.
