@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - custom/main
   # Manual re-run. `gh run rerun` refuses a run whose workflow file has changed
   # since, which is exactly when a re-run is needed most: a known-flaky failure
   # on a commit that is otherwise ready to tag, right after the workflow moved.

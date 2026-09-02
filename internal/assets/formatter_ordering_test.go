@@ -89,6 +89,18 @@ func TestRequiredChecksFailClosedWhenFormatFails(t *testing.T) {
 	}
 }
 
+func TestCIRunsOnPersonalIntegrationBranch(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const triggerContract = "on:\n  pull_request:\n  push:\n    branches:\n      - main\n      - custom/main\n"
+	if !strings.Contains(string(data), triggerContract) {
+		t.Fatal("CI must retain pull-request coverage and run pushes to both main and custom/main")
+	}
+}
+
 func TestWindowsReleaseBlockerCannotSkipOwnerRebinding(t *testing.T) {
 	workflow, err := os.ReadFile(filepath.Join(
 		"..",
