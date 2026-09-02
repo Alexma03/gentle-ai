@@ -26,7 +26,7 @@ Gentle AI detects the `pi` binary first. If Pi is the only selected agent, the i
 Gentle AI runs exactly these Pi setup steps:
 
 ```bash
-pi install npm:gentle-pi
+pi install git:github.com/Alexma03/gentle-pi@custom/main
 pi install npm:gentle-engram
 pi install npm:pi-mcp-adapter
 npm exec --yes --package gentle-engram@latest -- pi-engram init
@@ -38,7 +38,7 @@ pi install npm:pi-btw
 
 | Package                                                  | What it adds                                                                                                              |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| [`gentle-pi`](https://www.npmjs.com/package/gentle-pi)   | Gentleman persona, SDD/OpenSpec workflow, strict TDD support, safety policy, skills, prompts, SDD agents, and SDD chains. |
+| [`gentle-pi`](https://github.com/Alexma03/gentle-pi) (`git:github.com/Alexma03/gentle-pi@custom/main`) | Gentleman persona, SDD/OpenSpec workflow, strict TDD support, safety policy, skills, prompts, SDD agents, and SDD chains. |
 | [`gentle-engram`](https://pi.dev/packages/gentle-engram) | Pi integration for Engram session memory and MCP tools. It is not the Engram binary itself.                               |
 | `pi-mcp-adapter`                                         | Lets Pi expose MCP servers, including Engram, through Pi's MCP runtime.                                                   |
 | `pi-engram init`                                         | Initializes the Pi Engram MCP config shape owned by `gentle-engram`.                                                      |

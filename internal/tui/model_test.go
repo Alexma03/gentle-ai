@@ -387,7 +387,7 @@ func succeededExecution(stepID string) pipeline.ExecutionResult {
 }
 
 func TestStepProgressMsgAddsNestedPackageProgress(t *testing.T) {
-	const packageStep = "agent:pi:pi install npm:gentle-pi"
+	const packageStep = "agent:pi:pi install git:github.com/Alexma03/gentle-pi@custom/main"
 	state := updateModel(installingModel([]string{"agent:pi"}, 0), StepProgressMsg{StepID: packageStep, Status: pipeline.StepStatusRunning})
 	if len(state.Progress.Items) != 2 {
 		t.Fatalf("progress items = %v, want the nested package item", state.Progress.Items)
@@ -475,7 +475,7 @@ func TestPipelineDoneMsgMarksCompletion(t *testing.T) {
 func TestPipelineDoneMsgPreservesNestedPackageProgress(t *testing.T) {
 	m := installingModel([]string{"agent:pi", "fallback:with:colon"}, 7)
 
-	const packageStep = "agent:pi:pi install npm:gentle-pi"
+	const packageStep = "agent:pi:pi install git:github.com/Alexma03/gentle-pi@custom/main"
 	for _, msg := range []StepProgressMsg{
 		{RunID: 7, StepID: packageStep, Status: pipeline.StepStatusRunning},
 		{RunID: 7, StepID: packageStep, Status: pipeline.StepStatusSucceeded},
