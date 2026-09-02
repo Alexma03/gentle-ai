@@ -1079,6 +1079,13 @@ func TestUpdateHint(t *testing.T) {
 	}
 }
 
+func TestUpdateHintForOwnershipPrefersManualForkPolicy(t *testing.T) {
+	tool := ToolInfo{Name: "gentle-ai", ManualUpgradeHint: "update from the personal fork checkout"}
+	if got := updateHintForOwnership(tool, system.PlatformProfile{PackageManager: "brew"}, HomebrewFormula); got != tool.ManualUpgradeHint {
+		t.Fatalf("updateHintForOwnership() = %q, want manual fork policy %q", got, tool.ManualUpgradeHint)
+	}
+}
+
 func TestHomebrewPackageInstalledWithRequiresActiveBrewPath(t *testing.T) {
 	brewPrefix := filepath.Join(t.TempDir(), "opt", "gentle-ai")
 	brewBin := filepath.Join(brewPrefix, "bin", "gentle-ai")

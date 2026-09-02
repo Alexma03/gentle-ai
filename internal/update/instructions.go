@@ -35,6 +35,9 @@ func updateHint(tool ToolInfo, profile system.PlatformProfile) string {
 }
 
 func updateHintForOwnership(tool ToolInfo, profile system.PlatformProfile, ownership HomebrewOwnership) string {
+	if tool.ManualUpgradeHint != "" {
+		return tool.ManualUpgradeHint
+	}
 	if profile.PackageManager == "brew" && ownership != HomebrewNone {
 		return fmt.Sprintf("brew upgrade --%s %s", ownership, tool.Name)
 	}
