@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gentle-ai.dev/contracts/review-integration/v2/schemas/acknowledged.schema.json",
+  "title": "Gentle AI approved review acknowledgement v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "operation",
+    "action",
+    "lineage_id",
+    "target_identity",
+    "consumed_revision",
+    "authority"
+  ],
+  "properties": {
+    "schema": {"const": "gentle-ai.review-acknowledged/v1"},
+    "operation": {"const": "review/acknowledge-approved"},
+    "action": {"const": "acknowledged"},
+    "lineage_id": {"type": "string", "minLength": 1},
+    "target_identity": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "consumed_revision": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "authority": {"const": "burned"}
+  }
+}
