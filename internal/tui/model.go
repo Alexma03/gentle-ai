@@ -110,12 +110,6 @@ var communityToolInstallFn = func(id model.CommunityToolID, workspaceDir string,
 	}
 	return codegraph.Install(homeDir(), workspaceDir, runner, codegraph.DetectorFunc(exec.LookPath))
 }
-var communityToolStatusFn = func(id model.CommunityToolID, home string, detector codegraph.Detector) codegraph.Status {
-	if id != model.CommunityToolCodeGraph {
-		return codegraph.Status{Tool: id}
-	}
-	return codegraph.DetectStatus(home, detector)
-}
 
 // readCurrentAssignmentsFn is a package-level variable so tests can override
 // how current model assignments are read from runtimecatalog.json. It wraps
@@ -386,11 +380,6 @@ type ReviewModeUpdatedMsg struct {
 type CommunityToolInstallationDoneMsg struct {
 	Results []codegraph.Result
 	Err     error
-}
-
-type CommunityToolStatusLoadedMsg struct {
-	Statuses []codegraph.Status
-	Err      error
 }
 
 // AgentBuilderState holds all transient state for the agent-builder TUI flow.
@@ -1001,11 +990,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.CommunityToolErr = msg.Err
 		m.CommunityToolStatuses = communityToolStatusesFromResults(msg.Results, m.CommunityToolStatuses)
 		m.setScreen(ScreenCommunityToolResult)
-		return m, nil
-	case CommunityToolStatusLoadedMsg:
-		m.CommunityToolStatusLoading = false
-		m.CommunityToolStatuses = msg.Statuses
-		m.CommunityToolStatusErr = msg.Err
 		return m, nil
 	case StepProgressMsg:
 		return m.handleStepProgress(msg)
@@ -2966,22 +2950,6 @@ func (m Model) startCommunityToolInstallation() tea.Cmd {
 			results = append(results, result)
 		}
 		return CommunityToolInstallationDoneMsg{Results: results}
-	}
-}
-
-func (m Model) startCommunityToolStatusDetection() tea.Cmd {
-	tools := []model.CommunityToolID{model.CommunityToolCodeGraph}
-	home := homeDir()
-	detector := codegraph.DetectorFunc(func(name string) (string, error) {
-		path, err := exec.LookPath(name)
-		return path, err
-	})
-	return func() tea.Msg {
-		statuses := make([]codegraph.Status, 0, len(tools))
-		for _, tool := range tools {
-			statuses = append(statuses, communityToolStatusFn(tool, home, detector))
-		}
-		return CommunityToolStatusLoadedMsg{Statuses: statuses}
 	}
 }
 
