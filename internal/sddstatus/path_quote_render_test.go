@@ -1,7 +1,6 @@
 package sddstatus
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -112,7 +111,7 @@ func TestRuntimeObjectiveChangeRefusalRendersWindowsPathVerbatim(t *testing.T) {
 	store := RuntimeStore{Workspace: `C:\Users\dev\repo`, Change: "my-change"}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := store.runtimeObjectiveChangeRefusal(context.Background(), tt.status)
+			err := store.runtimeObjectiveChangeRefusal(tt.status)
 			if occurrences := strings.Count(err.Error(), want); occurrences != tt.occurrences {
 				t.Fatalf("objective-change refusal must carry the verbatim path:\nwant %d occurrences of %s, got %d\ngot: %s", tt.occurrences, want, occurrences, err)
 			}

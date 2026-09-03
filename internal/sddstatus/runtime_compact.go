@@ -213,7 +213,7 @@ func (store RuntimeStore) Acquire(ctx context.Context, request CompactAcquireReq
 	if err != nil {
 		return compactBlockedByUnreadableAuthority(err), nil
 	}
-	begin, err = store.runtimeBeginRequestWithInheritedChangedLineLimit(replay, begin)
+	begin, err = store.runtimeBeginRequestWithInheritedLimits(replay, begin)
 	if err != nil {
 		return compactBlockedByUnreadableAuthority(err), nil
 	}

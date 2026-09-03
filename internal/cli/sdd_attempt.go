@@ -279,7 +279,7 @@ var sddAttemptOperationDefinitions = []sddAttemptOperationContract{
 		// question exactly as before.
 		{name: "work-unit", usage: "optional; single-line label, at most 160 bytes; reports the verdict acquire would return"},
 		{name: "evidence-goal", usage: "optional; single-line objective, at most 240 bytes; reports the verdict acquire would return"},
-		{name: "max-attempts", kind: sddAttemptIntFlag, usage: "optional; default 2, limit 1..100"},
+		{name: "max-attempts", kind: sddAttemptIntFlag, usage: "optional; fresh objectives default 2, continuations inherit, limit 1..100"},
 		{name: "max-changed-lines", kind: sddAttemptIntFlag, hidden: true, usage: "deprecated; historical positive-limit compatibility only; zero is unbounded"},
 	}},
 	{name: "begin", purpose: "Start a bounded runtime attempt", flags: []sddAttemptFlagDefinition{
@@ -288,7 +288,7 @@ var sddAttemptOperationDefinitions = []sddAttemptOperationContract{
 		{name: "request-id", required: true, usage: "required; lowercase idempotency key, at most 128 bytes"},
 		{name: "work-unit", required: true, usage: "required; single-line label, at most 160 bytes"},
 		{name: "evidence-goal", required: true, usage: "required; single-line objective, at most 240 bytes"},
-		{name: "max-attempts", kind: sddAttemptIntFlag, usage: "optional; default 2, limit 1..100"},
+		{name: "max-attempts", kind: sddAttemptIntFlag, usage: "optional; fresh objectives default 2, continuations inherit, limit 1..100"},
 		{name: "max-changed-lines", kind: sddAttemptIntFlag, hidden: true, usage: "deprecated; historical positive-limit compatibility only; zero is unbounded"},
 		{name: "untracked-scope", usage: "required when eligible untracked files exist; select or exclude"},
 		{name: "expected-untracked-inventory", usage: "required with untracked-scope; inventory digest"},
@@ -346,7 +346,7 @@ var sddAttemptOperationDefinitions = []sddAttemptOperationContract{
 		{name: "request-id", required: true, usage: "required; lowercase idempotency key, at most 128 bytes"},
 		{name: "work-unit", required: true, usage: "required; single-line label, at most 160 bytes"},
 		{name: "evidence-goal", required: true, usage: "required; single-line objective, at most 240 bytes"},
-		{name: "max-attempts", kind: sddAttemptIntFlag, usage: "optional; default 2, limit 1..100"},
+		{name: "max-attempts", kind: sddAttemptIntFlag, usage: "optional; fresh objectives default 2, continuations inherit, limit 1..100"},
 		{name: "max-changed-lines", kind: sddAttemptIntFlag, hidden: true, usage: "deprecated; historical positive-limit compatibility only; zero is unbounded"},
 		{name: "remediates-evidence-revision", usage: "optional; sha256:<64 lowercase hex> failed evidence correction"},
 		{name: "untracked-scope", usage: "required when eligible untracked files exist; select or exclude"},

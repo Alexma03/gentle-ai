@@ -759,16 +759,14 @@ func (store RuntimeStore) Begin(ctx context.Context, request BeginAttemptRequest
 	if err != nil {
 		return RuntimeStatus{}, err
 	}
-	if inheritIntendedUntracked || request.MaxChangedLines == 0 {
-		replay, loadErr := store.load()
-		if loadErr != nil {
-			return RuntimeStatus{}, loadErr
-		}
-		request = runtimeRescopeSuccessorRequest(replay.Status, request, inheritIntendedUntracked)
-		request, loadErr = store.runtimeBeginRequestWithInheritedChangedLineLimit(replay, request)
-		if loadErr != nil {
-			return RuntimeStatus{}, loadErr
-		}
+	replay, loadErr := store.load()
+	if loadErr != nil {
+		return RuntimeStatus{}, loadErr
+	}
+	request = runtimeRescopeSuccessorRequest(replay.Status, request, inheritIntendedUntracked)
+	request, loadErr = store.runtimeBeginRequestWithInheritedLimits(replay, request)
+	if loadErr != nil {
+		return RuntimeStatus{}, loadErr
 	}
 	digest := runtimeValueHash("gentle-ai.sdd-runtime-begin-request/v1", request)
 	legacyDigest := ""
@@ -1166,13 +1164,13 @@ func (store RuntimeStore) runtimeRescopeExhaustedRefusal(flag string, requested,
 // pointed at status, whose next_action is `complete` — true, and useless to a
 // caller who has more work to do on this change.
 //
-// Complete is only reachable from a passed attempt within budget, so advance is
-// admissible here whenever the sole failing condition is the repeated work
-// unit: changing --work-unit is the entire difference. Reset is admitted too,
-// for a caller who means to discard this scope rather than succeed it.
+// Complete is reachable from a passed attempt regardless of advisory
+// accounting, so advance is admissible whenever the sole failing condition is
+// the repeated work unit. Reset is admitted too for a caller who means to
+// discard this scope rather than succeed it.
 func (store RuntimeStore) runtimeObjectiveCompleteRefusal(status RuntimeStatus) error {
 	return fmt.Errorf(
-		"%w: it passed within budget, so this change continues through a SUCCESSOR objective, not a repeat of this one — re-run this begin with a different --work-unit (everything else may stay as it is) and it is admitted as an advance that carries this objective's evidence forward. To discard this scope instead of succeeding it, run `gentle-ai sdd-attempt reset --cwd %q --change %q --expected-revision %q --request-id \"<unique-request-id>\" --reason \"<why-the-objective-changed>\" --actor \"<actor>\"`",
+		"%w: it passed, so this change continues through a SUCCESSOR objective, not a repeat of this one — re-run this begin with a different --work-unit (everything else may stay as it is) and it is admitted as an advance that carries this objective's evidence forward. To discard this scope instead of succeeding it, run `gentle-ai sdd-attempt reset --cwd %q --change %q --expected-revision %q --request-id \"<unique-request-id>\" --reason \"<why-the-objective-changed>\" --actor \"<actor>\"`",
 		ErrRuntimeObjectiveDone, store.Workspace, store.Change, status.Revision)
 }
 
@@ -1202,35 +1200,17 @@ func (store RuntimeStore) runtimeEffectiveWorktreeMismatchRefusal(active Runtime
 // --change, --expected-revision, --request-id, --reason and --actor, and a
 // caller who has only the sentinel has none of them.
 //
-// The states are distinguished rather than merged, because a message may
-// name a command only when running it resolves the block. `reset` is refused
-// one layer deeper for an unchanged (non-drifted) candidate whose budget is
-// intact (runtimeResetStructurallyPermitted plus the drift check in Reset),
-// because an elective early reset would launder the per-objective budget.
-// Naming it there would be the same defect in a new place. Since #2298 /
-// #2296 part 2, that non-drifted terminal shape is no longer a dead end: it
-// is exactly AUDITED NARROWING RESCOPE's admitted precondition
-// (runtimeObjectiveRescopeAdmissible), so the second branch names rescope
-// instead of falling straight to "begin against the scope the ledger holds"
-// -- printing that message for THIS state was the dead end #2298 / #2296
-// part 2 reported, because begin only ever re-offers the same objective and
-// reset is refused for lack of drift. The plain "begin against the scope"
-// branch survives only as the fail-closed default for a candidate-capture
-// failure, where neither reset nor rescope can be verified admissible.
-func (store RuntimeStore) runtimeObjectiveChangeRefusal(ctx context.Context, status RuntimeStatus) error {
+// The emitted reset is guarded by the same structural predicate Reset uses.
+// Candidate drift is not part of that predicate, so both drifted and unchanged
+// terminal objectives receive an executable reset exit. A non-terminal scope
+// instead receives the recorded begin continuation.
+func (store RuntimeStore) runtimeObjectiveChangeRefusal(status RuntimeStatus) error {
 	// The sentinel stays in the %w position in every branch: callers that
 	// route on errors.Is must keep working no matter which exit is named.
-	if store.runtimeObjectiveResetAdmissible(ctx, status) {
+	if runtimeObjectiveResetAdmissible(status) {
 		return fmt.Errorf(
 			"%w: reset the objective, then begin again — `gentle-ai sdd-attempt reset --cwd %s --change %q --expected-revision %q --request-id \"<unique-request-id>\" --reason \"<why-the-objective-changed>\" --actor \"<actor>\"`; the reset publishes a new ledger revision, so take the begin's --expected-revision from `gentle-ai sdd-attempt status --cwd %s --change %q` after it commits",
 			ErrRuntimeObjectiveChange, pathquote.Quote(store.Workspace), store.Change, status.Revision, pathquote.Quote(store.Workspace), store.Change)
-	}
-	if store.runtimeObjectiveRescopeAdmissible(ctx, status) {
-		objective := status.Objective
-		return fmt.Errorf(
-			"%w: this objective's candidate has not drifted, so resetting it is refused as an elective budget reset, but a maintainer may authorize a narrower successor scope instead — `gentle-ai sdd-attempt rescope --cwd %s --change %q --expected-revision %q --request-id \"<unique-request-id>\" --work-unit \"<narrower-work-unit>\" --evidence-goal \"<narrower-evidence-goal>\" --max-attempts \"<n, at most %d>\" --max-changed-lines \"<n, at most %d>\" --reason \"<why-the-objective-is-narrowing>\" --actor \"<actor>\"`; rescope carries cumulative_attempts and cumulative_changed_lines forward unchanged and refuses any max_attempts or max_changed_lines above the current objective's %d and %d",
-			ErrRuntimeObjectiveChange, pathquote.Quote(store.Workspace), store.Change, status.Revision,
-			objective.MaxAttempts, objective.MaxChangedLines, objective.MaxAttempts, objective.MaxChangedLines)
 	}
 	objective := status.Objective
 	if objective == nil {
@@ -1240,57 +1220,16 @@ func (store RuntimeStore) runtimeObjectiveChangeRefusal(ctx context.Context, sta
 		return ErrRuntimeObjectiveChange
 	}
 	return fmt.Errorf(
-		"%w: this objective is still open on its recorded scope and its candidate has not moved, so resetting it is refused as an elective budget reset; begin against the scope the ledger holds — `gentle-ai sdd-attempt begin --cwd %s --change %q --expected-revision %q --request-id \"<unique-request-id>\" --work-unit %q --evidence-goal %q --max-attempts %d --max-changed-lines %d`; `sdd-attempt status` publishes those four as objective.work_unit, objective.evidence_goal, objective.max_attempts, and objective.max_changed_lines",
+		"%w: this objective is still active on its recorded scope; begin against the scope the ledger holds — `gentle-ai sdd-attempt begin --cwd %s --change %q --expected-revision %q --request-id \"<unique-request-id>\" --work-unit %q --evidence-goal %q`; `sdd-attempt status` publishes the recorded work unit and evidence goal",
 		ErrRuntimeObjectiveChange, pathquote.Quote(store.Workspace), store.Change, status.Revision,
-		objective.WorkUnit, objective.EvidenceGoal, objective.MaxAttempts, objective.MaxChangedLines)
+		objective.WorkUnit, objective.EvidenceGoal)
 }
 
-// runtimeObjectiveResetAdmissible answers exactly one question: would `reset`
-// be ACCEPTED right now? It re-runs the same structural rule and the same
-// drift check Reset itself applies, against the same terminal candidate
-// provenance, so a refusal that consults it can only name the reset when
-// running that reset works. It is deliberately read-only and fail-closed: an
-// active attempt, a missing objective, a non-terminal last attempt, or a
-// candidate capture that fails all answer false, and the caller then names the
-// begin the ledger already accepts instead of a command refused one layer in.
-func (store RuntimeStore) runtimeObjectiveResetAdmissible(ctx context.Context, status RuntimeStatus) bool {
-	if status.ActiveAttempt != nil || status.Objective == nil || !runtimeResetStructurallyPermitted(status) {
-		return false
-	}
-	if status.DecisionRequired || status.Complete {
-		return true
-	}
-	last := status.Attempts[len(status.Attempts)-1]
-	intended, err := runtimeReplayedIntendedUntracked(ctx, store.Repo, last.IntendedUntracked)
-	if err != nil {
-		return false
-	}
-	candidate, err := captureRuntimeTerminalCandidate(ctx, store, last.BeginCandidateTree, intended)
-	if err != nil {
-		return false
-	}
-	return candidate.Identity != last.FinishCandidateIdentity || candidate.CandidateTree != last.FinishCandidateTree
-}
-
-// runtimeObjectiveRescopeAdmissible reports whether legacy audited rescope is
-// structurally available. It is fail-closed and requires a terminal failed or
-// interrupted attempt whose candidate has not drifted.
-func (store RuntimeStore) runtimeObjectiveRescopeAdmissible(ctx context.Context, status RuntimeStatus) bool {
-	if status.ActiveAttempt != nil || status.Objective == nil || !runtimeObjectiveRescopeStructurallyPermitted(status) {
-		return false
-	}
-	last := status.Attempts[len(status.Attempts)-1]
-	// #3842: same replay reconciliation as the reset probe, and for the same
-	// fail-closed reason — a reconcile error is a capture that could not run.
-	intended, err := runtimeReplayedIntendedUntracked(ctx, store.Repo, last.IntendedUntracked)
-	if err != nil {
-		return false
-	}
-	candidate, err := captureRuntimeTerminalCandidate(ctx, store, last.BeginCandidateTree, intended)
-	if err != nil {
-		return false
-	}
-	return candidate.Identity == last.FinishCandidateIdentity && candidate.CandidateTree == last.FinishCandidateTree
+// runtimeObjectiveResetAdmissible mirrors Reset's structural authorization.
+// Candidate drift is not a reset precondition: any terminal objective may be
+// reset explicitly, while routine failure recovery continues without one.
+func runtimeObjectiveResetAdmissible(status RuntimeStatus) bool {
+	return status.ActiveAttempt == nil && status.Objective != nil && runtimeResetStructurallyPermitted(status)
 }
 
 // runtimeObjectiveAdvanceAdmissible answers whether a passed objective may hand

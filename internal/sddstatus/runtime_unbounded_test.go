@@ -184,12 +184,12 @@ func TestRuntimeRescopePreservesLimitKind(t *testing.T) {
 			t.Fatalf("unbounded rescope gained a line ceiling: %#v", rescoped.Objective)
 		}
 
-		_, err = store.Begin(context.Background(), BeginAttemptRequest{
+		continued, err := store.Begin(context.Background(), BeginAttemptRequest{
 			ExpectedRevision: rescoped.Revision, RequestID: "unbounded-positive-continuation", WorkUnit: "narrower-unit",
 			EvidenceGoal: "remain unbounded", MaxAttempts: 3, MaxChangedLines: 10,
 		})
-		if !errors.Is(err, ErrRuntimeObjectiveChange) {
-			t.Fatalf("positive continuation on unbounded objective = %v, want ErrRuntimeObjectiveChange", err)
+		if err != nil || continued.ActiveAttempt == nil || continued.Objective.MaxChangedLines != 0 {
+			t.Fatalf("advisory positive continuation on unbounded objective = %#v err=%v", continued, err)
 		}
 	})
 }

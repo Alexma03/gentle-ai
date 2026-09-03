@@ -8,16 +8,10 @@ import (
 	"testing"
 )
 
-// TestRuntimeLedgerRescopeRecoversZeroDriftDeadlock is the RED-then-GREEN
-// reproduction of #2298: attempt 1 discovers mid-work that the required
-// scope exceeds the ceiling, reverts every temporary change back to the
-// exact original candidate (zero drift), and settles interrupted with 0
-// changed lines. Status then shows one remaining ordinal, decision_required
-// false, complete false, next_action begin -- but begin can only repeat the
-// SAME oversized objective (any changed param hits ErrRuntimeObjectiveChange)
-// and reset is ALSO refused (ErrRuntimeResetNotAllowed: no drift, not
-// decision-required, not complete). That dead end is the RED baseline this
-// test captures before proving AUDITED NARROWING RESCOPE clears it.
+// TestRuntimeLedgerRescopeRecoversZeroDriftDeadlock preserves the audited
+// narrowing transition introduced for #2298. Limits are now advisory and
+// explicit reset is also available, but a semantic work-scope change still
+// requires an explicit transition rather than silently reusing an objective.
 func TestRuntimeLedgerRescopeRecoversZeroDriftDeadlock(t *testing.T) {
 	repo := initRuntimeLedgerRepo(t)
 	store, err := OpenRuntimeStore(context.Background(), repo, "rescope-2298")
@@ -53,14 +47,14 @@ func TestRuntimeLedgerRescopeRecoversZeroDriftDeadlock(t *testing.T) {
 
 	// RED: begin against a narrower ceiling is refused as a changed objective.
 	_, err = store.Begin(context.Background(), BeginAttemptRequest{
-		ExpectedRevision: interrupted.Revision, RequestID: "oversized-begin-2", WorkUnit: "oversized-scope",
-		EvidenceGoal: "prove bounded apply scope", MaxAttempts: 2, MaxChangedLines: 100,
+		ExpectedRevision: interrupted.Revision, RequestID: "oversized-begin-2", WorkUnit: "narrower-apply-scope",
+		EvidenceGoal: "prove a 100-line bounded slice", MaxAttempts: 2, MaxChangedLines: 100,
 	})
 	if !errors.Is(err, ErrRuntimeObjectiveChange) {
 		t.Fatalf("narrower begin error = %v, want ErrRuntimeObjectiveChange", err)
 	}
-	if !strings.Contains(err.Error(), "gentle-ai sdd-attempt rescope") || strings.Contains(err.Error(), "gentle-ai sdd-attempt reset") {
-		t.Fatalf("dead-end refusal does not name rescope (and only rescope): %v", err)
+	if !strings.Contains(err.Error(), "gentle-ai sdd-attempt reset") {
+		t.Fatalf("changed-scope refusal does not name the authorized reset: %v", err)
 	}
 
 	// No reset is needed before the explicit narrower rescope.
@@ -268,8 +262,8 @@ func TestRuntimeLedgerRescopeNarrowsFailedVerificationToTestOnlyRemediation(t *t
 
 	// Both dead-end probes reproduce, exactly as in #2298.
 	if _, err := store.Begin(context.Background(), BeginAttemptRequest{
-		ExpectedRevision: failed.Revision, RequestID: "verify-begin-2", WorkUnit: "independent-verification",
-		EvidenceGoal: "independently verify the applied change", MaxAttempts: 2, MaxChangedLines: 50,
+		ExpectedRevision: failed.Revision, RequestID: "verify-begin-2", WorkUnit: "test-only-remediation",
+		EvidenceGoal: "bounded test-only remediation of the verification gap", MaxAttempts: 2, MaxChangedLines: 50,
 	}); !errors.Is(err, ErrRuntimeObjectiveChange) {
 		t.Fatalf("narrower begin error = %v, want ErrRuntimeObjectiveChange", err)
 	}
@@ -443,15 +437,10 @@ func TestRuntimeLedgerRescopeReplayRefusesForgedWidenedRecord(t *testing.T) {
 	}
 }
 
-// TestRuntimeLedgerRescopeCarriedBudgetBindsAtAdmission is mutation proof
-// (d), moved to its truthful boundary by #2804: carry-forward is not
-// cosmetic, and the place it binds is rescope ADMISSION. Narrowing to a
-// ceiling the carried CumulativeChangedLines already meets would publish a
-// successor whose status advertises begin while its first acquire is refused
-// budget-exhausted, whose reset is refused for zero drift, and whose own
-// rescope cannot widen -- a wedge with no admitted continuation. That
-// rescope is refused before mutation, and the runnable ceiling the refusal
-// names is executed, not asserted as prose.
+// TestRuntimeLedgerRescopeCarriedBudgetBindsAtAdmission preserves #2804's
+// compatibility validation: rescope may not publish internally exhausted
+// telemetry. Direct retry remains available independently of this legacy
+// narrowing rule.
 func TestRuntimeLedgerRescopeCarriedBudgetBindsAtAdmission(t *testing.T) {
 	repo := initRuntimeLedgerRepo(t)
 	store, err := OpenRuntimeStore(context.Background(), repo, "rescope-budget-binds")
@@ -536,14 +525,9 @@ func TestRuntimeLedgerRescopeCarriedBudgetBindsAtAdmission(t *testing.T) {
 	}
 }
 
-// TestRuntimeLedgerRescopeRefusesExhaustedAttemptAllowance is #2804's
-// write-time guard: rescope carries cumulative_attempts forward unchanged, so
-// a successor whose max_attempts the carried count already meets has no
-// runnable ordinal. Before this guard it was committed anyway: status
-// advertised begin, acquire refused budget-exhausted, reset refused for zero
-// drift, and a second rescope could not widen -- a published successor with
-// no admitted continuation. The refusal now lands before mutation and names
-// the exact runnable range, which is then executed.
+// TestRuntimeLedgerRescopeRefusesExhaustedAttemptAllowance preserves #2804's
+// write-time compatibility guard. Rescope carries accounting telemetry
+// forward, while direct retry no longer consumes that telemetry as authority.
 func TestRuntimeLedgerRescopeRefusesExhaustedAttemptAllowance(t *testing.T) {
 	repo := initRuntimeLedgerRepo(t)
 	store, err := OpenRuntimeStore(context.Background(), repo, "rescope-2804")

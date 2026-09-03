@@ -120,7 +120,13 @@ func TestRunSDDAttemptOneShotFailureRemainsRetryable(t *testing.T) {
 	if settled != (compactAttemptOutput{State: "proceed"}) {
 		t.Fatalf("failed one-shot settle = %#v, want retryable proceed", settled)
 	}
-	retried, _ := runCompactSDDAttempt(t, compactAcquireArgs(repo, change, "one-shot-retry", 1))
+	// Generated routine instructions intentionally omit --max-attempts. The
+	// continuation must inherit the objective's recorded compatibility value
+	// instead of normalizing omission to the fresh-objective default of two.
+	retried, _ := runCompactSDDAttempt(t, []string{
+		"acquire", "--cwd", repo, "--change", change, "--request-id", "one-shot-retry",
+		"--work-unit", "compact-unit", "--evidence-goal", "prove compact attempt",
+	})
 	if retried.State != "proceed" || retried.Token == "" {
 		t.Fatalf("diagnosed retry = %#v, want proceed with token", retried)
 	}
