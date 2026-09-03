@@ -61,7 +61,6 @@ internal/components/filemerge/toml.go	UpsertCodexMCPServerBlock
 internal/components/mcp/inject.go	context7Args
 internal/components/sdd/inject.go	injectClaudeModelAssignments
 internal/components/sdd/inject.go	resolveClaudeModelAlias
-internal/installcmd/resolver.go	validateGoForModuleInstall
 internal/installcmd/testhelper.go	OverrideGetenv
 internal/installcmd/testhelper.go	OverrideGoVersion
 internal/installcmd/testhelper.go	OverrideLookPath

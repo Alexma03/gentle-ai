@@ -66,14 +66,9 @@ var (
 		}
 		return codegraph.Install(homeDir, workspaceDir, runner, detector)
 	}
-	installCodeGraph = codegraph.Install
-	injectSDD        = sdd.Inject
-	pathEnvEntries   = func(profile system.PlatformProfile) []string {
-		return splitPathForOS(os.Getenv("PATH"), profile.OS)
-	}
+	installCodeGraph    = codegraph.Install
+	injectSDD           = sdd.Inject
 	addUserPath         = system.AddToUserPath
-	ensureUserPathFirst = system.PrioritizeUserPath
-	userPathEntries     = system.UserPathEntries
 	probePiSubagentsRPC = func(ctx context.Context, homeDir, workspaceDir string) (piagent.PiSubagentsRPCProviderResponse, error) {
 		return piagent.NewAdapter().ProbeSubagentsRPC(ctx, homeDir, workspaceDir)
 	}
@@ -1190,63 +1185,6 @@ func resolveAdapters(agentIDs []model.AgentID) []agents.Adapter {
 	return adapters
 }
 
-func shouldRefreshWindowsEngram(profile system.PlatformProfile, resolvedPath string, pathEntries []string) bool {
-	if profile.OS != "windows" || profile.PackageManager == "brew" || strings.TrimSpace(resolvedPath) == "" {
-		return false
-	}
-	return len(engramBinaryDirsOnPath(pathEntries, profile.OS)) > 1
-}
-
-func ensureRepairableWindowsEngramShadowing(profile system.PlatformProfile, installedPath, managedDir string) error {
-	userEntries, err := userPathEntries(profile.OS)
-	if err != nil {
-		return fmt.Errorf("read user PATH: %w", err)
-	}
-
-	staleDir := filepath.Dir(installedPath)
-	if !pathEntriesContainDir(userEntries, staleDir) {
-		return fmt.Errorf("%s is not in the user PATH, so user-scoped PATH repair cannot guarantee future shells will resolve %s before %s", staleDir, managedDir, staleDir)
-	}
-
-	return nil
-}
-
-func pathEntriesContainDir(entries []string, dir string) bool {
-	dir = strings.Trim(strings.TrimSpace(dir), `"`)
-	if dir == "" {
-		return false
-	}
-	for _, entry := range entries {
-		entry = strings.Trim(strings.TrimSpace(entry), `"`)
-		if entry == "" {
-			continue
-		}
-		if strings.EqualFold(filepath.Clean(entry), filepath.Clean(dir)) {
-			return true
-		}
-	}
-	return false
-}
-
-func engramBinaryDirsOnPath(pathEntries []string, goos string) []string {
-	var dirs []string
-	for _, entry := range pathEntries {
-		entry = strings.Trim(strings.TrimSpace(entry), `"`)
-		if entry == "" {
-			continue
-		}
-		binaryName := "engram"
-		if goos == "windows" {
-			binaryName = "engram.exe"
-		}
-		candidate := filepath.Join(entry, binaryName)
-		if _, err := os.Stat(candidate); err == nil {
-			dirs = append(dirs, entry)
-		}
-	}
-	return dirs
-}
-
 func resolveEngramVersion(command string) (string, error) {
 	if strings.TrimSpace(command) == "" || command == "engram" {
 		return verifyEngramVersion()
@@ -1259,17 +1197,6 @@ func resolveEngramProtocolFlag(ctx context.Context, command string) (string, err
 		return probeEngramProtocolFlag(ctx)
 	}
 	return probeEngramProtocolFlagCommand(ctx, command)
-}
-
-func splitPathForOS(value, goos string) []string {
-	separator := string(os.PathListSeparator)
-	if goos == "windows" {
-		separator = ";"
-	}
-	if value == "" {
-		return nil
-	}
-	return strings.Split(value, separator)
 }
 
 func (s componentApplyStep) Run() error {
