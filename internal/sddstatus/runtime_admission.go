@@ -224,24 +224,3 @@ func (store RuntimeStore) AdmissionStatus(ctx context.Context, request BeginAtte
 	}
 	return status, nil
 }
-
-// budgetConsentInput supports the legacy diagnostic consent envelope. New
-// accounting ceilings are advisory and never route here. HarnessFailures is
-// derived from HarnessDisposition, which means the harness proof was
-// incomplete; it does not prove that execution never started.
-func (store RuntimeStore) budgetConsentInput(status RuntimeStatus) BudgetConsentInput {
-	in := BudgetConsentInput{
-		Repo: store.Workspace, Change: store.Change, Revision: status.Revision,
-		CumulativeAttempts: status.CumulativeAttempts, CumulativeLines: status.CumulativeChangedLines,
-	}
-	if status.Objective != nil {
-		in.MaxAttempts, in.MaxChangedLines = status.Objective.MaxAttempts, status.Objective.MaxChangedLines
-		for _, attempt := range status.Attempts {
-			if attempt.ObjectiveID == status.Objective.ID &&
-				attempt.Outcome != AttemptPassed && attempt.HarnessDisposition == HarnessInvalidated {
-				in.HarnessFailures++
-			}
-		}
-	}
-	return in
-}

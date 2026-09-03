@@ -1,110 +1,41 @@
 package cli
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/sddstatus"
 )
 
-// #2588: the bounded attempt budget was spent entirely on the apply worker
-// failing to CONSTRUCT a valid harness — four different shell defects across
-// three executions, every one of them before a single consumer command ran.
-// The reporter ended at blocked(maintainer_decision) knowing nothing about
-// their own change, because their change was never exercised.
-//
-// Two things were wrong, and only one of them is the budget.
-//
-// The ledger recorded provider defects as evidence about the candidate. The
-// immutable chain now says "this candidate failed four bounded attempts" for a
-// candidate that was never tried, and that chain is what later remediation,
-// reset and archive decisions read.
-//
-// And maintainer_decision was a dead end in prose: it named a reset the human
-// had to know about and assemble by hand from six flags. There is no reason
-// the exhausted state cannot simply ASK, the way a medium-risk review START
-// asks before it spends anything.
-//
-// Deliberately NOT a fixed exemption count. An exemption an actor can claim is
-// not verifiable, so any N large enough to help is large enough to stop the
-// budget bounding anything. A grant a human issues is verifiable and audited,
-// and it needs no calibration.
-
-func TestExhaustedBudgetAsksInsteadOfDeadEnding(t *testing.T) {
-	envelope, err := sddstatus.BudgetConsentEnvelope(sddstatus.BudgetConsentInput{
-		Repo: "/repo", Change: "demo", Revision: "sha256:" + strings.Repeat("a", 64),
-		MaxAttempts: 2, CumulativeAttempts: 2,
-	})
-	if err != nil {
+// Old clients may still send a status payload containing the retired consent
+// field. Keeping it readable is compatibility; constructing a fresh blocking
+// question from routine accounting is not.
+func TestLegacyBudgetConsentStatusRemainsReadable(t *testing.T) {
+	var status sddstatus.RuntimeStatus
+	if err := json.Unmarshal([]byte(`{"change":"demo","consent":{"schema":"gentle-ai.sdd-integration.consent/v1","blocking":true}}`), &status); err != nil {
 		t.Fatal(err)
 	}
-	if !envelope.Blocking {
-		t.Fatal("the envelope must mark itself blocking: nothing may proceed until the human answers")
-	}
-	if len(envelope.Choices) != 2 || envelope.Choices[0].Answer != "granted" || envelope.Choices[1].Answer != "declined" {
-		t.Fatalf("choices = %#v, want exactly granted then declined", envelope.Choices)
-	}
-	// The grant has to be runnable verbatim, not described. The whole defect
-	// being fixed is a human being told to assemble a six-flag reset by hand.
-	grant := envelope.Choices[0].Invocation
-	for _, want := range []string{"gentle-ai sdd-attempt reset", "--cwd", "--change", "--expected-revision", "sha256:" + strings.Repeat("a", 64)} {
-		if !strings.Contains(grant, want) {
-			t.Fatalf("the grant invocation is not runnable verbatim (missing %q):\n%s", want, grant)
-		}
-	}
-	if envelope.Choices[1].Invocation == "" {
-		t.Fatal("declining must also be a runnable answer, not an absence")
-	}
-	// The accounting the human is deciding about has to be in front of them.
-	joined := strings.Join(envelope.Evidence, "\n")
-	if !strings.Contains(joined, "2") {
-		t.Fatalf("the evidence does not show the attempt accounting being decided:\n%s", joined)
+	if status.Consent == nil || !status.Consent.Blocking {
+		t.Fatalf("legacy consent status was not decoded: %#v", status.Consent)
 	}
 }
 
-// TestHarnessFailureIsTypedSoTheQuestionCanBeAnswered is the half that makes
-// the question decidable. A prompt that only says "retry?" reproduces #2588
-// with a click in the middle: the reporter answered the equivalent question
-// four times because nothing distinguished the tool failing from their code
-// failing.
-func TestHarnessFailureIsTypedSoTheQuestionCanBeAnswered(t *testing.T) {
-	envelope, err := sddstatus.BudgetConsentEnvelope(sddstatus.BudgetConsentInput{
-		Repo: "/repo", Change: "demo", Revision: "sha256:" + strings.Repeat("a", 64),
-		MaxAttempts: 2, CumulativeAttempts: 2, HarnessFailures: 2,
-	})
+func TestCurrentStatusDoesNotInventHarnessFailureConsent(t *testing.T) {
+	status := sddstatus.RuntimeStatus{Change: "demo", NextAction: sddstatus.RuntimeActionBegin}
+	payload, err := json.Marshal(status)
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := envelope.Headline + "\n" + envelope.Reason + "\n" + strings.Join(envelope.Evidence, "\n")
-	if !strings.Contains(text, "harness") {
-		t.Fatalf("the envelope does not say the attempts were spent on harness failures:\n%s", text)
-	}
-	// Invalidated means the result cannot prove the change; it does not mean the
-	// process never started or that partial evidence cannot exist.
-	if !strings.Contains(text, "partial evidence may exist") || !strings.Contains(text, "cannot prove the change") {
-		t.Fatalf("the envelope does not describe incomplete harness evidence honestly:\n%s", text)
-	}
-
-	clean, err := sddstatus.BudgetConsentEnvelope(sddstatus.BudgetConsentInput{
-		Repo: "/repo", Change: "demo", Revision: "sha256:" + strings.Repeat("a", 64),
-		MaxAttempts: 2, CumulativeAttempts: 2,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(clean.Headline+clean.Reason+strings.Join(clean.Evidence, "\n"), "harness") {
-		t.Fatal("an ordinary exhausted budget must not claim harness failures it did not have")
+	if strings.Contains(string(payload), `"consent"`) {
+		t.Fatalf("current status fabricated a blocking consent envelope: %s", payload)
 	}
 }
 
-// TestBudgetConsentRefusesAnIncompleteEnvelope keeps the producer honest
-// through the shared core's own completeness rule, the same one the review
-// envelope answers to.
-func TestBudgetConsentRefusesAnIncompleteEnvelope(t *testing.T) {
-	if _, err := sddstatus.BudgetConsentEnvelope(sddstatus.BudgetConsentInput{
-		Repo: "/repo", Change: "demo", MaxAttempts: 2, CumulativeAttempts: 2,
-	}); err == nil {
-		t.Fatal("an envelope with no revision cannot name a runnable reset, so it must refuse to be built")
+func TestCurrentStatusNeedsNoResetInvocation(t *testing.T) {
+	status := sddstatus.RuntimeStatus{Change: "demo", NextAction: sddstatus.RuntimeActionBegin}
+	if status.DecisionRequired || status.Consent != nil || status.NextAction != sddstatus.RuntimeActionBegin {
+		t.Fatalf("retryable status still requires an accounting reset: %#v", status)
 	}
 }
 
