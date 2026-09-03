@@ -27,7 +27,7 @@ const powerShellCommand = "<PowerShell>"
 
 // versionRegexp extracts a semver-like version from command output.
 // Same pattern as internal/system/deps.go for consistency.
-var versionRegexp = regexp.MustCompile(`(\d+\.\d+(?:\.\d+)?)`)
+var versionRegexp = regexp.MustCompile(`(\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*-?[0-9A-Za-z]*)?)`)
 
 // devVersionRegexp matches common unversioned source-build output like
 // "engram dev" or "version: dev".

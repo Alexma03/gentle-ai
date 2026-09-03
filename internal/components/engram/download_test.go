@@ -1268,7 +1268,7 @@ func TestEngramGoInstallFromMain_UsesGoEnvForBinDir(t *testing.T) {
 	}
 }
 
-func TestEngramGoInstallFromMain_BypassesPublicGoProxy(t *testing.T) {
+func TestEngramGoInstallFromMain_UsesNormalPublicGoProxyAndSumDB(t *testing.T) {
 	binDir := t.TempDir()
 	goPath := filepath.Join(binDir, "go")
 	recordPath := filepath.Join(t.TempDir(), "go-env.txt")
@@ -1296,6 +1296,9 @@ func TestEngramGoInstallFromMain_BypassesPublicGoProxy(t *testing.T) {
 	}
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("GO_ENV_RECORD", recordPath)
+	t.Setenv("GONOSUMDB", "example.com/private")
+	t.Setenv("GOPRIVATE", "github.com/acme/*")
+	t.Setenv("GONOPROXY", "corp.example/*")
 
 	origGoEnvFn := engramGoEnvFn
 	t.Cleanup(func() { engramGoEnvFn = origGoEnvFn })
@@ -1312,13 +1315,16 @@ func TestEngramGoInstallFromMain_BypassesPublicGoProxy(t *testing.T) {
 		t.Fatalf("ReadFile(%q) error = %v", recordPath, err)
 	}
 	for _, want := range []string{
-		"GONOSUMDB=github.com/Gentleman-Programming/engram",
-		"GOPRIVATE=github.com/Gentleman-Programming/engram",
-		"GONOPROXY=github.com/Gentleman-Programming/engram",
+		"GONOSUMDB=example.com/private",
+		"GOPRIVATE=github.com/acme/*",
+		"GONOPROXY=corp.example/*",
 	} {
 		if !strings.Contains(string(recorded), want) {
 			t.Fatalf("go install env missing %q\nrecorded:\n%s", want, recorded)
 		}
+	}
+	if strings.Contains(string(recorded), "Gentleman-Programming/engram") {
+		t.Fatalf("public Engram module must use normal proxy/checksum transparency, recorded:\n%s", recorded)
 	}
 }
 

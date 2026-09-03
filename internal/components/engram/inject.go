@@ -100,6 +100,10 @@ func engramOverlayJSON(agentID model.AgentID, cmd string) []byte {
 // InjectOptions carries optional configuration for an Inject call.
 // Zero value is always safe — all fields have documented defaults.
 type InjectOptions struct {
+	// Command is the exact Engram binary installed for this operation. When set,
+	// managed MCP configuration uses it instead of resolving another PATH entry.
+	Command string
+
 	// CodexMultiAgent controls whether features.multi_agent is written as true
 	// in ~/.codex/config.toml. Default (false) writes multi_agent = false, which
 	// is the safe no-op value for the experimental Codex multi-agent tool set.
@@ -248,7 +252,7 @@ func injectWithOptions(configHomeDir, promptDir string, adapter agents.Adapter, 
 	switch adapter.MCPStrategy() {
 	case model.StrategySeparateMCPFiles:
 		if adapter.Agent() == model.AgentClaudeCode && userScope {
-			result, err := injectClaudeUserConfig(configHomeDir, adapter)
+			result, err := injectClaudeUserConfig(configHomeDir, adapter, opts.Command)
 			if err != nil {
 				return InjectionResult{}, err
 			}
@@ -262,7 +266,7 @@ func injectWithOptions(configHomeDir, promptDir string, adapter agents.Adapter, 
 		// present instead of silently overwriting it with the relative "engram".
 		// See: https://github.com/Gentleman-Programming/gentle-ai/issues (engram absolute path regression)
 		mcpPath := adapter.MCPConfigPath(configHomeDir, "engram")
-		cmd := stableEngramCommandForMergedConfig(mcpPath, adapter.Agent())
+		cmd := selectedEngramCommand(opts.Command, mcpPath, adapter.Agent())
 		content := buildSeparateMCPContent(mcpPath, engramServerJSONWithCmd(cmd))
 		mcpWrite, err := filemerge.WriteFileAtomic(mcpPath, content, 0o644)
 		if err != nil {
@@ -276,7 +280,7 @@ func injectWithOptions(configHomeDir, promptDir string, adapter agents.Adapter, 
 		if settingsPath == "" {
 			break
 		}
-		overlay := engramOverlayJSON(adapter.Agent(), stableEngramCommandForMergedConfig(settingsPath, adapter.Agent()))
+		overlay := engramOverlayJSON(adapter.Agent(), selectedEngramCommand(opts.Command, settingsPath, adapter.Agent()))
 		settingsWrite, err := mergeJSONFile(settingsPath, overlay)
 		if err != nil {
 			return InjectionResult{}, err
@@ -289,7 +293,7 @@ func injectWithOptions(configHomeDir, promptDir string, adapter agents.Adapter, 
 		if mcpPath == "" {
 			break
 		}
-		engramCommand := stableEngramCommandForMergedConfig(mcpPath, adapter.Agent())
+		engramCommand := selectedEngramCommand(opts.Command, mcpPath, adapter.Agent())
 		overlay := engramOverlayJSON(adapter.Agent(), engramCommand)
 
 		mcpWrite, err := mergeJSONFile(mcpPath, overlay)
@@ -379,7 +383,7 @@ func injectWithOptions(configHomeDir, promptDir string, adapter agents.Adapter, 
 		}
 
 		// Step 3 — [mcp_servers.engram] block (always last; strip+re-append at EOF).
-		engramCmd := stableEngramCommandForMergedConfig(configPath, adapter.Agent())
+		engramCmd := selectedEngramCommand(opts.Command, configPath, adapter.Agent())
 		withMCP := filemerge.UpsertCodexEngramBlock(withCompact, engramCmd)
 
 		tomlWrite, err := filemerge.WriteFileAtomic(configPath, []byte(withMCP), 0o644)
@@ -447,13 +451,15 @@ func injectWithOptions(configHomeDir, promptDir string, adapter agents.Adapter, 
 	return InjectionResult{Changed: changed, Files: files}, nil
 }
 
-func injectClaudeUserConfig(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
+func injectClaudeUserConfig(homeDir string, adapter agents.Adapter, preferredCommand string) (InjectionResult, error) {
 	legacyPath := adapter.MCPConfigPath(homeDir, "engram")
-	command := stableEngramCommandForMergedConfig(claude.UserConfigPath(homeDir), model.AgentClaudeCode)
+	command := selectedEngramCommand(preferredCommand, claude.UserConfigPath(homeDir), model.AgentClaudeCode)
 	legacyManaged := false
 	if raw, err := os.ReadFile(legacyPath); err == nil {
 		if legacyCommand, ok := managedLegacyClaudeEngramCommand(raw); ok {
-			command = stableEngramCommandForExisting(legacyCommand, model.AgentClaudeCode)
+			if strings.TrimSpace(preferredCommand) == "" {
+				command = stableEngramCommandForExisting(legacyCommand, model.AgentClaudeCode)
+			}
 			legacyManaged = true
 		}
 	} else if !os.IsNotExist(err) {
@@ -589,6 +595,13 @@ func stableEngramCommandForMergedConfig(path string, agentID model.AgentID) stri
 
 	cmd, _ := resolveEngramCommand()
 	return cmd
+}
+
+func selectedEngramCommand(preferred, path string, agentID model.AgentID) string {
+	if command := strings.TrimSpace(preferred); command != "" {
+		return command
+	}
+	return stableEngramCommandForMergedConfig(path, agentID)
 }
 
 func stableEngramCommandForExisting(cmd string, agentID model.AgentID) string {

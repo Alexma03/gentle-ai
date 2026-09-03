@@ -1294,38 +1294,18 @@ func (s componentApplyStep) Run() error {
 				return fmt.Errorf("install beta engram from main: %w", err)
 			}
 			engramCommand = binaryPath
-		} else if installedPath, err := cmdLookPath("engram"); err != nil {
-			// Engram not on PATH — install it.
-			{
-				// Every supported platform installs Engram v2 from upstream main.
-				binaryPath, err := engramDownloadFn(s.profile)
-				if err != nil {
-					return fmt.Errorf("install Engram v2 from main: %w", err)
-				}
-				// Add the install directory to PATH so subsequent commands
-				// (engram setup, engram.Inject → resolveEngramCommand) can find it.
-				// On Windows this also persists the change to the user registry via PowerShell.
-				binDir := filepath.Dir(binaryPath)
-				if err := addUserPath(binDir); err != nil {
-					// Non-fatal: warn but continue — the binary was downloaded successfully.
-					fmt.Fprintf(os.Stderr, "WARNING: could not add %s to PATH: %v\n", binDir, err)
-				}
-				engramCommand = binaryPath
-			}
-		} else if shouldRefreshWindowsEngram(s.profile, installedPath, pathEnvEntries(s.profile)) {
+		} else {
+			// Selection is authoritative: always converge through the v2 @main
+			// installer even when PATH currently resolves a stable/Homebrew v1.
 			binaryPath, err := engramDownloadFn(s.profile)
 			if err != nil {
-				return fmt.Errorf("refresh shadowed engram binary: %w", err)
+				return fmt.Errorf("install Engram v2 from main: %w", err)
 			}
 			engramCommand = binaryPath
 			binDir := filepath.Dir(binaryPath)
-			if err := ensureRepairableWindowsEngramShadowing(s.profile, installedPath, binDir); err != nil {
-				return fmt.Errorf("repair Windows Engram PATH shadowing: refreshed managed Engram at %s, but cannot safely repair PATH order: %w. Move %s before %s in your user PATH or remove the stale Machine/System PATH entry, then rerun install", binaryPath, err, binDir, filepath.Dir(installedPath))
+			if err := addUserPath(binDir); err != nil {
+				fmt.Fprintf(os.Stderr, "WARNING: could not add %s to PATH: %v\n", binDir, err)
 			}
-			if err := ensureUserPathFirst(binDir); err != nil {
-				return fmt.Errorf("repair Windows Engram PATH shadowing: refreshed managed Engram at %s, but could not move %s ahead of stale PATH entry %s: %w. Move %s before %s in your user PATH, then rerun install", binaryPath, binDir, installedPath, err, binDir, filepath.Dir(installedPath))
-			}
-			fmt.Fprintf(os.Stderr, "WARNING: multiple engram.exe entries were found on PATH and %s resolved first. Refreshed managed Engram at %s and moved %s ahead of the stale entry in the user PATH.\n", installedPath, binaryPath, binDir)
 		}
 		setupMode := engram.ParseSetupMode(os.Getenv(engram.SetupModeEnvVar))
 		setupStrict := engram.ParseSetupStrict(os.Getenv(engram.SetupStrictEnvVar))
@@ -1400,6 +1380,7 @@ func (s componentApplyStep) Run() error {
 				}
 			}
 			engramOpts := engram.InjectOptions{
+				Command:                     engramCommand,
 				CodexOrchestratorAssignment: s.selection.CodexOrchestratorAssignment,
 				CodexCarrilModelAssignments: s.selection.CodexCarrilModelAssignments,
 				CodexModelAssignments:       s.selection.CodexModelAssignments,
@@ -2209,6 +2190,11 @@ func (s checkDependenciesStep) Run() error {
 	// surfaced on the TUI complete screen and by the actual install steps
 	// failing with real error messages.
 	_ = system.DetectDependencies(context.Background(), s.profile)
+	for _, component := range s.selection.Components {
+		if err := installcmd.ValidateComponentInstallPreflight(s.profile, component); err != nil {
+			return fmt.Errorf("preflight for component %q: %w", component, err)
+		}
+	}
 	for _, agent := range s.selection.Agents {
 		// Only Pi executes package commands (its already-present `pi`
 		// subcommands and npm-based Engram initialization — see

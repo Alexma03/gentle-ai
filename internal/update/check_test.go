@@ -1218,6 +1218,9 @@ func TestParseVersionFromOutput(t *testing.T) {
 	}{
 		{name: "engram v0.3.2", output: "engram v0.3.2", want: "0.3.2"},
 		{name: "bare version", output: "2.1.0", want: "2.1.0"},
+		{name: "Engram main pseudo-version", output: "engram v2.0.0-20260902153045-abcdef123456", want: "2.0.0-20260902153045-abcdef123456"},
+		{name: "Engram main pseudo-version after tag", output: "engram v2.0.1-0.20260902153045-abcdef123456", want: "2.0.1-0.20260902153045-abcdef123456"},
+		{name: "Engram main pseudo-version after prerelease", output: "engram 2.0.0-rc.4.0.20260903105937-0fbef9c322d8", want: "2.0.0-rc.4.0.20260903105937-0fbef9c322d8"},
 		{name: "no version", output: "no version info here", want: ""},
 		{name: "empty", output: "", want: ""},
 	}
