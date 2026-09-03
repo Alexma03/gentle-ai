@@ -25,7 +25,7 @@ const (
 	engramOwner            = "Gentleman-Programming"
 	engramRepo             = "engram"
 	engramName             = "engram"
-	engramCanonicalModule  = "github.com/Gentleman-Programming/engram"
+	engramCanonicalModule  = "github.com/Gentleman-Programming/engram/v2"
 	engramCanonicalPackage = engramCanonicalModule + "/cmd/engram"
 )
 
@@ -112,7 +112,7 @@ func appendGoEnvPattern(required, existing string) string {
 }
 
 func canonicalEngramGoInstallPackage(pkg string) string {
-	const lowerPackage = "github.com/gentleman-programming/engram/cmd/engram"
+	const lowerPackage = "github.com/gentleman-programming/engram/v2/cmd/engram"
 	if strings.HasPrefix(strings.ToLower(pkg), lowerPackage) {
 		return engramCanonicalPackage + pkg[len(lowerPackage):]
 	}
@@ -128,27 +128,35 @@ func canonicalEngramGoInstallPackage(pkg string) string {
 // used by the update-check path in internal/update/registry.go.
 const engramCoreTagPattern = `^v[0-9]+\.[0-9]+\.[0-9]+$`
 
-// DownloadLatestBinary fetches the latest engram release from GitHub and
-// installs it to the appropriate directory for the given platform.
+// DownloadLatestBinary installs Engram v2 from upstream main using Go's
+// existing destination rules and returns the installed binary path.
 // It returns the full path to the installed binary.
 //
-// When isBeta is true, engram is installed from source via `go install @main`
-// instead of downloading a release archive. This mirrors the install-time beta
-// path used by the CLI and ensures the upgrade executor honors GENTLE_AI_CHANNEL.
+// The channel-shaped boolean is retained for compatibility; both normal and
+// beta channels select the same v2 @main source in this fork.
 //
 // Checksum verification is mandatory for the stable (release) path: the install
 // fails if checksums.txt is unavailable, if the archive is not listed, or if
 // the digest does not match.
 //
-// This is the non-brew installation method for Linux and Windows.
-// On macOS, brew handles engram transitively and this should not be called.
+// The legacy release implementation below remains reachable only as structural
+// compatibility while callers transition; useEngramMainSource always selects
+// the source path on Linux, macOS, and Windows.
 func DownloadLatestBinary(profile system.PlatformProfile, isBeta bool) (string, error) {
-	// Beta channel: install from HEAD via go install rather than a release archive.
-	// This mirrors the installBetaEngramFromMain path used at install time.
-	if isBeta {
-		return engramGoInstallFn(engramCanonicalPackage + "@main")
+	// Both channels intentionally use Engram v2 from main in this personal fork.
+	if useEngramMainSource(isBeta) {
+		commands, err := InstallCommand(profile)
+		if err != nil {
+			return "", err
+		}
+		return engramGoInstallFn(commands[0][2])
 	}
+	return downloadLatestReleaseBinary(profile)
+}
 
+// downloadLatestReleaseBinary retains the former verified-release machinery
+// for compatibility tests; normal installation never selects it.
+func downloadLatestReleaseBinary(profile system.PlatformProfile) (string, error) {
 	ctx := context.Background()
 
 	// 1. Fetch the latest version tag from GitHub API. Only tags matching the
@@ -237,6 +245,10 @@ func DownloadLatestBinary(profile system.PlatformProfile, isBeta bool) (string, 
 
 	return outPath, nil
 }
+
+// useEngramMainSource retains the channel-shaped API while making main the
+// single source selected by this fork.
+func useEngramMainSource(bool) bool { return true }
 
 // engramCoreTagRE is the compiled form of engramCoreTagPattern, used to filter
 // GitHub release tags so only core engram binary releases are selected.

@@ -16,7 +16,7 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/update"
 )
 
-// engramDownloadFn is the function used to download the engram binary on the stable channel.
+// engramDownloadFn installs Engram v2 main for the normal channel.
 // Package-level var for testability — swapped in tests to avoid real network calls.
 var engramDownloadFn = func(profile system.PlatformProfile) (string, error) {
 	return engram.DownloadLatestBinary(profile, false)
@@ -49,6 +49,9 @@ type strategyOutcome struct {
 //   - binary method + windows → manualFallback (gentle-ai explains the signed-distribution hold)
 //   - unknown method → manualFallback with explicit message
 func runStrategy(ctx context.Context, r update.UpdateResult, profile system.PlatformProfile, preflightDestination ...string) (bool, error) {
+	if r.Tool.Name == "engram" && strings.EqualFold(r.Tool.Owner, "Gentleman-Programming") && r.Tool.Repo == "engram" && r.Tool.InstallMethod == update.InstallBinary {
+		return false, engramBinaryUpgrade(profile)
+	}
 	ownership := update.HomebrewNone
 	if profile.PackageManager == "brew" {
 		var err error
@@ -439,12 +442,8 @@ func gentleAIWindowsSourceInstallHint(r update.UpdateResult) string {
 		update.GentleAISourceInstallCommand(r.LatestVersion)
 }
 
-// engramBinaryUpgrade downloads or installs the latest engram binary.
-// It honors GENTLE_AI_CHANNEL: when the channel is beta, engram is installed
-// from source via `go install @main`. For stable (the default when the env var
-// is unset or unknown), the pre-built release binary is downloaded via
-// engramDownloadFn. On Windows, PATH changes are persisted to the user registry
-// via PowerShell.
+// engramBinaryUpgrade installs Engram v2 main through the existing channel
+// seams. Both normal and beta paths now select the same upstream source.
 func engramBinaryUpgrade(profile system.PlatformProfile) error {
 	// Resolve the install channel from the environment. Unknown values fall back
 	// to stable (ResolveInstallChannel returns an error for truly unrecognized
@@ -468,10 +467,10 @@ func engramBinaryUpgrade(profile system.PlatformProfile) error {
 			return fmt.Errorf("install engram from main (beta): %w", err)
 		}
 	} else {
-		// Stable channel (default): download the latest release binary.
+		// Normal channel: install the same v2 main source as beta.
 		binaryPath, err = engramDownloadFn(profile)
 		if err != nil {
-			return fmt.Errorf("download engram binary: %w", err)
+			return fmt.Errorf("install Engram v2 from main: %w", err)
 		}
 	}
 

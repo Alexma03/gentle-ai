@@ -252,7 +252,7 @@ func TestRunInstallWindowsEngramUsesDownloadNotGoInstall(t *testing.T) {
 }
 
 // TestRunInstallMacOSEngramStillUsesBrew verifies macOS unchanged.
-func TestRunInstallMacOSEngramStillUsesBrew(t *testing.T) {
+func TestRunInstallMacOSEngramUsesMainSource(t *testing.T) {
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
@@ -268,11 +268,12 @@ func TestRunInstallMacOSEngramStillUsesBrew(t *testing.T) {
 	recorder := &commandRecorder{}
 	runCommand = recorder.record
 
-	// DownloadFn should NOT be called for macOS (brew handles it).
+	// macOS uses the same main-source installer as other supported platforms.
 	origDownloadFn := engramDownloadFn
+	downloadCalled := false
 	engramDownloadFn = func(profile system.PlatformProfile) (string, error) {
-		t.Error("DownloadLatestBinary should NOT be called on macOS (brew handles it)")
-		return "", nil
+		downloadCalled = true
+		return filepath.Join(home, "go", "bin", "engram"), nil
 	}
 	t.Cleanup(func() { engramDownloadFn = origDownloadFn })
 
@@ -288,16 +289,13 @@ func TestRunInstallMacOSEngramStillUsesBrew(t *testing.T) {
 		t.Fatalf("verification ready = false")
 	}
 
-	// Must use brew install engram.
-	commands := recorder.get()
-	foundBrew := false
-	for _, cmd := range commands {
-		if strings.Contains(cmd, "brew install engram") {
-			foundBrew = true
-		}
+	if !downloadCalled {
+		t.Fatal("expected main-source installer on macOS")
 	}
-	if !foundBrew {
-		t.Fatalf("expected brew install engram on macOS, got commands: %v", commands)
+	for _, cmd := range recorder.get() {
+		if strings.Contains(cmd, "brew install engram") {
+			t.Fatalf("stable Homebrew path used: %s", cmd)
+		}
 	}
 }
 
@@ -360,7 +358,7 @@ func TestRunInstallBetaEngramUsesMainGoInstallAndInstalledBinary(t *testing.T) {
 	foundGoInstall := false
 	foundSetupWithBetaBinary := false
 	for _, cmd := range commands {
-		if cmd == "go install github.com/Gentleman-Programming/engram/cmd/engram@main" {
+		if cmd == "go install github.com/Gentleman-Programming/engram/v2/cmd/engram@main" {
 			foundGoInstall = true
 		}
 		if strings.HasPrefix(cmd, betaEngram+" setup ") {

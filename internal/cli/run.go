@@ -78,10 +78,9 @@ var (
 		return piagent.NewAdapter().ProbeSubagentsRPC(ctx, homeDir, workspaceDir)
 	}
 
-	// engramDownloadFn is the function used to download the engram binary on non-brew platforms.
+	// engramDownloadFn is the component-owned Engram v2 main installer.
 	// Package-level var for testability — tests can replace this to avoid real HTTP calls.
-	// Always uses the stable (release) path; beta channel at install time is handled
-	// separately via installBetaEngramFromMain.
+	// Both channels use main; the beta helper remains for channel-shaped compatibility.
 	engramDownloadFn = func(profile system.PlatformProfile) (string, error) {
 		return engram.DownloadLatestBinary(profile, false)
 	}
@@ -459,15 +458,9 @@ func runnableAgentCommands(agentIDs []model.AgentID) []string {
 	return commands
 }
 
-// withGoInstallPathNote appends a PATH guidance note when engram was installed
-// on a non-brew platform (Linux/Windows). Since engram is now installed via
-// direct binary download to /usr/local/bin or ~/.local/bin, this note helps
-// users who may need to add the install directory to their PATH.
+// withGoInstallPathNote appends PATH guidance for Go-installed Engram.
 func withGoInstallPathNote(report verify.Report, resolved planner.ResolvedPlan) verify.Report {
 	if !hasComponent(resolved.OrderedComponents, model.ComponentEngram) {
-		return report
-	}
-	if resolved.PlatformDecision.PackageManager == "brew" {
 		return report
 	}
 	binDir := goInstallBinDir()
@@ -530,7 +523,7 @@ func goInstallBinDirFromGoEnv() (string, error) {
 	return "", fmt.Errorf("go env returned empty GOBIN and GOPATH")
 }
 
-const engramBetaGoInstallPackage = "github.com/Gentleman-Programming/engram/cmd/engram@main"
+const engramBetaGoInstallPackage = "github.com/Gentleman-Programming/engram/v2/cmd/engram@main"
 
 func installBetaEngramFromMain() (string, error) {
 	if err := runCommand("go", "install", engramBetaGoInstallPackage); err != nil {
@@ -1303,21 +1296,11 @@ func (s componentApplyStep) Run() error {
 			engramCommand = binaryPath
 		} else if installedPath, err := cmdLookPath("engram"); err != nil {
 			// Engram not on PATH — install it.
-			if s.profile.PackageManager == "brew" {
-				// macOS (or Linux with Homebrew): use brew tap + brew install.
-				commands, err := engram.InstallCommand(s.profile)
-				if err != nil {
-					return fmt.Errorf("resolve install command for component %q: %w", s.component, err)
-				}
-				if err := runCommandSequence(commands); err != nil {
-					return err
-				}
-			} else {
-				// Linux / Windows: download the pre-built binary from GitHub Releases.
-				// No Go required — engram ships pre-built binaries.
+			{
+				// Every supported platform installs Engram v2 from upstream main.
 				binaryPath, err := engramDownloadFn(s.profile)
 				if err != nil {
-					return fmt.Errorf("download engram binary: %w", err)
+					return fmt.Errorf("install Engram v2 from main: %w", err)
 				}
 				// Add the install directory to PATH so subsequent commands
 				// (engram setup, engram.Inject → resolveEngramCommand) can find it.
@@ -1591,11 +1574,6 @@ func ResolveInstallProfile(detection system.DetectionResult) system.PlatformProf
 		PackageManager: "brew",
 		Supported:      true,
 	}
-}
-
-// runCommandSequence runs each command in the sequence one at a time, stopping on first error.
-func runCommandSequence(commands [][]string) error {
-	return runCommandSequenceWithProgress(commands, nil, "")
 }
 
 // runCommandSequenceWithProgress is the common command runner used by agent

@@ -1395,15 +1395,17 @@ func TestRunInstallEngramLinuxNeverInstallsGo(t *testing.T) {
 	}
 }
 
-func TestRunInstallEngramBrewSkipsGoCheck(t *testing.T) {
+func TestRunInstallEngramBrewUsesMainSource(t *testing.T) {
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
 	restoreLookPath := cmdLookPath
+	restoreDownload := engramDownloadFn
 	t.Cleanup(func() {
 		osUserHomeDir = restoreHome
 		runCommand = restoreCommand
 		cmdLookPath = restoreLookPath
+		engramDownloadFn = restoreDownload
 	})
 
 	osUserHomeDir = func() (string, error) { return home, nil }
@@ -1413,6 +1415,11 @@ func TestRunInstallEngramBrewSkipsGoCheck(t *testing.T) {
 	}
 	recorder := &commandRecorder{}
 	runCommand = recorder.record
+	mainInstallCalled := false
+	engramDownloadFn = func(system.PlatformProfile) (string, error) {
+		mainInstallCalled = true
+		return filepath.Join(home, "go", "bin", "engram"), nil
+	}
 
 	detection := macOSDetectionResult()
 	result, err := RunInstall(
@@ -1427,25 +1434,13 @@ func TestRunInstallEngramBrewSkipsGoCheck(t *testing.T) {
 		t.Fatalf("verification ready = false")
 	}
 
-	// Should use brew install, NOT go install, and no Go auto-install.
-	commands := recorder.get()
-	for _, cmd := range commands {
-		if strings.Contains(cmd, "golang") || strings.Contains(cmd, "apt-get") {
-			t.Fatalf("brew platform should not install Go, got command: %s", cmd)
-		}
-		if strings.Contains(cmd, "go install") {
-			t.Fatalf("brew platform should not use go install, got command: %s", cmd)
-		}
+	if !mainInstallCalled {
+		t.Fatal("expected Engram main-source installer")
 	}
-
-	foundBrew := false
-	for _, cmd := range commands {
+	for _, cmd := range recorder.get() {
 		if strings.Contains(cmd, "brew install engram") {
-			foundBrew = true
+			t.Fatalf("stable Homebrew installer used: %s", cmd)
 		}
-	}
-	if !foundBrew {
-		t.Fatalf("expected brew install engram, got commands: %v", commands)
 	}
 }
 

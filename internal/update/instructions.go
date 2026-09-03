@@ -65,9 +65,6 @@ func gentleAIHint(profile system.PlatformProfile) string {
 	}
 }
 
-func engramHint(profile system.PlatformProfile) string {
-	if profile.PackageManager == "brew" && homebrewPackageInstalled("engram") {
-		return "brew upgrade engram"
-	}
-	return "gentle-ai upgrade (downloads pre-built binary)"
+func engramHint(system.PlatformProfile) string {
+	return "go install github.com/Gentleman-Programming/engram/v2/cmd/engram@main"
 }
