@@ -2,7 +2,6 @@ package sddstatus
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -214,15 +213,7 @@ func TestRuntimeRescopeAdmissibleAfterIntendedUntrackedLandsByteIdentical(t *tes
 	if err == nil || !strings.Contains(err.Error(), "sdd-attempt rescope") {
 		t.Fatalf("changed-objective refusal after a byte-identical landing = %v, want the rescope exit named", err)
 	}
-	// The elective reset stays refused: the reconciled drift capture must
-	// succeed and answer zero drift instead of dying on the replayed
-	// selection.
-	if _, err := store.Reset(context.Background(), ResetObjectiveRequest{
-		ExpectedRevision: failed.Revision, RequestID: "tracked-zero-drift-reset",
-		Reason: "elective reset over an unmoved candidate", Actor: "maintainer",
-	}); !errors.Is(err, ErrRuntimeResetNotAllowed) {
-		t.Fatalf("zero-drift reset after the landing = %v, want ErrRuntimeResetNotAllowed", err)
-	}
+	// No reset is needed before the narrower rescope below.
 	rescoped, err := store.Rescope(context.Background(), RescopeObjectiveRequest{
 		ExpectedRevision: failed.Revision, RequestID: "tracked-zero-drift-rescope",
 		WorkUnit: "narrower verify", EvidenceGoal: "narrower verification",

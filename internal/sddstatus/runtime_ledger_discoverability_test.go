@@ -56,7 +56,7 @@ func TestRuntimeLedgerErrorsNameTheStatusRoute(t *testing.T) {
 // the form guard catches a refusal that names nothing, this one catches a
 // refusal that names the wrong thing.
 func TestStatusRouteActuallyResolvesEachSentinelState(t *testing.T) {
-	t.Run("budget exhausted routes to a reset that is admitted", func(t *testing.T) {
+	t.Run("budget exhaustion routes to a retry that is admitted", func(t *testing.T) {
 		store := mustRuntimeStore(t, initRuntimeLedgerRepo(t), "route-exhausted")
 		began, err := store.Begin(context.Background(), BeginAttemptRequest{
 			RequestID: "exhausted-1", WorkUnit: "apply", EvidenceGoal: "prove it",
@@ -73,14 +73,14 @@ func TestStatusRouteActuallyResolvesEachSentinelState(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if exhausted.NextAction != RuntimeActionReset {
-			t.Fatalf("next_action = %q, want reset", exhausted.NextAction)
+		if exhausted.DecisionRequired || exhausted.NextAction != RuntimeActionBegin {
+			t.Fatalf("status = %#v, want retryable begin", exhausted)
 		}
-		if _, err := store.Reset(context.Background(), ResetObjectiveRequest{
-			ExpectedRevision: exhausted.Revision, RequestID: "exhausted-reset",
-			Reason: "budget spent", Actor: "maintainer",
+		if _, err := store.Begin(context.Background(), BeginAttemptRequest{
+			ExpectedRevision: exhausted.Revision, RequestID: "exhausted-retry",
+			WorkUnit: "apply", EvidenceGoal: "prove it", MaxAttempts: 1, MaxChangedLines: 20,
 		}); err != nil {
-			t.Fatalf("status named reset, but reset is refused from this state: %v", err)
+			t.Fatalf("status named begin, but retry was refused: %v", err)
 		}
 	})
 

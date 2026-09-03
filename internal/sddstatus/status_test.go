@@ -458,14 +458,12 @@ func TestResolveRuntimeOverrideRestoresExpectedPlanningBlockersForBothStores(t *
 			if err != nil {
 				t.Fatalf("Resolve() error = %v", err)
 			}
-			if status.NextRecommended != "resolve-blockers" {
-				t.Fatalf("NextRecommended = %q, want resolve-blockers", status.NextRecommended)
+			if status.NextRecommended != "propose" {
+				t.Fatalf("NextRecommended = %q, want propose", status.NextRecommended)
 			}
 			reasons := strings.Join(status.BlockedReasons, "\n")
-			for _, want := range []string{"proposal.md is missing or partial.", "blocked(maintainer_decision)"} {
-				if !strings.Contains(reasons, want) {
-					t.Fatalf("BlockedReasons = %v, want containing %q", status.BlockedReasons, want)
-				}
+			if strings.Contains(reasons, "maintainer_decision") {
+				t.Fatalf("accounting telemetry rendered a blocker: %v", status.BlockedReasons)
 			}
 		})
 	}

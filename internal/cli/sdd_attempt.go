@@ -315,7 +315,7 @@ var sddAttemptOperationDefinitions = []sddAttemptOperationContract{
 		{name: "request-id", required: true, usage: "required; lowercase idempotency key, at most 128 bytes"},
 		{name: "destination-worktree", required: true, usage: "required; canonical registered linked worktree of the same Git common directory"},
 	}},
-	{name: "reset", purpose: "Reset a decision-required or complete objective", flags: []sddAttemptFlagDefinition{
+	{name: "reset", purpose: "Explicitly reset a terminal objective (compatibility workflow)", flags: []sddAttemptFlagDefinition{
 		sddAttemptCWDFlag, sddAttemptChangeFlag,
 		{name: "expected-revision", required: true, usage: "required; exact sha256:<64 lowercase hex> runtime revision"},
 		{name: "request-id", required: true, usage: "required; lowercase idempotency key, at most 128 bytes"},

@@ -163,7 +163,7 @@ func TestRuntimeLedgerRefusesAdvanceIntoTheSameWorkUnit(t *testing.T) {
 
 // An exhausted or failed objective stays maintainer territory: advance never
 // launders a budget that decision_required is holding.
-func TestRuntimeLedgerRefusesAdvanceWhenDecisionIsRequired(t *testing.T) {
+func TestRuntimeLedgerStillRefusesScopeChangeAfterRetryableFailure(t *testing.T) {
 	repo := initRuntimeLedgerRepo(t)
 	store, err := OpenRuntimeStore(context.Background(), repo, "objective-advance-exhausted")
 	if err != nil {
@@ -186,8 +186,8 @@ func TestRuntimeLedgerRefusesAdvanceWhenDecisionIsRequired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !exhausted.DecisionRequired || exhausted.Complete {
-		t.Fatalf("fixture did not reach decision_required: %#v", exhausted)
+	if exhausted.DecisionRequired || exhausted.Complete || exhausted.NextAction != RuntimeActionBegin {
+		t.Fatalf("fixture did not remain retryable: %#v", exhausted)
 	}
 	before := countRuntimeRecords(t, store.Dir)
 
@@ -195,8 +195,8 @@ func TestRuntimeLedgerRefusesAdvanceWhenDecisionIsRequired(t *testing.T) {
 		ExpectedRevision: exhausted.Revision, RequestID: "exhausted-advance", WorkUnit: advanceVerifyWorkUnit,
 		EvidenceGoal: advanceVerifyGoal, MaxAttempts: advanceVerifyMaxAttempts, MaxChangedLines: advanceVerifyMaxLines,
 	})
-	if !errors.Is(err, ErrRuntimeBudgetExhausted) {
-		t.Fatalf("advance past decision_required error = %T %v, want ErrRuntimeBudgetExhausted", err, err)
+	if !errors.Is(err, ErrRuntimeObjectiveChange) {
+		t.Fatalf("scope change after failure error = %T %v, want ErrRuntimeObjectiveChange", err, err)
 	}
 	if countRuntimeRecords(t, store.Dir) != before {
 		t.Fatalf("refused advance wrote %d records", countRuntimeRecords(t, store.Dir)-before)

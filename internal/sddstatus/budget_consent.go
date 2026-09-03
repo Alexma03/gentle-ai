@@ -12,8 +12,8 @@ import (
 
 const SDDBudgetConsentSchema = "gentle-ai.sdd-integration.consent/v1"
 
-// BudgetConsentInput is everything the exhausted-budget question is built
-// from. Every field is already on the ledger; nothing here is inferred.
+// BudgetConsentInput preserves the legacy typed-envelope API. Routine runtime
+// routing no longer constructs this question from accounting ceilings.
 type BudgetConsentInput struct {
 	Repo     string
 	Change   string
@@ -24,30 +24,13 @@ type BudgetConsentInput struct {
 	MaxChangedLines    int
 	CumulativeLines    int
 
-	// HarnessFailures counts attempts in this objective that ended without the
-	// work ever running, because the harness that was supposed to run it could
-	// not be constructed. They are the reason this question exists (#2588) and
-	// the reason it can be answered: an exhausted budget means something very
-	// different when none of it was spent on the candidate.
+	// HarnessFailures counts attempts whose harness result was invalidated.
+	// Execution may have started and partial evidence may still exist.
 	HarnessFailures int
 }
 
-// BudgetConsentResult is the typed blocking question an exhausted attempt
-// budget asks instead of dead-ending.
-//
-// blocked(maintainer_decision) used to end the conversation in prose: it named
-// a reset the human had to know about and assemble by hand out of six flags,
-// and #2902, #2913 and #2588 all died there. There is no reason the exhausted
-// state cannot simply ask, the way a medium-risk review START already asks
-// before it spends anything.
-//
-// The grant is deliberately NOT a new exemption concept. It is the reset the
-// ledger already admits at decision-required, offered as a runnable choice
-// rather than as advice. Nothing new can be laundered through it, and there is
-// no exemption count to calibrate: an exemption an actor could CLAIM would not
-// be verifiable, and any count large enough to help would be large enough to
-// stop the budget bounding anything. A grant a human issues is verifiable,
-// audited, and needs no number.
+// BudgetConsentResult is retained for schema and API compatibility. Routine
+// accounting exhaustion no longer routes through this blocking question.
 type BudgetConsentResult struct {
 	Schema   string `json:"schema"`
 	Change   string `json:"change"`
@@ -97,11 +80,11 @@ func BudgetConsentEnvelope(in BudgetConsentInput) (BudgetConsentResult, error) {
 		// with a click in the middle: its reporter answered that question four
 		// times because nothing distinguished the tool failing from their code
 		// failing. Saying so is what makes this answerable.
-		headline = "This work unit spent its attempt budget without ever running your work."
+		headline = "This work unit spent its attempt budget with incomplete harness evidence."
 		reason = fmt.Sprintf(
-			"%d of the %d attempts ended before the work started, because the harness meant to run it could not be built. Those attempts are not evidence about your change: your change never ran.",
+			"%d of the %d attempts were settled with an invalidated harness. Execution may have started and partial evidence may exist, but the harness result cannot prove the change.",
 			in.HarnessFailures, in.CumulativeAttempts)
-		evidence = append(evidence, fmt.Sprintf("attempts that never ran the work: %d", in.HarnessFailures))
+		evidence = append(evidence, fmt.Sprintf("attempts with incomplete or invalidated harness evidence: %d", in.HarnessFailures))
 		if in.HarnessFailures > 1 {
 			evidence = append(evidence,
 				"more than one attempt failed the same way, which usually means the harness will not converge on a retry; a provided harness or a maintainer is the cheaper next step")
@@ -175,7 +158,7 @@ func sddBudgetConsentResetRequestID(in BudgetConsentInput) string {
 
 func sddBudgetConsentReason(in BudgetConsentInput) string {
 	if in.HarnessFailures > 0 {
-		return "maintainer authorized a fresh budget after attempts that never ran the work"
+		return "maintainer authorized a fresh budget after incomplete harness evidence"
 	}
 	return "maintainer authorized a fresh budget for this objective"
 }

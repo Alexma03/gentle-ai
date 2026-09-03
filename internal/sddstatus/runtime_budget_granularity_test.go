@@ -104,10 +104,9 @@ func TestInterruptedCallThatDeliveredNothingStillSpendsTheBudget(t *testing.T) {
 	}
 }
 
-// TestRefundsAreCappedAtTheConfiguredAttemptCeiling pins the bound: an
-// objective earns back at most MaxAttempts calls, so it spends at most twice
-// what the operator configured and max_attempts still escalates.
-func TestRefundsAreCappedAtTheConfiguredAttemptCeiling(t *testing.T) {
+// TestRefundsPreserveLifetimeTelemetryPastTheConfiguredAttemptCeiling pins the
+// compatibility accounting without turning it into consent authority.
+func TestRefundsPreserveLifetimeTelemetryPastTheConfiguredAttemptCeiling(t *testing.T) {
 	repo := initRuntimeLedgerRepo(t)
 	store, err := OpenRuntimeStore(context.Background(), repo, "budget-refund-cap")
 	if err != nil {
@@ -122,12 +121,12 @@ func TestRefundsAreCappedAtTheConfiguredAttemptCeiling(t *testing.T) {
 		status = interruptRuntimeAttempt(t, store, status.Revision, fmt.Sprintf("cap-finish-%d", call))
 		expected = status.Revision
 		if call < 4 && status.DecisionRequired {
-			t.Fatalf("call %d reached decision-required before the 2x ceiling", call)
+			t.Fatalf("call %d became decision-required despite advisory accounting", call)
 		}
 	}
 
-	if !status.DecisionRequired {
-		t.Errorf("four delivering calls on a 2-attempt objective did not reach decision-required; max_attempts no longer escalates")
+	if status.DecisionRequired || status.NextAction != RuntimeActionBegin {
+		t.Errorf("advisory attempt telemetry blocked retry: %#v", status)
 	}
 	if status.LifetimeAttempts != 4 {
 		t.Errorf("LifetimeAttempts = %d, want 4; every call that ran must stay recorded", status.LifetimeAttempts)

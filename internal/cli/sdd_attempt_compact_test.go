@@ -109,6 +109,23 @@ func TestRunSDDAttemptLegacyStatusJSONIsUnchanged(t *testing.T) {
 	}
 }
 
+func TestRunSDDAttemptOneShotFailureRemainsRetryable(t *testing.T) {
+	repo := initReviewCLIRepo(t)
+	const change = "one-shot-retry"
+	started, _ := runCompactSDDAttempt(t, compactAcquireArgs(repo, change, "one-shot-acquire", 1))
+	if started.State != "proceed" || started.Token == "" {
+		t.Fatalf("initial acquire = %#v", started)
+	}
+	settled, _ := runCompactSDDAttempt(t, compactSettleArgs(repo, change, started.Token, "one-shot-settle", "failed"))
+	if settled != (compactAttemptOutput{State: "proceed"}) {
+		t.Fatalf("failed one-shot settle = %#v, want retryable proceed", settled)
+	}
+	retried, _ := runCompactSDDAttempt(t, compactAcquireArgs(repo, change, "one-shot-retry", 1))
+	if retried.State != "proceed" || retried.Token == "" {
+		t.Fatalf("diagnosed retry = %#v, want proceed with token", retried)
+	}
+}
+
 func TestRunSDDAttemptCompactBlocksWithoutMutation(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -122,14 +139,9 @@ func TestRunSDDAttemptCompactBlocksWithoutMutation(t *testing.T) {
 			},
 		},
 		{
-			name: "maintainer decision",
+			name: "invalid continuation",
 			prepare: func(t *testing.T, repo, change string, _ sddstatus.RuntimeStore) ([]string, string, string) {
-				started, _ := runCompactSDDAttempt(t, compactAcquireArgs(repo, change, "decision-acquire", 1))
-				settled, _ := runCompactSDDAttempt(t, compactSettleArgs(repo, change, started.Token, "decision-settle", "failed"))
-				if settled.Reason != "maintainer_decision" {
-					t.Fatalf("exhausting settle = %#v", settled)
-				}
-				return compactAcquireArgs(repo, change, "decision-retry", 1), "maintainer_decision", ""
+				return compactSettleArgs(repo, change, cliAttemptHash('f'), "invalid-settle", "failed"), "invalid_continuation", ""
 			},
 		},
 		{
@@ -395,12 +407,12 @@ func TestRunSDDAttemptSettleSurvivesOffToOnReviewModeTransition(t *testing.T) {
 	failedEvidence := cliAttemptHash('a')
 	failedAttempt, _ := runCompactSDDAttempt(t, compactAcquireArgs(repo, change, "failed-acquire", 1))
 	failed, _ := runCompactSDDAttempt(t, compactSettleArgsWithEvidence(repo, change, failedAttempt.Token, "failed-settle", "failed", failedEvidence))
-	if failed.State != "blocked" || failed.Reason != "maintainer_decision" {
-		t.Fatalf("failed verification did not exhaust its bounded objective: %#v", failed)
+	if failed.State != "proceed" || failed.Reason != "" {
+		t.Fatalf("failed verification did not remain retryable: %#v", failed)
 	}
 	failedStatus := runSDDAttemptStatus(t, []string{"status", "--cwd", repo, "--change", change})
-	if !failedStatus.DecisionRequired {
-		t.Fatalf("failed verification status = %#v, want maintainer decision", failedStatus)
+	if failedStatus.DecisionRequired || failedStatus.NextAction != sddstatus.RuntimeActionBegin {
+		t.Fatalf("failed verification status = %#v, want retryable begin", failedStatus)
 	}
 	if err := RunSDDAttempt([]string{
 		"reset", "--cwd", repo, "--change", change, "--expected-revision", failedStatus.Revision,

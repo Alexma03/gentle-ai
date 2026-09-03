@@ -194,7 +194,7 @@ func TestRuntimeRescopePreservesLimitKind(t *testing.T) {
 	})
 }
 
-func TestRuntimePositiveHistoricalLimitStillExhaustsAndReplays(t *testing.T) {
+func TestRuntimePositiveHistoricalLimitRemainsAdvisoryAndReplays(t *testing.T) {
 	repo := initRuntimeLedgerRepo(t)
 	store := mustRuntimeStore(t, repo, "positive-limit-replay")
 	started, err := store.Begin(context.Background(), BeginAttemptRequest{
@@ -214,14 +214,14 @@ func TestRuntimePositiveHistoricalLimitStillExhaustsAndReplays(t *testing.T) {
 		t.Fatal(err)
 	}
 	last := finished.Attempts[len(finished.Attempts)-1]
-	if !last.ChangedLineBudgetExceeded || !finished.DecisionRequired || finished.Complete {
-		t.Fatalf("positive historical limit was not enforced: status=%#v attempt=%#v", finished, last)
+	if !last.ChangedLineBudgetExceeded || finished.DecisionRequired || !finished.Complete {
+		t.Fatalf("positive historical telemetry blocked passing evidence: status=%#v attempt=%#v", finished, last)
 	}
 	replayed, err := store.Status()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !replayed.DecisionRequired || replayed.Objective == nil || replayed.Objective.MaxChangedLines != 5 {
+	if replayed.DecisionRequired || !replayed.Complete || replayed.Objective == nil || replayed.Objective.MaxChangedLines != 5 {
 		t.Fatalf("positive historical limit did not replay: %#v", replayed)
 	}
 }

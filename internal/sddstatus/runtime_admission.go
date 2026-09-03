@@ -107,10 +107,6 @@ func (store RuntimeStore) runtimeBeginAdmission(
 		}
 		advancing = true
 	}
-	if status.DecisionRequired {
-		return runtimeBeginAdmissionResult{}, ErrRuntimeBudgetExhausted
-	}
-
 	generation := status.ObjectiveGeneration + 1
 	var snapshot reviewtransaction.Snapshot
 	var err error
@@ -161,7 +157,8 @@ func (store RuntimeStore) runtimeBeginAdmission(
 			return runtimeBeginAdmissionResult{}, store.runtimeObjectiveChangeRefusal(ctx, status)
 		}
 		snapshot, err = captureRuntimeCandidate(ctx, store.Repo, request.IntendedUntracked)
-		if err == nil && (snapshot.Identity != status.Objective.InitialCandidateIdentity || snapshot.CandidateTree != status.Objective.InitialCandidateTree) {
+		identityChanged := snapshot.Identity != status.Objective.InitialCandidateIdentity && !runtimeLegacyExhaustedSuccessor(status)
+		if err == nil && (identityChanged || snapshot.CandidateTree != status.Objective.InitialCandidateTree) {
 			return runtimeBeginAdmissionResult{}, store.runtimeObjectiveChangeRefusal(ctx, status)
 		}
 	default:
@@ -169,12 +166,6 @@ func (store RuntimeStore) runtimeBeginAdmission(
 	}
 	if err != nil {
 		return runtimeBeginAdmissionResult{}, wrapRuntimeCandidateUnavailable("before launch", err)
-	}
-	// The successor opens a fresh per-objective budget, so the charges the
-	// completed scope accrued cannot exhaust it before its first attempt.
-	if !advancing && (status.CumulativeAttempts >= request.MaxAttempts ||
-		runtimeChangedLineBudgetExhausted(request.MaxChangedLines, status.CumulativeChangedLines)) {
-		return runtimeBeginAdmissionResult{}, ErrRuntimeBudgetExhausted
 	}
 	return runtimeBeginAdmissionResult{Advancing: advancing, Generation: generation, Snapshot: snapshot}, nil
 }
@@ -229,15 +220,6 @@ func (store RuntimeStore) AdmissionStatus(ctx context.Context, request BeginAtte
 		Status: status, AttemptTokens: replay.AttemptTokens, Request: normalized,
 	}); terminal && result.State == CompactStateBlocked {
 		status.BlockedReason, status.BlockedExit = result.Reason, result.Exit
-		// An exhausted budget is a decision, so it asks instead of ending the
-		// conversation. The grant is the reset the ledger already admits at
-		// decision-required, offered as a runnable choice rather than as prose
-		// the human has to assemble from six flags.
-		if result.Reason == CompactBlockMaintainerDecision {
-			if consent, consentErr := BudgetConsentEnvelope(store.budgetConsentInput(status)); consentErr == nil {
-				status.Consent = &consent
-			}
-		}
 		return status, nil
 	}
 	if _, admissionErr := store.runtimeBeginAdmission(ctx, status, normalized); admissionErr != nil {
@@ -248,11 +230,10 @@ func (store RuntimeStore) AdmissionStatus(ctx context.Context, request BeginAtte
 	return status, nil
 }
 
-// budgetConsentInput reads the question's facts off the ledger. HarnessFailures
-// is derived from HarnessDisposition, which the settle contract already
-// carries: an attempt the actor settled as `invalidated` is one whose harness
-// could not be used, so it produced no evidence about the candidate. Reusing
-// the declared field beats inventing a second way to say the same thing.
+// budgetConsentInput supports the legacy diagnostic consent envelope. New
+// accounting ceilings are advisory and never route here. HarnessFailures is
+// derived from HarnessDisposition, which means the harness proof was
+// incomplete; it does not prove that execution never started.
 func (store RuntimeStore) budgetConsentInput(status RuntimeStatus) BudgetConsentInput {
 	in := BudgetConsentInput{
 		Repo: store.Workspace, Change: store.Change, Revision: status.Revision,

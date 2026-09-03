@@ -92,23 +92,23 @@ func TestRuntimeLedgerConsumesOrdinalBeforeLaunchAndChargesNativeLines(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if interrupted.CumulativeChangedLines != 2 || !interrupted.DecisionRequired || interrupted.NextAction != RuntimeActionReset {
+	if interrupted.CumulativeChangedLines != 2 || interrupted.DecisionRequired || interrupted.NextAction != RuntimeActionBegin {
 		t.Fatalf("interrupted terminal status = %#v", interrupted)
 	}
 	head := interrupted.Revision
-	_, err = store.Begin(context.Background(), BeginAttemptRequest{
+	retried, err := store.Begin(context.Background(), BeginAttemptRequest{
 		ExpectedRevision: head, RequestID: "begin-3", WorkUnit: "browser-harness",
 		EvidenceGoal: "prove process containment", MaxAttempts: 2, MaxChangedLines: 4,
 	})
-	if !errors.Is(err, ErrRuntimeBudgetExhausted) {
-		t.Fatalf("third begin error = %v, want ErrRuntimeBudgetExhausted", err)
+	if err != nil || retried.ActiveAttempt == nil || retried.ActiveAttempt.Ordinal != 3 {
+		t.Fatalf("third begin retry = %#v err=%v", retried, err)
 	}
 	unchanged, err := store.Status()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if unchanged.Revision != head || countRuntimeRecords(t, store.Dir) != 4 {
-		t.Fatalf("exhausted begin mutated authority: revision=%q records=%d", unchanged.Revision, countRuntimeRecords(t, store.Dir))
+	if unchanged.Revision == head || countRuntimeRecords(t, store.Dir) != 5 {
+		t.Fatalf("retry was not recorded: revision=%q records=%d", unchanged.Revision, countRuntimeRecords(t, store.Dir))
 	}
 }
 

@@ -698,7 +698,7 @@ func nativeRuntimeCompletesRemediation(runtimeStatus *RuntimeStatus, attemptToke
 		return false
 	}
 	last := runtimeStatus.Attempts[len(runtimeStatus.Attempts)-1]
-	return last.Outcome == AttemptPassed && !last.ChangedLineBudgetExceeded &&
+	return last.Outcome == AttemptPassed &&
 		last.RemediatesEvidenceRevision == verify.EvidenceRevision &&
 		last.EvidenceRevision != "" && last.EvidenceRevision == runtimeStatus.EvidenceRevision
 }
@@ -735,7 +735,9 @@ func applyNativeRuntimeErrorRouting(status *Status, runtimeErr error) {
 // acquire checks. Blocking here stopped the one caller that was entitled to
 // proceed, and every caller reaches acquire before launching anyway.
 //
-// A maintainer decision has no self-service exit, so it stays a hard stop.
+// Genuine objective/candidate mismatches have no safe implicit scope change,
+// so they remain hard stops. Accounting-only DecisionRequired projections are
+// ignored by runtimeReadiness and never reach this router.
 func applyNativeRuntimeRouting(status *Status) {
 	if status == nil || status.RuntimeStatus == nil {
 		return
@@ -1841,11 +1843,11 @@ func renderPhaseInstructions(status Status) PhaseInstructions {
 func nativeRuntimeInstructions(status Status, change string) []string {
 	workspace := status.ActionContext.WorkspaceRoot
 	instructions := []string{
-		fmt.Sprintf("Before any runtime-bearing apply, verify, or remediation launch, run `gentle-ai sdd-attempt acquire --cwd %s --change %q --request-id \"<unique-request-id>\" --work-unit \"<label>\" --evidence-goal \"<stable-goal>\" --max-attempts <count>`.", pathquote.Quote(workspace), change),
-		"Launch only for state proceed and retain its opaque token. State blocked or complete stops the launch; full runtime status is a diagnostic escape hatch, not normal model context.",
+		fmt.Sprintf("Before any runtime-bearing apply, verify, or remediation launch, run `gentle-ai sdd-attempt acquire --cwd %s --change %q --request-id \"<unique-request-id>\" --work-unit \"<label>\" --evidence-goal \"<stable-goal>\"`.", pathquote.Quote(workspace), change),
+		"Launch only for state proceed and retain its opaque token. State blocked identifies an integrity, ownership, binding, or continuation problem with no safe automatic recovery; state complete is terminal.",
 		fmt.Sprintf("After a failed or passed run, call `gentle-ai sdd-attempt settle --cwd %s --change %q --token \"<acquire-token>\" --request-id \"<unique-request-id>\" --outcome <passed|failed> --evidence-revision <sha256> --diagnosis \"<proven-diagnosis>\" --harness-disposition <reused|invalidated> --cleanup-evidence \"<evidence>\" --process-evidence \"<evidence>\"`.", pathquote.Quote(workspace), change),
 		fmt.Sprintf("After an interrupted run, call `gentle-ai sdd-attempt settle --cwd %s --change %q --token \"<acquire-token>\" --request-id \"<unique-request-id>\" --outcome interrupted --diagnosis \"<proven-diagnosis>\" --harness-disposition <reused|invalidated> --cleanup-evidence \"<evidence>\" --process-evidence \"<evidence>\"` and omit --evidence-revision.", pathquote.Quote(workspace), change),
-		"Treat settle state proceed as permission for another bounded acquire, blocked as a hard stop, and complete as terminal. Reset is exceptional, requires an explicit maintainer scope decision, and is never automatic.",
+		"Treat settle state proceed as permission for another diagnosed acquire, blocked as a genuine safety or integrity stop, and complete as terminal. After failure, preserve the bounded evidence, change strategy when evidence repeats, and retry without asking a human to reset accounting.",
 	}
 	if status.RemediationState.Required && status.RuntimeStatus != nil && status.RuntimeStatus.Objective != nil {
 		evidence, found := runtimeChainFailedEvidence(status.RuntimeStatus.Attempts)
@@ -1856,7 +1858,7 @@ func nativeRuntimeInstructions(status Status, change string) []string {
 				changedLineArgument = fmt.Sprintf(" --max-changed-lines %d", objective.MaxChangedLines)
 			}
 			instructions = append(instructions,
-				fmt.Sprintf("For failed SDD evidence %s, run `gentle-ai sdd-attempt acquire --cwd %s --change %q --request-id \"<unique-request-id>\" --work-unit %q --evidence-goal %q --max-attempts %d%s --remediates-evidence-revision %s`.", evidence, pathquote.Quote(workspace), change, objective.WorkUnit, objective.EvidenceGoal, objective.MaxAttempts, changedLineArgument, evidence),
+				fmt.Sprintf("For failed SDD evidence %s, run `gentle-ai sdd-attempt acquire --cwd %s --change %q --request-id \"<unique-request-id>\" --work-unit %q --evidence-goal %q%s --remediates-evidence-revision %s`.", evidence, pathquote.Quote(workspace), change, objective.WorkUnit, objective.EvidenceGoal, changedLineArgument, evidence),
 				fmt.Sprintf("After the candidate changes, settle that token with `--remediates-evidence-revision %s`; fresh independent verification is required before archive.", evidence),
 			)
 		}

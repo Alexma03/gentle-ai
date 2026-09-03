@@ -37,7 +37,7 @@ func TestResolveEmbedsAndRoutesNativeRuntimeAuthority(t *testing.T) {
 		}
 	})
 
-	t.Run("decision required blocks execution until explicit reset", func(t *testing.T) {
+	t.Run("accounting exhaustion remains retryable without reset", func(t *testing.T) {
 		repo := initRuntimeLedgerRepo(t)
 		seedReadyChange(t, repo, "exhausted-runtime", "- [ ] 1.1 Work\n")
 		store := mustRuntimeStore(t, repo, "exhausted-runtime")
@@ -57,8 +57,8 @@ func TestResolveEmbedsAndRoutesNativeRuntimeAuthority(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !exhausted.DecisionRequired {
-			t.Fatalf("runtime status = %#v, want decision_required", exhausted)
+		if exhausted.DecisionRequired || exhausted.NextAction != RuntimeActionBegin {
+			t.Fatalf("runtime status = %#v, want retryable begin", exhausted)
 		}
 
 		status, err := Resolve(ResolveOptions{CWD: repo, ChangeName: "exhausted-runtime", IncludeInstructions: true})
@@ -66,7 +66,12 @@ func TestResolveEmbedsAndRoutesNativeRuntimeAuthority(t *testing.T) {
 			t.Fatal(err)
 		}
 		assertRuntimeStatusRevision(t, status, exhausted.Revision)
-		assertRuntimeContinuationBlocked(t, status, "blocked(maintainer_decision)")
+		if status.NextRecommended == "resolve-blockers" || status.Dependencies.Apply != DependencyReady {
+			t.Fatalf("accounting telemetry blocked status routing: next=%q dependencies=%#v", status.NextRecommended, status.Dependencies)
+		}
+		if instructions := strings.Join(status.PhaseInstructions.Apply, "\n"); !strings.Contains(instructions, "gentle-ai sdd-attempt acquire") {
+			t.Fatalf("retry instructions omit acquire:\n%s", instructions)
+		}
 	})
 
 	t.Run("completed objective remains visible without blocking phase progress", func(t *testing.T) {

@@ -10,8 +10,7 @@ import (
 // #2564 status truthfulness, reconciled with #2565's chain-derived binding:
 // the bounded correction prescription renders whenever the immutable attempt
 // chain holds unremediated failed evidence (naming the chain's evidence, and
-// surviving an audited reset), the decision-required state renders the
-// audited reset route, and only a chain with nothing left to remediate
+// surviving an optional explicit reset), and only a chain with nothing left to remediate
 // renders the fresh-verification route.
 
 // seedUnmanagedFailedVerification drives the shared fixture: the disabled
@@ -49,8 +48,8 @@ func TestStatusKeepsPrescribingChainBoundRemediationAfterReset(t *testing.T) {
 	const change = "post-reset-advice"
 	repo := initRuntimeLedgerRepo(t)
 	store, failedEvidence, failed := seedUnmanagedFailedVerification(t, repo, change, 1)
-	if !failed.DecisionRequired {
-		t.Fatalf("exhausted failed verification did not require a decision: %#v", failed)
+	if failed.DecisionRequired || failed.NextAction != RuntimeActionBegin {
+		t.Fatalf("failed verification did not remain retryable: %#v", failed)
 	}
 	reset, err := store.Reset(context.Background(), ResetObjectiveRequest{
 		ExpectedRevision: failed.Revision, RequestID: change + "-reset",
@@ -78,29 +77,25 @@ func TestStatusKeepsPrescribingChainBoundRemediationAfterReset(t *testing.T) {
 	}
 }
 
-// TestStatusRendersResetRouteWhileRemediationNeedsADecision covers the wedge
-// every #1974 occurrence reported: failed evidence with an exhausted budget is
-// decision-required, so an immediate correction acquire would return
-// blocked/maintainer_decision. Status renders the audited reset route with
-// the exact current revision, and names the chain binding the post-reset
-// acquire must declare.
-func TestStatusRendersResetRouteWhileRemediationNeedsADecision(t *testing.T) {
+// TestStatusRendersDirectRemediationWithoutAccountingConsent verifies that
+// failed evidence remains directly remediable at an accounting ceiling.
+func TestStatusRendersDirectRemediationWithoutAccountingConsent(t *testing.T) {
 	const change = "decision-required-advice"
 	repo := initRuntimeLedgerRepo(t)
 	_, failedEvidence, failed := seedUnmanagedFailedVerification(t, repo, change, 1)
-	if !failed.DecisionRequired {
-		t.Fatalf("exhausted failed verification did not require a decision: %#v", failed)
+	if failed.DecisionRequired || failed.NextAction != RuntimeActionBegin {
+		t.Fatalf("failed verification did not remain retryable: %#v", failed)
 	}
 
 	_, joined := resolveDisabledRemediationInstructions(t, repo, change)
 	if strings.Contains(joined, "bounded correction attempt: run") {
-		t.Fatalf("decision-required status still prescribes the blocked correction acquire:\n%s", joined)
+		t.Fatalf("retryable status unexpectedly used obsolete correction wording:\n%s", joined)
 	}
 	if !strings.Contains(joined, "Remediation follows ordinary SDD failed-evidence accounting.") || strings.Contains(joined, "sdd-attempt reset") {
-		t.Fatalf("decision-required status did not keep remediation authority-free:\n%s", joined)
+		t.Fatalf("retryable status did not keep remediation authority-free:\n%s", joined)
 	}
 	if !strings.Contains(joined, "--remediates-evidence-revision "+failedEvidence) {
-		t.Fatalf("decision-required status does not name the chain binding for the post-reset acquire:\n%s", joined)
+		t.Fatalf("retryable status does not name the chain binding:\n%s", joined)
 	}
 }
 

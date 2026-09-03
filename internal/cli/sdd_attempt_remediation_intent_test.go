@@ -35,8 +35,8 @@ func TestRunSDDAttemptAcquireRemediationIntentFailsFastAfterReset(t *testing.T) 
 		"--diagnosis", "independent verification found a correctable defect", "--harness-disposition", "reused",
 		"--cleanup-evidence", "process group exited", "--process-evidence", "no descendants remained",
 	})
-	if settled.State != "blocked" || settled.Reason != "maintainer_decision" {
-		t.Fatalf("exhausting failed settle = %#v", settled)
+	if settled.State != "proceed" || settled.Reason != "" {
+		t.Fatalf("failed settle did not remain retryable = %#v", settled)
 	}
 
 	var legacy bytes.Buffer
