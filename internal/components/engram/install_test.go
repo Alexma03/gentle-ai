@@ -7,56 +7,12 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
 )
 
-func TestInstallCommandByProfile(t *testing.T) {
-	tests := []struct {
-		name    string
-		profile system.PlatformProfile
-		want    [][]string
-		wantErr bool
-	}{
-		{
-			name:    "darwin uses brew tap and install",
-			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
-			want:    [][]string{{"brew", "tap", "Gentleman-Programming/homebrew-tap"}, {"brew", "install", "engram"}},
-		},
-		// Linux and Windows now use DownloadLatestBinary() — InstallCommand returns an error
-		// to signal that callers must use the direct download path instead.
-		{
-			name:    "ubuntu returns error (uses DownloadLatestBinary instead of go install)",
-			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
-			wantErr: true,
-		},
-		{
-			name:    "arch returns error (uses DownloadLatestBinary instead of go install)",
-			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
-			wantErr: true,
-		},
-		{
-			name:    "fedora returns error (uses DownloadLatestBinary instead of go install)",
-			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroFedora, PackageManager: "dnf"},
-			wantErr: true,
-		},
-		{
-			name:    "unsupported package manager returns error",
-			profile: system.PlatformProfile{OS: "linux", PackageManager: "zypper"},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			command, err := InstallCommand(tt.profile)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("InstallCommand() error = %v, wantErr %v", err, tt.wantErr)
-			}
-
-			if tt.wantErr {
-				return
-			}
-
-			if !reflect.DeepEqual(command, tt.want) {
-				t.Fatalf("InstallCommand() = %v, want %v", command, tt.want)
-			}
-		})
+func TestInstallCommandUsesV2MainOnEveryPlatform(t *testing.T) {
+	want := [][]string{{"go", "install", "github.com/Gentleman-Programming/engram/v2/cmd/engram@main"}}
+	for _, profile := range []system.PlatformProfile{{OS: "linux"}, {OS: "darwin", PackageManager: "brew"}, {OS: "windows"}} {
+		got, err := InstallCommand(profile)
+		if err != nil || !reflect.DeepEqual(got, want) {
+			t.Fatalf("%s command=%v err=%v want=%v", profile.OS, got, err, want)
+		}
 	}
 }

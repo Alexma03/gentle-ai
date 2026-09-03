@@ -877,3 +877,21 @@ func TestEngramBinaryUpgrade_BetaChannelUsesGoInstallMain(t *testing.T) {
 		t.Fatal("expected engramBetaInstallFn (beta path) to be called, but it was not")
 	}
 }
+
+func TestEngramUpgradeMacOSBypassesStableHomebrew(t *testing.T) {
+	origDownload, origOwnership := engramDownloadFn, homebrewOwnershipDetector
+	t.Cleanup(func() { engramDownloadFn, homebrewOwnershipDetector = origDownload, origOwnership })
+	homebrewOwnershipDetector = func(string) (update.HomebrewOwnership, error) {
+		t.Fatal("Engram main update must bypass Homebrew ownership")
+		return update.HomebrewNone, nil
+	}
+	called := false
+	engramDownloadFn = func(system.PlatformProfile) (string, error) { called = true; return "/tmp/engram", nil }
+	r := update.UpdateResult{Tool: update.ToolInfo{Name: "engram", Owner: "Gentleman-Programming", Repo: "engram", InstallMethod: update.InstallBinary}}
+	if _, err := runStrategy(context.Background(), r, system.PlatformProfile{OS: "darwin", PackageManager: "brew"}); err != nil {
+		t.Fatal(err)
+	}
+	if !called {
+		t.Fatal("main-source updater was not called")
+	}
+}

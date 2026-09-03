@@ -6,6 +6,10 @@
 
 Engram works automatically. Your AI agent saves decisions, discoveries, and context to persistent memory without you doing anything. You do not need to memorize commands or manage memory manually.
 
+This fork installs and updates the Engram core CLI from
+`github.com/Gentleman-Programming/engram/v2/cmd/engram@main` on Linux, macOS,
+and Windows. `@main` is a moving source target rather than an immutable release.
+
 This page exists for when you want to inspect, share, or fix your memories by hand.
 
 ---

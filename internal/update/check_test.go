@@ -330,10 +330,10 @@ func TestUsesBetaMainHeadCheck(t *testing.T) {
 			want:           false,
 		},
 		{
-			name:           "other tool pseudo-version still uses latest release",
+			name:           "engram always uses main",
 			tool:           ToolInfo{Name: "engram", Owner: "Gentleman-Programming", Repo: "engram"},
-			currentVersion: "1.40.3-0.20260614211459-b6872c69e3e4",
-			want:           false,
+			currentVersion: "1.15.13",
+			want:           true,
 		},
 	}
 
@@ -858,52 +858,29 @@ func TestResolveGitHubToken_EmptyWhenNoEnvAndNoGh(t *testing.T) {
 
 // --- TestCheckAll ---
 
-func TestCheckSingleTool_EngramUsesBinaryReleaseChannel(t *testing.T) {
+func TestCheckSingleToolEngramNormalChannelProposesMain(t *testing.T) {
 	mockNoHomebrew(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		switch r.URL.Path {
-		case "/repos/Gentleman-Programming/engram/releases":
-			json.NewEncoder(w).Encode([]githubRelease{
-				{TagName: "pi-v0.1.7", HTMLURL: "https://github.com/Gentleman-Programming/engram/releases/tag/pi-v0.1.7"},
-				{TagName: "v1.15.13", HTMLURL: "https://github.com/Gentleman-Programming/engram/releases/tag/v1.15.13"},
-			})
-		default:
-			// Stray or misdirected request: reply 404 and let the test's
-			// main-goroutine assertions decide (see simulateStrayForeignRequest).
-			http.NotFound(w, r)
+		if r.URL.Path == "/repos/Gentleman-Programming/engram/commits/main" {
+			json.NewEncoder(w).Encode(githubCommit{SHA: "972997650b51abcdef", HTMLURL: "https://github.com/Gentleman-Programming/engram/commit/972997650b51abcdef"})
+			return
 		}
+		http.NotFound(w, r)
 	}))
 	defer server.Close()
-
-	origClient := httpClient
-	origLookPath := lookPath
-	origExecCommand := execCommand
-	t.Cleanup(func() {
-		httpClient = origClient
-		lookPath = origLookPath
-		execCommand = origExecCommand
-	})
-
+	origClient, origLookPath, origExecCommand := httpClient, lookPath, execCommand
+	t.Cleanup(func() { httpClient, lookPath, execCommand = origClient, origLookPath, origExecCommand })
 	httpClient = server.Client()
 	httpClient.Transport = &testTransport{server: server}
-	lookPath = func(name string) (string, error) {
-		if name == "engram" {
-			return "/usr/local/bin/engram", nil
-		}
-		return "", fmt.Errorf("not found")
-	}
-	execCommand = func(name string, args ...string) *exec.Cmd {
-		if name == "engram" {
-			return exec.Command("echo", "engram 1.15.13")
-		}
-		return exec.Command("false")
-	}
-
+	lookPath = func(string) (string, error) { return "/usr/local/bin/engram", nil }
+	execCommand = func(string, ...string) *exec.Cmd { return exec.Command("echo", "engram 1.15.13") }
 	result := checkSingleTool(context.Background(), Tools[1], "dev", system.PlatformProfile{OS: "darwin", PackageManager: "brew", Supported: true})
-	assertResult(t, result, "engram", UpToDate, "1.15.13", "1.15.13")
-	if result.ReleaseURL != "https://github.com/Gentleman-Programming/engram/releases/tag/v1.15.13" {
-		t.Fatalf("ReleaseURL = %q, want binary channel release", result.ReleaseURL)
+	if result.Status != UpdateAvailable {
+		t.Fatalf("status=%q want %q", result.Status, UpdateAvailable)
+	}
+	if result.LatestVersion != "main@972997650b51" || !strings.Contains(result.UpdateHint, "engram/v2/cmd/engram@main") {
+		t.Fatalf("latest=%q hint=%q err=%v", result.LatestVersion, result.UpdateHint, result.Err)
 	}
 }
 
@@ -1033,25 +1010,25 @@ func TestUpdateHint(t *testing.T) {
 			tool:          ToolInfo{Name: "engram"},
 			profile:       system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
 			brewInstalled: true,
-			want:          "brew upgrade engram",
+			want:          "go install github.com/Gentleman-Programming/engram/v2/cmd/engram@main",
 		},
 		{
 			name:    "engram macOS non-brew",
 			tool:    ToolInfo{Name: "engram"},
 			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
-			want:    "gentle-ai upgrade (downloads pre-built binary)",
+			want:    "go install github.com/Gentleman-Programming/engram/v2/cmd/engram@main",
 		},
 		{
 			name:    "engram linux",
 			tool:    ToolInfo{Name: "engram"},
 			profile: system.PlatformProfile{OS: "linux", PackageManager: "apt"},
-			want:    "gentle-ai upgrade (downloads pre-built binary)",
+			want:    "go install github.com/Gentleman-Programming/engram/v2/cmd/engram@main",
 		},
 		{
 			name:    "engram windows",
 			tool:    ToolInfo{Name: "engram"},
 			profile: system.PlatformProfile{OS: "windows", PackageManager: "winget"},
-			want:    "gentle-ai upgrade (downloads pre-built binary)",
+			want:    "go install github.com/Gentleman-Programming/engram/v2/cmd/engram@main",
 		},
 		{
 			name:    "unknown tool",
@@ -1241,6 +1218,9 @@ func TestParseVersionFromOutput(t *testing.T) {
 	}{
 		{name: "engram v0.3.2", output: "engram v0.3.2", want: "0.3.2"},
 		{name: "bare version", output: "2.1.0", want: "2.1.0"},
+		{name: "Engram main pseudo-version", output: "engram v2.0.0-20260902153045-abcdef123456", want: "2.0.0-20260902153045-abcdef123456"},
+		{name: "Engram main pseudo-version after tag", output: "engram v2.0.1-0.20260902153045-abcdef123456", want: "2.0.1-0.20260902153045-abcdef123456"},
+		{name: "Engram main pseudo-version after prerelease", output: "engram 2.0.0-rc.4.0.20260903105937-0fbef9c322d8", want: "2.0.0-rc.4.0.20260903105937-0fbef9c322d8"},
 		{name: "no version", output: "no version info here", want: ""},
 		{name: "empty", output: "", want: ""},
 	}
@@ -1518,6 +1498,9 @@ func TestCheckFiltered_DevBuildSkipNotEligible(t *testing.T) {
 		switch {
 		case contains(path, "gentle-ai"):
 			release = githubRelease{TagName: "v9.9.9"}
+		case contains(path, "engram/commits/main"):
+			json.NewEncoder(w).Encode(githubCommit{SHA: "972997650b51abcdef"})
+			return
 		case contains(path, "engram"):
 			release = githubRelease{TagName: "v2.0.0"}
 		default:
@@ -1569,7 +1552,7 @@ func TestCheckFiltered_DevBuildSkipNotEligible(t *testing.T) {
 		t.Fatalf("gentle-ai status = %q, want DevBuild", results[0].Status)
 	}
 
-	// engram should be UpdateAvailable (1.0.0 < 2.0.0)
+	// engram stable versions are offered the selected main source
 	if results[1].Status != UpdateAvailable {
 		t.Fatalf("engram status = %q, want UpdateAvailable", results[1].Status)
 	}
@@ -1585,6 +1568,9 @@ func TestNoUpdatesPath(t *testing.T) {
 		path := r.URL.Path
 		var release githubRelease
 		switch {
+		case contains(path, "engram/commits/main"):
+			json.NewEncoder(w).Encode(githubCommit{SHA: "972997650b51abcdef"})
+			return
 		case contains(path, "engram"):
 			release = githubRelease{TagName: "v0.3.2"}
 		default:
@@ -1631,9 +1617,9 @@ func TestNoUpdatesPath(t *testing.T) {
 		t.Fatalf("len = %d, want 1", len(results))
 	}
 
-	// engram: up to date
-	if results[0].Status != UpToDate {
-		t.Fatalf("engram status = %q, want UpToDate", results[0].Status)
+	// A stable version is outside the selected main source.
+	if results[0].Status != UpdateAvailable {
+		t.Fatalf("engram status = %q, want UpdateAvailable", results[0].Status)
 	}
 
 }
@@ -1643,7 +1629,7 @@ func TestNoUpdatesPath(t *testing.T) {
 // TestEngramHintNoBrew verifies that on non-brew platforms, engramHint
 // no longer returns "go install..." — it should reflect binary download.
 // This is the regression test for issue #160.
-func TestEngramHintNoBrew(t *testing.T) {
+func TestEngramHintUsesV2Main(t *testing.T) {
 	tests := []struct {
 		name    string
 		profile system.PlatformProfile
@@ -1663,14 +1649,9 @@ func TestEngramHintNoBrew(t *testing.T) {
 			tool := ToolInfo{Name: "engram"}
 			got := updateHint(tool, tc.profile)
 
-			// Must NOT contain "go install".
-			if contains(got, "go install") {
-				t.Errorf("engramHint for non-brew should NOT contain 'go install', got %q", got)
-			}
-
-			// Must NOT be empty (should have some actionable hint).
-			if got == "" {
-				t.Errorf("engramHint for non-brew should not be empty")
+			want := "go install github.com/Gentleman-Programming/engram/v2/cmd/engram@main"
+			if got != want {
+				t.Errorf("engramHint = %q, want %q", got, want)
 			}
 		})
 	}
@@ -1812,4 +1793,12 @@ func mockCmd(name string, args ...string) *exec.Cmd {
 		}
 	}
 	return exec.Command(name, args...)
+}
+
+func TestEngramNormalChannelUsesMainHead(t *testing.T) {
+	t.Setenv("GENTLE_AI_CHANNEL", "stable")
+	tool := ToolInfo{Name: "engram", Owner: "Gentleman-Programming", Repo: "engram"}
+	if !usesBetaMainHeadCheck(tool, "1.15.13") {
+		t.Fatal("Engram normal channel must propose upstream main, not the stable release")
+	}
 }

@@ -146,9 +146,13 @@ If Homebrew refuses an upgrade from an untrusted tap, trust only the artifact Ho
 brew trust --formula gentleman-programming/tap/gentle-ai
 brew upgrade gentle-ai
 
-# Cask tools, for example engram
-brew trust --cask gentleman-programming/tap/engram
-brew upgrade engram
+```
+
+Engram core is installed and updated from v2 `main` on every supported
+platform, including macOS:
+
+```bash
+go install github.com/Gentleman-Programming/engram/v2/cmd/engram@main
 ```
 
 If you choose to install several tools from this tap, run `brew trust gentleman-programming/tap` instead. This broader option trusts all current and future formulas, casks, and external commands published in the tap.

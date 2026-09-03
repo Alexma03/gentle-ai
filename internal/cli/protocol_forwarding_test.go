@@ -9,7 +9,25 @@ import (
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/components/engram"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
 )
+
+func stubEngramMainInstallForProtocolTest(t *testing.T, binaryPath string) {
+	t.Helper()
+	origDownload := engramDownloadFn
+	origVerifyCommand := verifyEngramVersionCommand
+	origProbeCommand := probeEngramProtocolFlagCommand
+	engramDownloadFn = func(system.PlatformProfile) (string, error) { return binaryPath, nil }
+	verifyEngramVersionCommand = func(string) (string, error) { return verifyEngramVersion() }
+	probeEngramProtocolFlagCommand = func(ctx context.Context, _ string) (string, error) {
+		return probeEngramProtocolFlag(ctx)
+	}
+	t.Cleanup(func() {
+		engramDownloadFn = origDownload
+		verifyEngramVersionCommand = origVerifyCommand
+		probeEngramProtocolFlagCommand = origProbeCommand
+	})
+}
 
 // ---------------------------------------------------------------------------
 // Task 2.4 GREEN evidence: InjectOptions.Version threading from
@@ -19,6 +37,7 @@ import (
 
 func TestRunInstallThreadsEngramVersionIntoClaudeSlimSelection(t *testing.T) {
 	home := t.TempDir()
+	stubEngramMainInstallForProtocolTest(t, filepath.Join(home, "go", "bin", "engram"))
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
 	restoreLookPath := cmdLookPath
@@ -63,6 +82,7 @@ func TestRunInstallThreadsEngramVersionIntoClaudeSlimSelection(t *testing.T) {
 
 func TestRunInstallBelowFloorVersionKeepsClaudeFullSelection(t *testing.T) {
 	home := t.TempDir()
+	stubEngramMainInstallForProtocolTest(t, filepath.Join(home, "go", "bin", "engram"))
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
 	restoreLookPath := cmdLookPath
@@ -109,6 +129,8 @@ func TestRunInstallBelowFloorVersionKeepsClaudeFullSelection(t *testing.T) {
 
 func TestRunInstallForwardsProtocolSlimForClaudeCodeWhenSupported(t *testing.T) {
 	home := t.TempDir()
+	mainBinary := filepath.Join(home, "go", "bin", "engram")
+	stubEngramMainInstallForProtocolTest(t, mainBinary)
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
 	restoreLookPath := cmdLookPath
@@ -147,7 +169,7 @@ func TestRunInstallForwardsProtocolSlimForClaudeCodeWhenSupported(t *testing.T) 
 
 	found := false
 	for _, cmd := range recorder.get() {
-		if cmd == "engram setup claude-code --protocol=slim" {
+		if cmd == mainBinary+" setup claude-code --protocol=slim" {
 			found = true
 			break
 		}
@@ -159,6 +181,8 @@ func TestRunInstallForwardsProtocolSlimForClaudeCodeWhenSupported(t *testing.T) 
 
 func TestRunInstallOmitsProtocolFlagWhenProbeFails(t *testing.T) {
 	home := t.TempDir()
+	mainBinary := filepath.Join(home, "go", "bin", "engram")
+	stubEngramMainInstallForProtocolTest(t, mainBinary)
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
 	restoreLookPath := cmdLookPath
@@ -202,7 +226,7 @@ func TestRunInstallOmitsProtocolFlagWhenProbeFails(t *testing.T) {
 	}
 	found := false
 	for _, cmd := range recorder.get() {
-		if cmd == "engram setup claude-code" {
+		if cmd == mainBinary+" setup claude-code" {
 			found = true
 		}
 	}
@@ -222,6 +246,7 @@ func TestRunInstallSkipsProtocolProbeWhenSetupModeOff(t *testing.T) {
 	t.Setenv(engram.SetupModeEnvVar, "off")
 
 	home := t.TempDir()
+	stubEngramMainInstallForProtocolTest(t, filepath.Join(home, "go", "bin", "engram"))
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
 	restoreLookPath := cmdLookPath
@@ -275,6 +300,7 @@ func TestRunInstallSkipsProtocolProbeWhenSetupModeOff(t *testing.T) {
 // not just the cli-level wrapper var.
 func TestRunInstallShellsOutEngramVersionOnlyOnce(t *testing.T) {
 	home := t.TempDir()
+	stubEngramMainInstallForProtocolTest(t, filepath.Join(home, "go", "bin", "engram"))
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
 	restoreLookPath := cmdLookPath

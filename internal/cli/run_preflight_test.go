@@ -83,6 +83,29 @@ func TestCheckDependenciesStepDoesNotBlockClaudeCodeOnMissingNpm(t *testing.T) {
 	}
 }
 
+func TestCheckDependenciesStepFailsBeforeEngramComponentWhenGoIsTooOld(t *testing.T) {
+	restoreLookPath := installcmd.OverrideLookPath(func(string) (string, error) { return "/usr/bin/go", nil })
+	restoreGoVersion := installcmd.OverrideGoVersion(func() ([]byte, error) {
+		return []byte("go version go1.25.9 linux/amd64"), nil
+	})
+	t.Cleanup(restoreLookPath)
+	t.Cleanup(restoreGoVersion)
+
+	step := checkDependenciesStep{
+		id:      "prepare:check-dependencies",
+		profile: system.PlatformProfile{OS: "linux", PackageManager: "apt", Supported: true},
+		selection: model.Selection{
+			Agents:     []model.AgentID{model.AgentClaudeCode},
+			Components: []model.ComponentID{model.ComponentEngram},
+		},
+	}
+
+	err := step.Run()
+	if err == nil || !strings.Contains(err.Error(), "Go 1.25.10+") {
+		t.Fatalf("checkDependenciesStep.Run() error = %v, want early Engram Go preflight failure", err)
+	}
+}
+
 // TestCheckDependenciesStepFailsWhenNpmMissingForPi verifies that selecting Pi with
 // npm absent produces a clear, actionable Node.js / npm error before any npm command
 // runs. Pi's install always runs engramInitCommand(), which falls through to

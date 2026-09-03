@@ -2,9 +2,9 @@ package installcmd
 
 import (
 	"fmt"
+	goversion "go/version"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
@@ -154,37 +154,32 @@ func (profileResolver) ResolveDependencyInstall(profile system.PlatformProfile, 
 	}
 }
 
-// validateGoForModuleInstall checks that Go ≥1.24 is installed and GO111MODULE is not
+// validateGoForModuleInstall checks that Go >=1.25.10 is installed and GO111MODULE is not
 // disabled before attempting `go install`. Returns an actionable error if any check fails.
 // MUST NOT be called for brew-based installs (brew manages Go transitively).
 func validateGoForModuleInstall(profile system.PlatformProfile) error {
 	if _, err := cmdLookPath("go"); err != nil {
 		return fmt.Errorf(
-			"Go 1.24+ is required to install Engram but was not found in PATH.\n" +
+			"Go 1.25.10+ is required to install Engram but was not found in PATH.\n" +
 				"Please install Go from https://go.dev/dl/ and restart your terminal.")
 	}
 
 	out, err := cmdGoVersion()
 	if err != nil {
 		return fmt.Errorf(
-			"Go 1.24+ is required but could not verify the installed version.\n" +
+			"Go 1.25.10+ is required but could not verify the installed version.\n" +
 				"Please ensure Go is properly installed: https://go.dev/dl/")
 	}
 
-	// Parse "go version go1.XX.Y platform/arch"
+	// Parse "go version go1.XX.Y platform/arch" and enforce the patch floor.
 	parts := strings.Fields(string(out))
-	if len(parts) >= 3 {
-		versionStr := strings.TrimPrefix(parts[2], "go")
-		versionParts := strings.SplitN(versionStr, ".", 3)
-		if len(versionParts) >= 2 {
-			major, _ := strconv.Atoi(versionParts[0])
-			minor, _ := strconv.Atoi(versionParts[1])
-			if major < 1 || (major == 1 && minor < 24) {
-				return fmt.Errorf(
-					"Go 1.24+ is required to install Engram, but found go%s.\n"+
-						"Please update Go: https://go.dev/dl/", versionStr)
-			}
-		}
+	if len(parts) < 3 || !goversion.IsValid(parts[2]) {
+		return fmt.Errorf("Go 1.25.10+ is required but the installed version could not be parsed.\nPlease update Go: https://go.dev/dl/")
+	}
+	if goversion.Compare(parts[2], "go1.25.10") < 0 {
+		return fmt.Errorf(
+			"Go 1.25.10+ is required to install Engram, but found %s.\n"+
+				"Please update Go: https://go.dev/dl/", parts[2])
 	}
 
 	if osGetenv("GO111MODULE") == "off" {
@@ -198,13 +193,17 @@ func validateGoForModuleInstall(profile system.PlatformProfile) error {
 	return nil
 }
 
-// resolveEngramInstall returns the correct install command sequence for Engram per platform.
-// - darwin (brew): brew tap + brew install (via Gentleman-Programming/homebrew-tap)
-// - linux/windows: returns an error — callers must use engram.DownloadLatestBinary() instead.
-//
-// The go install method has been removed because it required Go 1.24+ which most
-// users on Linux/Windows don't have. Pre-built binaries are available at:
-// https://github.com/Gentleman-Programming/engram/releases
+// ValidateComponentInstallPreflight validates prerequisites for components
+// that execute installation commands during the apply stage.
+func ValidateComponentInstallPreflight(profile system.PlatformProfile, component model.ComponentID) error {
+	if component == model.ComponentEngram {
+		return validateGoForModuleInstall(profile)
+	}
+	return nil
+}
+
+// resolveEngramInstall retains the legacy stable command sequence for API
+// compatibility. The active Engram component path installs v2 @main directly.
 func resolveEngramInstall(profile system.PlatformProfile) (CommandSequence, error) {
 	switch profile.PackageManager {
 	case "brew":

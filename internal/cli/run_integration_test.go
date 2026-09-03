@@ -21,11 +21,16 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
 )
 
-// missingBinaryLookPath simulates installable binaries (engram) as
-// missing. Go availability is no longer required for engram installation
-// (pre-built binaries are downloaded directly from GitHub Releases).
+// missingBinaryLookPath simulates installable binaries as missing.
 func missingBinaryLookPath(name string) (string, error) {
 	return "", exec.ErrNotFound
+}
+
+func stubEngramDownloadForIntegrationTest(t *testing.T, binaryPath string) {
+	t.Helper()
+	original := engramDownloadFn
+	engramDownloadFn = func(system.PlatformProfile) (string, error) { return binaryPath, nil }
+	t.Cleanup(func() { engramDownloadFn = original })
 }
 
 func assertFileContains(t *testing.T, path string, want string) {
@@ -215,6 +220,7 @@ func TestRunInstallReturnsStatePersistenceFailure(t *testing.T) {
 func TestRunInstallEngramForPiAndClaudeProvisionsBothMCPTargets(t *testing.T) {
 	stubCanonicalPiSubagentsRPC(t)
 	home := t.TempDir()
+	stubEngramDownloadForIntegrationTest(t, filepath.Join(home, "go", "bin", "engram"))
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
 	restoreLookPath := cmdLookPath
@@ -434,11 +440,11 @@ func TestRunInstallRollsBackOnComponentFailure(t *testing.T) {
 
 	osUserHomeDir = func() (string, error) { return home, nil }
 	runCommand = func(name string, args ...string) error {
-		if name == "brew" && len(args) == 2 && args[0] == "install" && args[1] == "engram" {
-			return os.ErrPermission
-		}
 		return nil
 	}
+	origDownloadFn := engramDownloadFn
+	engramDownloadFn = func(system.PlatformProfile) (string, error) { return "", os.ErrPermission }
+	t.Cleanup(func() { engramDownloadFn = origDownloadFn })
 
 	// Use only engram (not context7) — context7 injects MCP config into
 	// the settings file and does not have a rollback step, so including it
@@ -900,7 +906,7 @@ func macOSDetectionResult() system.DetectionResult {
 	}
 }
 
-func TestRunInstallMacOSStillResolvesBrewCommands(t *testing.T) {
+func TestRunInstallMacOSUsesMainSourceInstaller(t *testing.T) {
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
@@ -915,6 +921,14 @@ func TestRunInstallMacOSStillResolvesBrewCommands(t *testing.T) {
 	cmdLookPath = missingBinaryLookPath
 	recorder := &commandRecorder{}
 	runCommand = recorder.record
+	mainBinary := filepath.Join(home, "go", "bin", "engram")
+	installCalled := false
+	origDownloadFn := engramDownloadFn
+	engramDownloadFn = func(system.PlatformProfile) (string, error) {
+		installCalled = true
+		return mainBinary, nil
+	}
+	t.Cleanup(func() { engramDownloadFn = origDownloadFn })
 
 	detection := macOSDetectionResult()
 	result, err := RunInstall(
@@ -929,17 +943,13 @@ func TestRunInstallMacOSStillResolvesBrewCommands(t *testing.T) {
 		t.Fatalf("macOS verification ready = false")
 	}
 
-	// Verify brew install command was used, not apt or pacman.
-	commands := recorder.get()
-	foundBrew := false
-	for _, cmd := range commands {
-		if strings.Contains(cmd, "brew install engram") {
-			foundBrew = true
-			break
-		}
+	if !installCalled {
+		t.Fatal("expected macOS Engram installation to use the v2 main source seam")
 	}
-	if !foundBrew {
-		t.Fatalf("expected brew install for macOS engram, got commands: %v", commands)
+	for _, cmd := range recorder.get() {
+		if strings.Contains(cmd, "brew install engram") {
+			t.Fatalf("macOS must not install stable Homebrew Engram, commands: %v", recorder.get())
+		}
 	}
 }
 
@@ -1017,11 +1027,11 @@ func TestRunInstallMacOSRollbackStillWorks(t *testing.T) {
 
 	osUserHomeDir = func() (string, error) { return home, nil }
 	runCommand = func(name string, args ...string) error {
-		if name == "brew" && len(args) == 2 && args[0] == "install" && args[1] == "engram" {
-			return os.ErrPermission
-		}
 		return nil
 	}
+	origDownloadFn := engramDownloadFn
+	engramDownloadFn = func(system.PlatformProfile) (string, error) { return "", os.ErrPermission }
+	t.Cleanup(func() { engramDownloadFn = origDownloadFn })
 
 	detection := macOSDetectionResult()
 	// Exclude context7 — it has no rollback and taints the settings file.
@@ -1049,8 +1059,12 @@ func TestRunInstallMacOSRollbackStillWorks(t *testing.T) {
 
 // --- Skip-when-installed and Go auto-install tests ---
 
-func TestRunInstallEngramSkipsInstallWhenAlreadyOnPath(t *testing.T) {
+func TestRunInstallEngramReinstallsMainWhenStableBinaryAlreadyOnPath(t *testing.T) {
 	home := t.TempDir()
+	registryPath := filepath.Join(home, ".claude.json")
+	if err := os.WriteFile(registryPath, []byte(`{"mcpServers":{"engram":{"command":"/opt/homebrew/bin/engram","args":["mcp","--tools=agent"]}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
 	restoreLookPath := cmdLookPath
@@ -1067,6 +1081,10 @@ func TestRunInstallEngramSkipsInstallWhenAlreadyOnPath(t *testing.T) {
 	}
 	recorder := &commandRecorder{}
 	runCommand = recorder.record
+	mainBinary := filepath.Join(home, "go", "bin", "engram")
+	origDownloadFn := engramDownloadFn
+	engramDownloadFn = func(system.PlatformProfile) (string, error) { return mainBinary, nil }
+	t.Cleanup(func() { engramDownloadFn = origDownloadFn })
 
 	detection := macOSDetectionResult()
 	result, err := RunInstall(
@@ -1081,11 +1099,22 @@ func TestRunInstallEngramSkipsInstallWhenAlreadyOnPath(t *testing.T) {
 		t.Fatalf("verification ready = false")
 	}
 
-	// No brew/go install commands should have been recorded — only agent install.
-	for _, cmd := range recorder.get() {
-		if strings.Contains(cmd, "brew install engram") || (strings.Contains(cmd, "go install") && strings.Contains(cmd, "engram")) {
-			t.Fatalf("expected engram install to be skipped, but got command: %s", cmd)
+	commands := recorder.get()
+	foundSetup := false
+	for _, cmd := range commands {
+		if strings.HasPrefix(cmd, mainBinary+" setup ") {
+			foundSetup = true
 		}
+	}
+	if !foundSetup {
+		t.Fatalf("existing stable Engram must converge through main installer path %q, commands: %v", mainBinary, commands)
+	}
+	registry, err := os.ReadFile(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(registry), mainBinary) {
+		t.Fatalf("managed MCP command must use installed main binary %q, registry:\n%s", mainBinary, registry)
 	}
 }
 
@@ -1106,6 +1135,10 @@ func TestRunInstallEngramAttemptsClaudeSetupWhenBinaryPresent(t *testing.T) {
 	}
 	recorder := &commandRecorder{}
 	runCommand = recorder.record
+	mainBinary := filepath.Join(home, "go", "bin", "engram")
+	origDownloadFn := engramDownloadFn
+	engramDownloadFn = func(system.PlatformProfile) (string, error) { return mainBinary, nil }
+	t.Cleanup(func() { engramDownloadFn = origDownloadFn })
 
 	result, err := RunInstall(
 		[]string{"--agent", "claude-code", "--component", "engram"},
@@ -1121,7 +1154,7 @@ func TestRunInstallEngramAttemptsClaudeSetupWhenBinaryPresent(t *testing.T) {
 	commands := recorder.get()
 	foundSetup := false
 	for _, cmd := range commands {
-		if strings.Contains(cmd, "engram setup claude-code") {
+		if strings.Contains(cmd, mainBinary+" setup claude-code") {
 			foundSetup = true
 			break
 		}
@@ -1133,6 +1166,8 @@ func TestRunInstallEngramAttemptsClaudeSetupWhenBinaryPresent(t *testing.T) {
 
 func TestRunInstallEngramFallsBackToInjectWhenSetupFails(t *testing.T) {
 	home := t.TempDir()
+	mainBinary := filepath.Join(home, "go", "bin", "engram")
+	stubEngramDownloadForIntegrationTest(t, mainBinary)
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
 	restoreLookPath := cmdLookPath
@@ -1147,7 +1182,7 @@ func TestRunInstallEngramFallsBackToInjectWhenSetupFails(t *testing.T) {
 		return "/usr/local/bin/" + name, nil
 	}
 	runCommand = func(name string, args ...string) error {
-		if name == "engram" && len(args) >= 2 && args[0] == "setup" && args[1] == "claude-code" {
+		if name == mainBinary && len(args) >= 2 && args[0] == "setup" && args[1] == "claude-code" {
 			return errors.New("setup failed")
 		}
 		return nil
@@ -1191,8 +1226,12 @@ func TestRunInstallEngramSetupStrictFailsWhenSetupFails(t *testing.T) {
 	cmdLookPath = func(name string) (string, error) {
 		return "/usr/local/bin/" + name, nil
 	}
+	mainBinary := filepath.Join(home, "go", "bin", "engram")
+	origDownloadFn := engramDownloadFn
+	engramDownloadFn = func(system.PlatformProfile) (string, error) { return mainBinary, nil }
+	t.Cleanup(func() { engramDownloadFn = origDownloadFn })
 	runCommand = func(name string, args ...string) error {
-		if name == "engram" && len(args) >= 2 && args[0] == "setup" && args[1] == "claude-code" {
+		if name == mainBinary && len(args) >= 2 && args[0] == "setup" && args[1] == "claude-code" {
 			return errors.New("setup failed")
 		}
 		return nil
@@ -1212,6 +1251,8 @@ func TestRunInstallEngramSetupStrictFailsWhenSetupFails(t *testing.T) {
 
 func TestRunInstallEngramDefaultModeAttemptsClaudeSetup(t *testing.T) {
 	home := t.TempDir()
+	mainBinary := filepath.Join(home, "go", "bin", "engram")
+	stubEngramDownloadForIntegrationTest(t, mainBinary)
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
 	restoreLookPath := cmdLookPath
@@ -1242,7 +1283,7 @@ func TestRunInstallEngramDefaultModeAttemptsClaudeSetup(t *testing.T) {
 	commands := recorder.get()
 	foundSetup := false
 	for _, cmd := range commands {
-		if strings.Contains(cmd, "engram setup claude-code") {
+		if strings.Contains(cmd, mainBinary+" setup claude-code") {
 			foundSetup = true
 			break
 		}
@@ -1254,6 +1295,7 @@ func TestRunInstallEngramDefaultModeAttemptsClaudeSetup(t *testing.T) {
 
 func TestRunInstallAntigravityInitializesCLISettings(t *testing.T) {
 	home := t.TempDir()
+	stubEngramDownloadForIntegrationTest(t, filepath.Join(home, "go", "bin", "engram"))
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
 	restoreLookPath := cmdLookPath
@@ -1298,9 +1340,7 @@ func TestRunInstallAntigravityInitializesCLISettings(t *testing.T) {
 	}
 }
 
-// TestRunInstallEngramLinuxUsesDirectDownloadNoGoRequired verifies that on Linux,
-// engram is now installed via pre-built binary download — Go is NOT required.
-func TestRunInstallEngramLinuxUsesDirectDownloadNoGoRequired(t *testing.T) {
+func TestRunInstallEngramLinuxRequiresGoBeforeSourceInstall(t *testing.T) {
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
@@ -1312,47 +1352,40 @@ func TestRunInstallEngramLinuxUsesDirectDownloadNoGoRequired(t *testing.T) {
 	})
 
 	osUserHomeDir = func() (string, error) { return home, nil }
-	// Simulate: engram missing, Go also NOT available — should still succeed.
+	// The CLI's binary lookup is unrelated to the component preflight seam.
 	cmdLookPath = func(string) (string, error) {
 		return "", exec.ErrNotFound
 	}
+	restorePreflight := installcmd.OverrideLookPath(func(string) (string, error) {
+		return "", exec.ErrNotFound
+	})
+	t.Cleanup(restorePreflight)
 	recorder := &commandRecorder{}
 	runCommand = recorder.record
 
-	// Override download to succeed without hitting GitHub.
+	installCalled := false
 	origDownloadFn := engramDownloadFn
 	engramDownloadFn = func(profile system.PlatformProfile) (string, error) {
+		installCalled = true
 		return "/tmp/fake-engram", nil
 	}
 	t.Cleanup(func() { engramDownloadFn = origDownloadFn })
 
 	detection := linuxDetectionResult(system.LinuxDistroUbuntu, "apt")
-	result, err := RunInstall(
+	_, err := RunInstall(
 		[]string{"--agent", "claude-code", "--component", "engram"},
 		detection,
 	)
-	if err != nil {
-		t.Fatalf("RunInstall() error = %v", err)
+	if err == nil || !strings.Contains(err.Error(), "Go 1.25.10+") {
+		t.Fatalf("RunInstall() error = %v, want Go 1.25.10+ preflight failure", err)
 	}
-
-	if !result.Verify.Ready {
-		t.Fatalf("verification ready = false")
-	}
-
-	// Neither "go install" nor "apt-get install golang" should appear.
-	for _, cmd := range recorder.get() {
-		if strings.Contains(cmd, "apt-get install -y golang") {
-			t.Fatalf("Go should NOT be auto-installed (no longer needed for engram), got command: %s", cmd)
-		}
-		if strings.Contains(cmd, "go install") && strings.Contains(cmd, "engram") {
-			t.Fatalf("engram should NOT be installed via go install, got command: %s", cmd)
-		}
+	if installCalled {
+		t.Fatal("Engram installer ran before Go dependency preflight")
 	}
 }
 
-// TestRunInstallEngramLinuxNeverInstallsGo verifies that even if Go is present,
-// we never install Go as a prerequisite for engram (direct download path).
-func TestRunInstallEngramLinuxNeverInstallsGo(t *testing.T) {
+// Gentle AI validates Go but does not mutate the user's toolchain.
+func TestRunInstallEngramLinuxDoesNotAutoInstallGo(t *testing.T) {
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
@@ -1387,7 +1420,7 @@ func TestRunInstallEngramLinuxNeverInstallsGo(t *testing.T) {
 		t.Fatalf("verification ready = false")
 	}
 
-	// No Go installation commands should appear.
+	// No package-manager Go installation commands should appear.
 	for _, cmd := range recorder.get() {
 		if strings.Contains(cmd, "apt-get install -y golang") || strings.Contains(cmd, "apt-get install -y go") {
 			t.Fatalf("Go should never be installed as engram dependency, got command: %s", cmd)
@@ -1395,15 +1428,17 @@ func TestRunInstallEngramLinuxNeverInstallsGo(t *testing.T) {
 	}
 }
 
-func TestRunInstallEngramBrewSkipsGoCheck(t *testing.T) {
+func TestRunInstallEngramBrewUsesMainSource(t *testing.T) {
 	home := t.TempDir()
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
 	restoreLookPath := cmdLookPath
+	restoreDownload := engramDownloadFn
 	t.Cleanup(func() {
 		osUserHomeDir = restoreHome
 		runCommand = restoreCommand
 		cmdLookPath = restoreLookPath
+		engramDownloadFn = restoreDownload
 	})
 
 	osUserHomeDir = func() (string, error) { return home, nil }
@@ -1413,6 +1448,11 @@ func TestRunInstallEngramBrewSkipsGoCheck(t *testing.T) {
 	}
 	recorder := &commandRecorder{}
 	runCommand = recorder.record
+	mainInstallCalled := false
+	engramDownloadFn = func(system.PlatformProfile) (string, error) {
+		mainInstallCalled = true
+		return filepath.Join(home, "go", "bin", "engram"), nil
+	}
 
 	detection := macOSDetectionResult()
 	result, err := RunInstall(
@@ -1427,25 +1467,13 @@ func TestRunInstallEngramBrewSkipsGoCheck(t *testing.T) {
 		t.Fatalf("verification ready = false")
 	}
 
-	// Should use brew install, NOT go install, and no Go auto-install.
-	commands := recorder.get()
-	for _, cmd := range commands {
-		if strings.Contains(cmd, "golang") || strings.Contains(cmd, "apt-get") {
-			t.Fatalf("brew platform should not install Go, got command: %s", cmd)
-		}
-		if strings.Contains(cmd, "go install") {
-			t.Fatalf("brew platform should not use go install, got command: %s", cmd)
-		}
+	if !mainInstallCalled {
+		t.Fatal("expected Engram main-source installer")
 	}
-
-	foundBrew := false
-	for _, cmd := range commands {
+	for _, cmd := range recorder.get() {
 		if strings.Contains(cmd, "brew install engram") {
-			foundBrew = true
+			t.Fatalf("stable Homebrew installer used: %s", cmd)
 		}
-	}
-	if !foundBrew {
-		t.Fatalf("expected brew install engram, got commands: %v", commands)
 	}
 }
 
@@ -1588,6 +1616,7 @@ func (fakeFileInfo) Sys() any           { return nil }
 // entries.
 func TestRunInstallUpgradeIdempotency(t *testing.T) {
 	home := t.TempDir()
+	stubEngramDownloadForIntegrationTest(t, filepath.Join(home, "go", "bin", "engram"))
 	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
 	restoreLookPath := cmdLookPath

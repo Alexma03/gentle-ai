@@ -66,22 +66,16 @@ var (
 		}
 		return codegraph.Install(homeDir, workspaceDir, runner, detector)
 	}
-	installCodeGraph = codegraph.Install
-	injectSDD        = sdd.Inject
-	pathEnvEntries   = func(profile system.PlatformProfile) []string {
-		return splitPathForOS(os.Getenv("PATH"), profile.OS)
-	}
+	installCodeGraph    = codegraph.Install
+	injectSDD           = sdd.Inject
 	addUserPath         = system.AddToUserPath
-	ensureUserPathFirst = system.PrioritizeUserPath
-	userPathEntries     = system.UserPathEntries
 	probePiSubagentsRPC = func(ctx context.Context, homeDir, workspaceDir string) (piagent.PiSubagentsRPCProviderResponse, error) {
 		return piagent.NewAdapter().ProbeSubagentsRPC(ctx, homeDir, workspaceDir)
 	}
 
-	// engramDownloadFn is the function used to download the engram binary on non-brew platforms.
+	// engramDownloadFn is the component-owned Engram v2 main installer.
 	// Package-level var for testability — tests can replace this to avoid real HTTP calls.
-	// Always uses the stable (release) path; beta channel at install time is handled
-	// separately via installBetaEngramFromMain.
+	// Both channels use main; the beta helper remains for channel-shaped compatibility.
 	engramDownloadFn = func(profile system.PlatformProfile) (string, error) {
 		return engram.DownloadLatestBinary(profile, false)
 	}
@@ -459,15 +453,9 @@ func runnableAgentCommands(agentIDs []model.AgentID) []string {
 	return commands
 }
 
-// withGoInstallPathNote appends a PATH guidance note when engram was installed
-// on a non-brew platform (Linux/Windows). Since engram is now installed via
-// direct binary download to /usr/local/bin or ~/.local/bin, this note helps
-// users who may need to add the install directory to their PATH.
+// withGoInstallPathNote appends PATH guidance for Go-installed Engram.
 func withGoInstallPathNote(report verify.Report, resolved planner.ResolvedPlan) verify.Report {
 	if !hasComponent(resolved.OrderedComponents, model.ComponentEngram) {
-		return report
-	}
-	if resolved.PlatformDecision.PackageManager == "brew" {
 		return report
 	}
 	binDir := goInstallBinDir()
@@ -530,7 +518,7 @@ func goInstallBinDirFromGoEnv() (string, error) {
 	return "", fmt.Errorf("go env returned empty GOBIN and GOPATH")
 }
 
-const engramBetaGoInstallPackage = "github.com/Gentleman-Programming/engram/cmd/engram@main"
+const engramBetaGoInstallPackage = "github.com/Gentleman-Programming/engram/v2/cmd/engram@main"
 
 func installBetaEngramFromMain() (string, error) {
 	if err := runCommand("go", "install", engramBetaGoInstallPackage); err != nil {
@@ -1197,63 +1185,6 @@ func resolveAdapters(agentIDs []model.AgentID) []agents.Adapter {
 	return adapters
 }
 
-func shouldRefreshWindowsEngram(profile system.PlatformProfile, resolvedPath string, pathEntries []string) bool {
-	if profile.OS != "windows" || profile.PackageManager == "brew" || strings.TrimSpace(resolvedPath) == "" {
-		return false
-	}
-	return len(engramBinaryDirsOnPath(pathEntries, profile.OS)) > 1
-}
-
-func ensureRepairableWindowsEngramShadowing(profile system.PlatformProfile, installedPath, managedDir string) error {
-	userEntries, err := userPathEntries(profile.OS)
-	if err != nil {
-		return fmt.Errorf("read user PATH: %w", err)
-	}
-
-	staleDir := filepath.Dir(installedPath)
-	if !pathEntriesContainDir(userEntries, staleDir) {
-		return fmt.Errorf("%s is not in the user PATH, so user-scoped PATH repair cannot guarantee future shells will resolve %s before %s", staleDir, managedDir, staleDir)
-	}
-
-	return nil
-}
-
-func pathEntriesContainDir(entries []string, dir string) bool {
-	dir = strings.Trim(strings.TrimSpace(dir), `"`)
-	if dir == "" {
-		return false
-	}
-	for _, entry := range entries {
-		entry = strings.Trim(strings.TrimSpace(entry), `"`)
-		if entry == "" {
-			continue
-		}
-		if strings.EqualFold(filepath.Clean(entry), filepath.Clean(dir)) {
-			return true
-		}
-	}
-	return false
-}
-
-func engramBinaryDirsOnPath(pathEntries []string, goos string) []string {
-	var dirs []string
-	for _, entry := range pathEntries {
-		entry = strings.Trim(strings.TrimSpace(entry), `"`)
-		if entry == "" {
-			continue
-		}
-		binaryName := "engram"
-		if goos == "windows" {
-			binaryName = "engram.exe"
-		}
-		candidate := filepath.Join(entry, binaryName)
-		if _, err := os.Stat(candidate); err == nil {
-			dirs = append(dirs, entry)
-		}
-	}
-	return dirs
-}
-
 func resolveEngramVersion(command string) (string, error) {
 	if strings.TrimSpace(command) == "" || command == "engram" {
 		return verifyEngramVersion()
@@ -1266,17 +1197,6 @@ func resolveEngramProtocolFlag(ctx context.Context, command string) (string, err
 		return probeEngramProtocolFlag(ctx)
 	}
 	return probeEngramProtocolFlagCommand(ctx, command)
-}
-
-func splitPathForOS(value, goos string) []string {
-	separator := string(os.PathListSeparator)
-	if goos == "windows" {
-		separator = ";"
-	}
-	if value == "" {
-		return nil
-	}
-	return strings.Split(value, separator)
 }
 
 func (s componentApplyStep) Run() error {
@@ -1301,48 +1221,18 @@ func (s componentApplyStep) Run() error {
 				return fmt.Errorf("install beta engram from main: %w", err)
 			}
 			engramCommand = binaryPath
-		} else if installedPath, err := cmdLookPath("engram"); err != nil {
-			// Engram not on PATH — install it.
-			if s.profile.PackageManager == "brew" {
-				// macOS (or Linux with Homebrew): use brew tap + brew install.
-				commands, err := engram.InstallCommand(s.profile)
-				if err != nil {
-					return fmt.Errorf("resolve install command for component %q: %w", s.component, err)
-				}
-				if err := runCommandSequence(commands); err != nil {
-					return err
-				}
-			} else {
-				// Linux / Windows: download the pre-built binary from GitHub Releases.
-				// No Go required — engram ships pre-built binaries.
-				binaryPath, err := engramDownloadFn(s.profile)
-				if err != nil {
-					return fmt.Errorf("download engram binary: %w", err)
-				}
-				// Add the install directory to PATH so subsequent commands
-				// (engram setup, engram.Inject → resolveEngramCommand) can find it.
-				// On Windows this also persists the change to the user registry via PowerShell.
-				binDir := filepath.Dir(binaryPath)
-				if err := addUserPath(binDir); err != nil {
-					// Non-fatal: warn but continue — the binary was downloaded successfully.
-					fmt.Fprintf(os.Stderr, "WARNING: could not add %s to PATH: %v\n", binDir, err)
-				}
-				engramCommand = binaryPath
-			}
-		} else if shouldRefreshWindowsEngram(s.profile, installedPath, pathEnvEntries(s.profile)) {
+		} else {
+			// Selection is authoritative: always converge through the v2 @main
+			// installer even when PATH currently resolves a stable/Homebrew v1.
 			binaryPath, err := engramDownloadFn(s.profile)
 			if err != nil {
-				return fmt.Errorf("refresh shadowed engram binary: %w", err)
+				return fmt.Errorf("install Engram v2 from main: %w", err)
 			}
 			engramCommand = binaryPath
 			binDir := filepath.Dir(binaryPath)
-			if err := ensureRepairableWindowsEngramShadowing(s.profile, installedPath, binDir); err != nil {
-				return fmt.Errorf("repair Windows Engram PATH shadowing: refreshed managed Engram at %s, but cannot safely repair PATH order: %w. Move %s before %s in your user PATH or remove the stale Machine/System PATH entry, then rerun install", binaryPath, err, binDir, filepath.Dir(installedPath))
+			if err := addUserPath(binDir); err != nil {
+				fmt.Fprintf(os.Stderr, "WARNING: could not add %s to PATH: %v\n", binDir, err)
 			}
-			if err := ensureUserPathFirst(binDir); err != nil {
-				return fmt.Errorf("repair Windows Engram PATH shadowing: refreshed managed Engram at %s, but could not move %s ahead of stale PATH entry %s: %w. Move %s before %s in your user PATH, then rerun install", binaryPath, binDir, installedPath, err, binDir, filepath.Dir(installedPath))
-			}
-			fmt.Fprintf(os.Stderr, "WARNING: multiple engram.exe entries were found on PATH and %s resolved first. Refreshed managed Engram at %s and moved %s ahead of the stale entry in the user PATH.\n", installedPath, binaryPath, binDir)
 		}
 		setupMode := engram.ParseSetupMode(os.Getenv(engram.SetupModeEnvVar))
 		setupStrict := engram.ParseSetupStrict(os.Getenv(engram.SetupStrictEnvVar))
@@ -1417,6 +1307,7 @@ func (s componentApplyStep) Run() error {
 				}
 			}
 			engramOpts := engram.InjectOptions{
+				Command:                     engramCommand,
 				CodexOrchestratorAssignment: s.selection.CodexOrchestratorAssignment,
 				CodexCarrilModelAssignments: s.selection.CodexCarrilModelAssignments,
 				CodexModelAssignments:       s.selection.CodexModelAssignments,
@@ -1591,11 +1482,6 @@ func ResolveInstallProfile(detection system.DetectionResult) system.PlatformProf
 		PackageManager: "brew",
 		Supported:      true,
 	}
-}
-
-// runCommandSequence runs each command in the sequence one at a time, stopping on first error.
-func runCommandSequence(commands [][]string) error {
-	return runCommandSequenceWithProgress(commands, nil, "")
 }
 
 // runCommandSequenceWithProgress is the common command runner used by agent
@@ -2231,6 +2117,11 @@ func (s checkDependenciesStep) Run() error {
 	// surfaced on the TUI complete screen and by the actual install steps
 	// failing with real error messages.
 	_ = system.DetectDependencies(context.Background(), s.profile)
+	for _, component := range s.selection.Components {
+		if err := installcmd.ValidateComponentInstallPreflight(s.profile, component); err != nil {
+			return fmt.Errorf("preflight for component %q: %w", component, err)
+		}
+	}
 	for _, agent := range s.selection.Agents {
 		// Only Pi executes package commands (its already-present `pi`
 		// subcommands and npm-based Engram initialization — see

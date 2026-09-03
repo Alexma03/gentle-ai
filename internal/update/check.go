@@ -81,7 +81,7 @@ func checkSingleTool(ctx context.Context, tool ToolInfo, currentBuildVersion str
 	// main-head beta target is advertised only when Homebrew does not own the
 	// tool (issue #2323: checker advertised main@sha while the instruction
 	// installed stable).
-	betaMainHead := usesBetaMainHeadCheck(tool, currentBuildVersion) && homebrewOwnership == HomebrewNone
+	betaMainHead := usesBetaMainHeadCheck(tool, currentBuildVersion) && (isEngramRepo(tool) || homebrewOwnership == HomebrewNone)
 
 	// Run local detection and remote fetch concurrently.
 	var wg sync.WaitGroup
@@ -160,11 +160,15 @@ func checkSingleTool(ctx context.Context, tool ToolInfo, currentBuildVersion str
 }
 
 func usesBetaMainHeadCheck(tool ToolInfo, currentVersion string) bool {
-	return isGentleAIRepo(tool) && (isBetaUpdateChannel() || isGoPseudoVersionWithCommit(currentVersion))
+	return isEngramRepo(tool) || (isGentleAIRepo(tool) && (isBetaUpdateChannel() || isGoPseudoVersionWithCommit(currentVersion)))
 }
 
 func isGentleAIRepo(tool ToolInfo) bool {
 	return tool.Name == "gentle-ai" && strings.EqualFold(tool.Owner, "Gentleman-Programming") && tool.Repo == "gentle-ai"
+}
+
+func isEngramRepo(tool ToolInfo) bool {
+	return tool.Name == "engram" && strings.EqualFold(tool.Owner, "Gentleman-Programming") && tool.Repo == "engram"
 }
 
 func isBetaUpdateChannel() bool {
@@ -193,6 +197,8 @@ func applyBetaMainHeadStatus(result UpdateResult, localVersion string, commit gi
 	if result.Tool.ManualUpgradeHint != "" {
 		result.UpdateHint = result.Tool.ManualUpgradeHint
 		result.ReleaseURL = ""
+	} else if isEngramRepo(result.Tool) {
+		result.UpdateHint = "go install github.com/Gentleman-Programming/engram/v2/cmd/engram@main"
 	} else {
 		result.UpdateHint = GentleAISourceInstallCommand(result.LatestVersion)
 	}
@@ -208,6 +214,12 @@ func applyBetaMainHeadStatus(result UpdateResult, localVersion string, commit gi
 
 	localSHA := localBuildCommit(localVersion)
 	if localSHA == "" {
+		if isEngramRepo(result.Tool) {
+			// A stable 1.x version is necessarily outside the selected v2 main
+			// source, so offer the one-way source update.
+			result.Status = UpdateAvailable
+			return result
+		}
 		result.Status = VersionUnknown
 		return result
 	}

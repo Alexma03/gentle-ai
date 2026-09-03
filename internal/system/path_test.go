@@ -129,53 +129,6 @@ func TestAddToUserPathUsesProcessPathInGoTests(t *testing.T) {
 	}
 }
 
-func TestPrioritizeUserPathUsesProcessPathInGoTests(t *testing.T) {
-	if !runningInGoTest() {
-		t.Fatal("runningInGoTest() = false in go test binary")
-	}
-
-	firstDir := filepath.Join(t.TempDir(), "first")
-	targetDir := filepath.Join(t.TempDir(), "target")
-	original := os.Getenv("PATH")
-	t.Cleanup(func() { os.Setenv("PATH", original) })
-
-	os.Setenv("PATH", strings.Join([]string{firstDir, targetDir}, string(os.PathListSeparator)))
-
-	if err := PrioritizeUserPath(targetDir); err != nil {
-		t.Fatalf("PrioritizeUserPath() error = %v", err)
-	}
-
-	entries := filepath.SplitList(os.Getenv("PATH"))
-	if len(entries) == 0 || !strings.EqualFold(filepath.Clean(entries[0]), filepath.Clean(targetDir)) {
-		t.Fatalf("PATH first entry = %q, want %q; full PATH=%q", entries, targetDir, os.Getenv("PATH"))
-	}
-}
-
-func TestPrioritizeProcessPathMovesExistingEntryToFront(t *testing.T) {
-	firstDir := filepath.Join(t.TempDir(), "first")
-	targetDir := filepath.Join(t.TempDir(), "target")
-	lastDir := filepath.Join(t.TempDir(), "last")
-	original := os.Getenv("PATH")
-	t.Cleanup(func() { os.Setenv("PATH", original) })
-
-	os.Setenv("PATH", strings.Join([]string{firstDir, targetDir, lastDir}, string(os.PathListSeparator)))
-
-	if err := prioritizeProcessPath(targetDir); err != nil {
-		t.Fatalf("prioritizeProcessPath() error = %v", err)
-	}
-
-	entries := filepath.SplitList(os.Getenv("PATH"))
-	if len(entries) != 3 {
-		t.Fatalf("PATH entries = %v, want three preserved entries", entries)
-	}
-	if entries[0] != targetDir {
-		t.Fatalf("PATH first entry = %q, want %q", entries[0], targetDir)
-	}
-	if entries[1] != firstDir || entries[2] != lastDir {
-		t.Fatalf("PATH should preserve non-target order after target move, got %v", entries)
-	}
-}
-
 func TestAddToUserPathWindowsEmptyPersistentPathDoesNotWriteTrailingEntry(t *testing.T) {
 	targetDir := `C:\gentle-ai\bin`
 	t.Setenv("PATH", os.Getenv("PATH"))
