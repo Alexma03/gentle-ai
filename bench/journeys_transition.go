@@ -73,12 +73,12 @@ func transitionJourneys() []Journey {
 		{
 			ID:     "tr02-reset-after-rescope-keeps-the-ledger-readable",
 			Review: reviewOptedIn,
-			Title:  "Narrow, spend the budget, then reset: the widening route, driven end to end",
+			Title:  "Narrow, record repeated failures, then exercise explicit reset end to end",
 			Source: "#2769's documented exhaust-to-widen route + #2830's write-versus-replay surface",
 			// What this proves, stated narrowly because two decoys narrowed it:
 			// the exhaust-to-widen route that #2769's refusals advertise can be
 			// walked end to end. Narrow the objective, spend the narrowed
-			// budget, land on decision-required, reset from there.
+			// accounting, remain retryable, and exercise the compatible reset path.
 			//
 			// It does NOT guard the wedge class tr01 measures, and the honest
 			// reason is worth keeping. An earlier version ran `reset` straight
@@ -99,9 +99,9 @@ func transitionJourneys() []Journey {
 					Requires: sddAttemptBeginCapability, Composite: transitionBeginAndFail},
 				{Name: "narrow the objective", Requires: sddAttemptRescopeCapability,
 					Composite: transitionRescope("bench-rescope-before-reset", "narrower before reset")},
-				{Name: "spend the narrowed objective's remaining attempts",
+				{Name: "record bounded failures without creating a consent gate",
 					Requires: sddAttemptBeginCapability, Composite: transitionExhaustAttempts},
-				{Name: "reset from decision-required, which is the route the refusals name",
+				{Name: "exercise explicit compatibility reset",
 					Requires: sddAttemptResetCapability, Composite: transitionReset("bench-reset-after-rescope")},
 				{Name: "the ledger still answers", Composite: transitionProveLedgerReadable},
 			},
@@ -423,23 +423,20 @@ func transitionFinishOpenAttempt(r *journeyRun) error {
 	return nil
 }
 
-// transitionExhaustAttempts drives the narrowed objective to decision-required
-// by failing attempts until the ledger stops offering begin. That is the state
-// where reset genuinely publishes, which is what makes tr02 able to observe a
-// wedge at all: an operation refused before publication cannot leave a bad
-// record behind, so a journey that only reaches a refusal measures nothing.
+// transitionExhaustAttempts records repeated failures beyond the compatibility
+// ceiling and proves the ledger continues to offer a diagnosed retry.
 func transitionExhaustAttempts(r *journeyRun) error {
 	return transitionExhaustWith(r, narrowedObjective, "bench-exhaust")
 }
 
 func transitionExhaustWith(r *journeyRun, objective []string, prefix string) error {
-	for attempt := 0; attempt < 8; attempt++ {
+	for attempt := 0; attempt < 2; attempt++ {
 		status, err := readRuntimeStatus(r)
 		if err != nil {
 			return err
 		}
 		if status.NextAction != "begin" {
-			return nil
+			return fmt.Errorf("accounting telemetry stopped retry before attempt %d: %#v", attempt+1, status)
 		}
 		id := fmt.Sprintf("%s-%d", prefix, attempt)
 		r.run(sddAttemptArgs(r, "begin", status.Revision, id+"-begin", objective...), false)
@@ -450,7 +447,14 @@ func transitionExhaustWith(r *journeyRun, objective []string, prefix string) err
 		r.run(sddAttemptArgs(r, "finish", status.Revision, id+"-finish",
 			append([]string{"--outcome", "failed", "--evidence-revision", sddFailedEvidence}, sddTerminalEvidence...)...), false)
 	}
-	return fmt.Errorf("the objective never reached decision-required after eight attempts")
+	status, err := readRuntimeStatus(r)
+	if err != nil {
+		return err
+	}
+	if status.NextAction != "begin" {
+		return fmt.Errorf("repeated failure did not remain retryable: %#v", status)
+	}
+	return nil
 }
 
 // transitionReset consumes the post-rescope state through reset instead.

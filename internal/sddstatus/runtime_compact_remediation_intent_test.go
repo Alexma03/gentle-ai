@@ -51,8 +51,8 @@ func seedFailedVerificationLedger(t *testing.T, repo, change string, maxAttempts
 func TestCompactAcquireRemediationIntentSurvivesAuditedReset(t *testing.T) {
 	repo := initRuntimeLedgerRepo(t)
 	store, failedEvidence, failed := seedFailedVerificationLedger(t, repo, "intent-after-reset", 1)
-	if !failed.DecisionRequired {
-		t.Fatalf("exhausted failed verification did not require a decision: %#v", failed)
+	if failed.DecisionRequired || failed.NextAction != RuntimeActionBegin {
+		t.Fatalf("failed verification did not remain retryable: %#v", failed)
 	}
 	reset, err := store.Reset(context.Background(), ResetObjectiveRequest{
 		ExpectedRevision: failed.Revision, RequestID: "intent-reset",

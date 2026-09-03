@@ -39,8 +39,8 @@ func TestRuntimeRemediationSettlesWhenCorrectionPredatesAcquire(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !failed.DecisionRequired || failed.NextAction != RuntimeActionReset {
-		t.Fatalf("exhausted failed verification = %#v", failed)
+	if failed.DecisionRequired || failed.NextAction != RuntimeActionBegin {
+		t.Fatalf("failed verification was not retryable = %#v", failed)
 	}
 	reset, err := store.Reset(context.Background(), ResetObjectiveRequest{
 		ExpectedRevision: failed.Revision, RequestID: "predates-audited-reset",

@@ -9,7 +9,7 @@ import (
 // issue3564Journeys proves an attempt token remains governed only by its SDD
 // evidence chain when receipt-driven development changes while the token is
 // live. The journey starts from the runner's untouched (off) mode, acquires a
-// reset-authorized failed-evidence correction, turns review on, and settles the
+// directly retryable failed-evidence correction, turns review on, and settles the
 // exact token without creating or consulting review authority.
 func issue3564Journeys() []Journey {
 	return []Journey{
@@ -22,7 +22,7 @@ func issue3564Journeys() []Journey {
 				{Name: "fixture: repository with a committed OpenSpec change", Fixture: sddRuntimeRepo},
 				{Name: "review mode starts off", Requires: modeCapability,
 					Args: productArgs("review", "mode", "status", "--json"), After: issue3564ModeIs("off")},
-				{Name: "fail and reset the bounded verification objective", Requires: sddAttemptRemediationCapability,
+				{Name: "fail the verification objective without blocking its retry", Requires: sddAttemptRemediationCapability,
 					Composite: issue3564FailAndReset},
 				{Name: "acquire the exact failed-evidence correction while review is off", Requires: sddAttemptRemediationCapability,
 					Composite: issue3564AcquireCorrection},
@@ -71,18 +71,13 @@ func issue3564FailAndReset(r *journeyRun) error {
 	}, sddTerminalEvidence...), false)
 	var settled sddCompactAttemptResult
 	if err := json.Unmarshal([]byte(strings.TrimSpace(failed.Stdout)), &settled); err != nil ||
-		failed.ExitCode != 0 || settled.State != "blocked" || settled.Reason != "maintainer_decision" {
+		failed.ExitCode != 0 || settled.State != "proceed" || settled.Reason != "" {
 		return fmt.Errorf("failed verification settle = %#v exit=%d err=%v", settled, failed.ExitCode, err)
 	}
 
 	status, err := readRuntimeStatus(r)
-	if err != nil || status.NextAction != "reset" {
+	if err != nil || status.NextAction != "begin" || status.DecisionRequired {
 		return fmt.Errorf("failed verification runtime status = %#v err=%v", status, err)
-	}
-	reset := r.run(sddAttemptArgs(r, "reset", status.Revision, "issue3564-reset",
-		"--reason", "maintainer authorizes exact failed-evidence remediation", "--actor", "bench"), false)
-	if reset.ExitCode != 0 {
-		return fmt.Errorf("failed-evidence reset exited %d: %s", reset.ExitCode, firstLine(reset.Stderr, reset.Stdout))
 	}
 	return nil
 }

@@ -46,27 +46,25 @@ func runtimeRescopeSuccessorRequest(status RuntimeStatus, request BeginAttemptRe
 	return request
 }
 
-// runtimeBeginRequestWithInheritedChangedLineLimit preserves a positive limit
-// already owned by a historical objective when a modern caller omits the
-// deprecated max_changed_lines input (zero). A fresh objective keeps zero, which
-// is its unbounded representation. Exact request replay reads the committed begin
-// event first so a later reset or advance cannot change the digest of the original
-// request.
-func (store RuntimeStore) runtimeBeginRequestWithInheritedChangedLineLimit(replay runtimeReplay, request BeginAttemptRequest) (BeginAttemptRequest, error) {
-	if request.MaxChangedLines != 0 {
-		return request, nil
-	}
+// runtimeBeginRequestWithInheritedLimits keeps advisory accounting out of
+// objective identity. A continuation inherits the objective's recorded values,
+// while a fresh objective keeps the caller/default values. Exact request replay
+// reads the committed event so later objective transitions cannot change its
+// digest.
+func (store RuntimeStore) runtimeBeginRequestWithInheritedLimits(replay runtimeReplay, request BeginAttemptRequest) (BeginAttemptRequest, error) {
 	if receipt, ok := replay.Requests[request.RequestID]; ok {
 		record, err := store.loadRecord(receipt.Revision)
 		if err != nil {
 			return BeginAttemptRequest{}, err
 		}
-		if record.Begin != nil && record.Begin.MaxChangedLines > 0 {
+		if record.Begin != nil {
+			request.MaxAttempts = record.Begin.MaxAttempts
 			request.MaxChangedLines = record.Begin.MaxChangedLines
 		}
 		return request, nil
 	}
-	if replay.Status.Objective != nil && !replay.Status.Complete && replay.Status.Objective.MaxChangedLines > 0 {
+	if replay.Status.Objective != nil && !replay.Status.Complete {
+		request.MaxAttempts = replay.Status.Objective.MaxAttempts
 		request.MaxChangedLines = replay.Status.Objective.MaxChangedLines
 	}
 	return request, nil
@@ -107,10 +105,6 @@ func (store RuntimeStore) runtimeBeginAdmission(
 		}
 		advancing = true
 	}
-	if status.DecisionRequired {
-		return runtimeBeginAdmissionResult{}, ErrRuntimeBudgetExhausted
-	}
-
 	generation := status.ObjectiveGeneration + 1
 	var snapshot reviewtransaction.Snapshot
 	var err error
@@ -121,7 +115,7 @@ func (store RuntimeStore) runtimeBeginAdmission(
 		// Finish is the candidate provenance to chase.
 		generation = status.Objective.Generation
 		if runtimeObjectiveScopeChanged(status, request) {
-			return runtimeBeginAdmissionResult{}, store.runtimeObjectiveChangeRefusal(ctx, status)
+			return runtimeBeginAdmissionResult{}, store.runtimeObjectiveChangeRefusal(status)
 		}
 		last := status.Attempts[len(status.Attempts)-1]
 		if last.Outcome == AttemptRunning || last.FinishCandidateIdentity == "" || last.FinishCandidateTree == "" {
@@ -140,10 +134,10 @@ func (store RuntimeStore) runtimeBeginAdmission(
 			snapshot, err = captureRuntimeTerminalCandidate(ctx, store, last.BeginCandidateTree, intended)
 		}
 		if err == nil && (snapshot.Identity != last.FinishCandidateIdentity || snapshot.CandidateTree != last.FinishCandidateTree) {
-			return runtimeBeginAdmissionResult{}, store.runtimeObjectiveChangeRefusal(ctx, status)
+			return runtimeBeginAdmissionResult{}, store.runtimeObjectiveChangeRefusal(status)
 		}
 		if err == nil && !slices.Equal(request.IntendedUntracked, last.IntendedUntracked) {
-			return runtimeBeginAdmissionResult{}, store.runtimeObjectiveChangeRefusal(ctx, status)
+			return runtimeBeginAdmissionResult{}, store.runtimeObjectiveChangeRefusal(status)
 		}
 	case status.Objective != nil && !advancing:
 		// A freshly opened objective (Rescope) with no attempt recorded
@@ -158,11 +152,12 @@ func (store RuntimeStore) runtimeBeginAdmission(
 		// #2296 part 2's landmine) and wrongly refuse.
 		generation = status.Objective.Generation
 		if runtimeObjectiveScopeChanged(status, request) {
-			return runtimeBeginAdmissionResult{}, store.runtimeObjectiveChangeRefusal(ctx, status)
+			return runtimeBeginAdmissionResult{}, store.runtimeObjectiveChangeRefusal(status)
 		}
 		snapshot, err = captureRuntimeCandidate(ctx, store.Repo, request.IntendedUntracked)
-		if err == nil && (snapshot.Identity != status.Objective.InitialCandidateIdentity || snapshot.CandidateTree != status.Objective.InitialCandidateTree) {
-			return runtimeBeginAdmissionResult{}, store.runtimeObjectiveChangeRefusal(ctx, status)
+		identityChanged := snapshot.Identity != status.Objective.InitialCandidateIdentity && !runtimeLegacyExhaustedSuccessor(status)
+		if err == nil && (identityChanged || snapshot.CandidateTree != status.Objective.InitialCandidateTree) {
+			return runtimeBeginAdmissionResult{}, store.runtimeObjectiveChangeRefusal(status)
 		}
 	default:
 		snapshot, err = captureRuntimeCandidate(ctx, store.Repo, request.IntendedUntracked)
@@ -170,23 +165,14 @@ func (store RuntimeStore) runtimeBeginAdmission(
 	if err != nil {
 		return runtimeBeginAdmissionResult{}, wrapRuntimeCandidateUnavailable("before launch", err)
 	}
-	// The successor opens a fresh per-objective budget, so the charges the
-	// completed scope accrued cannot exhaust it before its first attempt.
-	if !advancing && (status.CumulativeAttempts >= request.MaxAttempts ||
-		runtimeChangedLineBudgetExhausted(request.MaxChangedLines, status.CumulativeChangedLines)) {
-		return runtimeBeginAdmissionResult{}, ErrRuntimeBudgetExhausted
-	}
 	return runtimeBeginAdmissionResult{Advancing: advancing, Generation: generation, Snapshot: snapshot}, nil
 }
 
-// runtimeObjectiveScopeChanged is the single work-unit-scope comparison both
-// continuing-objective branches make. It was written out twice, which is how a
-// scope field could be added to one branch and forgotten in the other.
+// runtimeObjectiveScopeChanged compares semantic work scope only. Attempt and
+// changed-line limits are advisory telemetry inherited separately.
 func runtimeObjectiveScopeChanged(status RuntimeStatus, request BeginAttemptRequest) bool {
 	return request.WorkUnit != status.Objective.WorkUnit ||
-		request.EvidenceGoal != status.Objective.EvidenceGoal ||
-		request.MaxAttempts != status.Objective.MaxAttempts ||
-		request.MaxChangedLines != status.Objective.MaxChangedLines
+		request.EvidenceGoal != status.Objective.EvidenceGoal
 }
 
 // AdmissionStatus is the read-only surface's answer to the question consumers
@@ -221,7 +207,7 @@ func (store RuntimeStore) AdmissionStatus(ctx context.Context, request BeginAtte
 		return status, nil
 	}
 	normalized = runtimeRescopeSuccessorRequest(status, normalized, inheritIntendedUntracked)
-	normalized, err = store.runtimeBeginRequestWithInheritedChangedLineLimit(replay, normalized)
+	normalized, err = store.runtimeBeginRequestWithInheritedLimits(replay, normalized)
 	if err != nil {
 		return RuntimeStatus{}, err
 	}
@@ -229,15 +215,6 @@ func (store RuntimeStore) AdmissionStatus(ctx context.Context, request BeginAtte
 		Status: status, AttemptTokens: replay.AttemptTokens, Request: normalized,
 	}); terminal && result.State == CompactStateBlocked {
 		status.BlockedReason, status.BlockedExit = result.Reason, result.Exit
-		// An exhausted budget is a decision, so it asks instead of ending the
-		// conversation. The grant is the reset the ledger already admits at
-		// decision-required, offered as a runnable choice rather than as prose
-		// the human has to assemble from six flags.
-		if result.Reason == CompactBlockMaintainerDecision {
-			if consent, consentErr := BudgetConsentEnvelope(store.budgetConsentInput(status)); consentErr == nil {
-				status.Consent = &consent
-			}
-		}
 		return status, nil
 	}
 	if _, admissionErr := store.runtimeBeginAdmission(ctx, status, normalized); admissionErr != nil {
@@ -246,26 +223,4 @@ func (store RuntimeStore) AdmissionStatus(ctx context.Context, request BeginAtte
 		}
 	}
 	return status, nil
-}
-
-// budgetConsentInput reads the question's facts off the ledger. HarnessFailures
-// is derived from HarnessDisposition, which the settle contract already
-// carries: an attempt the actor settled as `invalidated` is one whose harness
-// could not be used, so it produced no evidence about the candidate. Reusing
-// the declared field beats inventing a second way to say the same thing.
-func (store RuntimeStore) budgetConsentInput(status RuntimeStatus) BudgetConsentInput {
-	in := BudgetConsentInput{
-		Repo: store.Workspace, Change: store.Change, Revision: status.Revision,
-		CumulativeAttempts: status.CumulativeAttempts, CumulativeLines: status.CumulativeChangedLines,
-	}
-	if status.Objective != nil {
-		in.MaxAttempts, in.MaxChangedLines = status.Objective.MaxAttempts, status.Objective.MaxChangedLines
-		for _, attempt := range status.Attempts {
-			if attempt.ObjectiveID == status.Objective.ID &&
-				attempt.Outcome != AttemptPassed && attempt.HarnessDisposition == HarnessInvalidated {
-				in.HarnessFailures++
-			}
-		}
-	}
-	return in
 }

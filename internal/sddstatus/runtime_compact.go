@@ -190,8 +190,6 @@ func runtimeReadiness(in runtimeReadinessInput) (CompactAttemptResult, bool) {
 			return CompactAttemptResult{}, false
 		}
 		return CompactAttemptResult{State: CompactStateComplete}, true
-	case in.Status.DecisionRequired:
-		return compactBlocked(CompactBlockMaintainerDecision, ""), true
 	case in.Status.ActiveAttempt != nil:
 		return compactBlocked(CompactBlockActiveAttempt, activeToken), true
 	default:
@@ -215,7 +213,7 @@ func (store RuntimeStore) Acquire(ctx context.Context, request CompactAcquireReq
 	if err != nil {
 		return compactBlockedByUnreadableAuthority(err), nil
 	}
-	begin, err = store.runtimeBeginRequestWithInheritedChangedLineLimit(replay, begin)
+	begin, err = store.runtimeBeginRequestWithInheritedLimits(replay, begin)
 	if err != nil {
 		return compactBlockedByUnreadableAuthority(err), nil
 	}
@@ -548,23 +546,9 @@ func compactBlockedExitText(reason CompactBlockReason, token string) string {
 			"`gentle-ai sdd-attempt status --cwd <repo> --change <change>` to see the live attempt and its " +
 			"current revision, then reissue this call against that state"
 	case CompactBlockMaintainerDecision:
-		// #2530: this said "rescope or reset", and rescope is structurally
-		// refused for exactly this state — runtimeObjectiveRescopeStructurally
-		// Permitted returns false whenever DecisionRequired is set, which is
-		// the only way this block is reached. Reset is the admitted one, and
-		// the ledger's own next_action has said so all along.
-		//
-		// #2913: this also offered `review mode disable --scope clone` as an
-		// exit. A reporter ran it, it SUCCEEDED, effective mode went to off,
-		// and this block was exactly where they left it — then status told
-		// them to run it again. The command could never have cleared this.
-		// Receipt-driven review governs DELIVERY of a finished change; it has
-		// no authority over whether an SDD work unit may open, so turning it
-		// off cannot open one. Reset is the whole exit, and it is named here
-		// as a complete command instead of as advice.
-		return "this work unit's attempt or changed-line budget needs a maintainer decision; run " +
-			"`gentle-ai sdd-attempt status --cwd <repo> --change <change>` for the accounting, then have a " +
-			"maintainer reset the objective with `gentle-ai sdd-attempt reset --cwd <repo> --change <change> " +
+		return "the requested objective or candidate does not match the recorded scope and cannot be changed implicitly; run " +
+			"`gentle-ai sdd-attempt status --cwd <repo> --change <change>` for the binding, then have a " +
+			"maintainer explicitly reset the objective with `gentle-ai sdd-attempt reset --cwd <repo> --change <change> " +
 			"--expected-revision <the revision that status prints> --request-id \"<unique-request-id>\" " +
 			"--reason \"<why-the-objective-is-being-reset>\" --actor \"<actor>\"`; turning receipt-driven " +
 			"review off does not clear this, because review governs delivery of a finished change, not " +

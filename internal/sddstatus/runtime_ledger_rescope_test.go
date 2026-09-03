@@ -8,16 +8,10 @@ import (
 	"testing"
 )
 
-// TestRuntimeLedgerRescopeRecoversZeroDriftDeadlock is the RED-then-GREEN
-// reproduction of #2298: attempt 1 discovers mid-work that the required
-// scope exceeds the ceiling, reverts every temporary change back to the
-// exact original candidate (zero drift), and settles interrupted with 0
-// changed lines. Status then shows one remaining ordinal, decision_required
-// false, complete false, next_action begin -- but begin can only repeat the
-// SAME oversized objective (any changed param hits ErrRuntimeObjectiveChange)
-// and reset is ALSO refused (ErrRuntimeResetNotAllowed: no drift, not
-// decision-required, not complete). That dead end is the RED baseline this
-// test captures before proving AUDITED NARROWING RESCOPE clears it.
+// TestRuntimeLedgerRescopeRecoversZeroDriftDeadlock preserves the audited
+// narrowing transition introduced for #2298. Limits are now advisory and
+// explicit reset is also available, but a semantic work-scope change still
+// requires an explicit transition rather than silently reusing an objective.
 func TestRuntimeLedgerRescopeRecoversZeroDriftDeadlock(t *testing.T) {
 	repo := initRuntimeLedgerRepo(t)
 	store, err := OpenRuntimeStore(context.Background(), repo, "rescope-2298")
@@ -53,24 +47,17 @@ func TestRuntimeLedgerRescopeRecoversZeroDriftDeadlock(t *testing.T) {
 
 	// RED: begin against a narrower ceiling is refused as a changed objective.
 	_, err = store.Begin(context.Background(), BeginAttemptRequest{
-		ExpectedRevision: interrupted.Revision, RequestID: "oversized-begin-2", WorkUnit: "oversized-scope",
-		EvidenceGoal: "prove bounded apply scope", MaxAttempts: 2, MaxChangedLines: 100,
+		ExpectedRevision: interrupted.Revision, RequestID: "oversized-begin-2", WorkUnit: "narrower-apply-scope",
+		EvidenceGoal: "prove a 100-line bounded slice", MaxAttempts: 2, MaxChangedLines: 100,
 	})
 	if !errors.Is(err, ErrRuntimeObjectiveChange) {
 		t.Fatalf("narrower begin error = %v, want ErrRuntimeObjectiveChange", err)
 	}
-	if !strings.Contains(err.Error(), "gentle-ai sdd-attempt rescope") || strings.Contains(err.Error(), "gentle-ai sdd-attempt reset") {
-		t.Fatalf("dead-end refusal does not name rescope (and only rescope): %v", err)
+	if !strings.Contains(err.Error(), "gentle-ai sdd-attempt reset") {
+		t.Fatalf("changed-scope refusal does not name the authorized reset: %v", err)
 	}
 
-	// RED: reset is refused too -- the candidate has not drifted.
-	_, err = store.Reset(context.Background(), ResetObjectiveRequest{
-		ExpectedRevision: interrupted.Revision, RequestID: "oversized-reset-1",
-		Reason: "attempted elective reset with no drift", Actor: "maintainer",
-	})
-	if !errors.Is(err, ErrRuntimeResetNotAllowed) {
-		t.Fatalf("reset error = %v, want ErrRuntimeResetNotAllowed", err)
-	}
+	// No reset is needed before the explicit narrower rescope.
 	afterRedRecords := countRuntimeRecords(t, store.Dir)
 	if afterRedRecords != 2 {
 		t.Fatalf("RED probes mutated the ledger: records=%d, want 2", afterRedRecords)
@@ -275,16 +262,12 @@ func TestRuntimeLedgerRescopeNarrowsFailedVerificationToTestOnlyRemediation(t *t
 
 	// Both dead-end probes reproduce, exactly as in #2298.
 	if _, err := store.Begin(context.Background(), BeginAttemptRequest{
-		ExpectedRevision: failed.Revision, RequestID: "verify-begin-2", WorkUnit: "independent-verification",
-		EvidenceGoal: "independently verify the applied change", MaxAttempts: 2, MaxChangedLines: 50,
+		ExpectedRevision: failed.Revision, RequestID: "verify-begin-2", WorkUnit: "test-only-remediation",
+		EvidenceGoal: "bounded test-only remediation of the verification gap", MaxAttempts: 2, MaxChangedLines: 50,
 	}); !errors.Is(err, ErrRuntimeObjectiveChange) {
 		t.Fatalf("narrower begin error = %v, want ErrRuntimeObjectiveChange", err)
 	}
-	if _, err := store.Reset(context.Background(), ResetObjectiveRequest{
-		ExpectedRevision: failed.Revision, RequestID: "verify-reset-1", Reason: "attempted elective reset", Actor: "maintainer",
-	}); !errors.Is(err, ErrRuntimeResetNotAllowed) {
-		t.Fatalf("reset error = %v, want ErrRuntimeResetNotAllowed", err)
-	}
+	// No reset is needed before the explicit narrower rescope.
 
 	rescoped, err := store.Rescope(context.Background(), RescopeObjectiveRequest{
 		ExpectedRevision: failed.Revision, RequestID: "verify-rescope-1",
@@ -454,15 +437,10 @@ func TestRuntimeLedgerRescopeReplayRefusesForgedWidenedRecord(t *testing.T) {
 	}
 }
 
-// TestRuntimeLedgerRescopeCarriedBudgetBindsAtAdmission is mutation proof
-// (d), moved to its truthful boundary by #2804: carry-forward is not
-// cosmetic, and the place it binds is rescope ADMISSION. Narrowing to a
-// ceiling the carried CumulativeChangedLines already meets would publish a
-// successor whose status advertises begin while its first acquire is refused
-// budget-exhausted, whose reset is refused for zero drift, and whose own
-// rescope cannot widen -- a wedge with no admitted continuation. That
-// rescope is refused before mutation, and the runnable ceiling the refusal
-// names is executed, not asserted as prose.
+// TestRuntimeLedgerRescopeCarriedBudgetBindsAtAdmission preserves #2804's
+// compatibility validation: rescope may not publish internally exhausted
+// telemetry. Direct retry remains available independently of this legacy
+// narrowing rule.
 func TestRuntimeLedgerRescopeCarriedBudgetBindsAtAdmission(t *testing.T) {
 	repo := initRuntimeLedgerRepo(t)
 	store, err := OpenRuntimeStore(context.Background(), repo, "rescope-budget-binds")
@@ -547,14 +525,9 @@ func TestRuntimeLedgerRescopeCarriedBudgetBindsAtAdmission(t *testing.T) {
 	}
 }
 
-// TestRuntimeLedgerRescopeRefusesExhaustedAttemptAllowance is #2804's
-// write-time guard: rescope carries cumulative_attempts forward unchanged, so
-// a successor whose max_attempts the carried count already meets has no
-// runnable ordinal. Before this guard it was committed anyway: status
-// advertised begin, acquire refused budget-exhausted, reset refused for zero
-// drift, and a second rescope could not widen -- a published successor with
-// no admitted continuation. The refusal now lands before mutation and names
-// the exact runnable range, which is then executed.
+// TestRuntimeLedgerRescopeRefusesExhaustedAttemptAllowance preserves #2804's
+// write-time compatibility guard. Rescope carries accounting telemetry
+// forward, while direct retry no longer consumes that telemetry as authority.
 func TestRuntimeLedgerRescopeRefusesExhaustedAttemptAllowance(t *testing.T) {
 	repo := initRuntimeLedgerRepo(t)
 	store, err := OpenRuntimeStore(context.Background(), repo, "rescope-2804")
@@ -631,14 +604,9 @@ func TestRuntimeLedgerRescopeRefusesExhaustedAttemptAllowance(t *testing.T) {
 	}
 }
 
-// TestProjectLegacyExhaustedSuccessorIsScopedToTheFreshRescopeWedge pins the
-// projection's scope instead of asserting it in prose: only the exact
-// publication wedge -- the last transition is the rescope that opened the
-// current objective, and the successor has no attempt of its own -- may be
-// converted to decision-required. Every other exhausted shape must keep its
-// replayed projection, so an objective legitimately holding unused allowance
-// is never silently converted into a demanded reset.
-func TestProjectLegacyExhaustedSuccessorIsScopedToTheFreshRescopeWedge(t *testing.T) {
+// TestProjectLegacyExhaustedSuccessorKeepsEveryShapeRetryable pins the
+// compatibility projection: accounting-only exhaustion never becomes consent.
+func TestProjectLegacyExhaustedSuccessorKeepsEveryShapeRetryable(t *testing.T) {
 	objective := &RuntimeObjective{ID: "objective-b", MaxAttempts: 1, MaxChangedLines: 10}
 
 	// Exhausted with no rescope transition at all: not the wedge.
@@ -660,28 +628,21 @@ func TestProjectLegacyExhaustedSuccessorIsScopedToTheFreshRescopeWedge(t *testin
 		t.Fatalf("successor with its own attempt was converted: %#v", ownAttempt)
 	}
 
-	// The publication wedge itself projects to decision-required/reset.
+	// The historical publication wedge is retryable too.
 	wedge := RuntimeStatus{
 		Objective: objective, CumulativeAttempts: 1, NextAction: RuntimeActionBegin,
 		LastRescope: &RuntimeRescope{ObjectiveID: objective.ID},
 		Attempts:    []RuntimeAttempt{{ObjectiveID: "objective-a", Outcome: AttemptFailed}},
 	}
 	projectLegacyExhaustedSuccessor(&wedge)
-	if !wedge.DecisionRequired || wedge.NextAction != RuntimeActionReset {
-		t.Fatalf("the publication wedge did not project: %#v", wedge)
+	if wedge.DecisionRequired || wedge.NextAction != RuntimeActionBegin {
+		t.Fatalf("the publication wedge did not recover: %#v", wedge)
 	}
 }
 
-// TestRuntimeLedgerLegacyExhaustedRescopeReplaysToDecisionRequired is #2804's
-// recovery half: builds before the write-time guard PUBLISHED exhausted
-// successors, and prevention alone does not repair them (the fresh occurrence
-// on #2804 says exactly that). The immutable record stays valid -- replay
-// never rewrites history -- but the projected state must tell the truth: an
-// objective with no runnable ordinal is a maintainer decision, exactly as
-// applyRuntimeConsecutiveRescopeRepairEvent already projects for the same
-// shape. Status stops advertising a begin acquire refuses, and the reset that
-// decision-required admits is executed all the way to a wider fresh budget.
-func TestRuntimeLedgerLegacyExhaustedRescopeReplaysToDecisionRequired(t *testing.T) {
+// TestRuntimeLedgerLegacyExhaustedRescopeReplaysToRetryable proves old
+// exhausted successor records recover without rewriting their immutable history.
+func TestRuntimeLedgerLegacyExhaustedRescopeReplaysToRetryable(t *testing.T) {
 	repo := initRuntimeLedgerRepo(t)
 	store, err := OpenRuntimeStore(context.Background(), repo, "rescope-2804-legacy")
 	if err != nil {
@@ -752,40 +713,24 @@ func TestRuntimeLedgerLegacyExhaustedRescopeReplaysToDecisionRequired(t *testing
 	if err != nil {
 		t.Fatalf("replaying the published legacy exhausted rescope failed: %v", err)
 	}
-	if !status.DecisionRequired || status.Complete || status.NextAction != RuntimeActionReset {
-		t.Fatalf("legacy exhausted successor status = %#v, want decision-required with next_action reset", status)
+	if status.DecisionRequired || status.Complete || status.NextAction != RuntimeActionBegin {
+		t.Fatalf("legacy exhausted successor status = %#v, want retryable begin", status)
 	}
 	if status.Objective == nil || status.Objective.ID != legacyObjectiveID || status.Objective.MaxAttempts != 1 ||
 		status.CumulativeAttempts != 1 || len(status.Attempts) != 1 {
 		t.Fatalf("legacy exhausted successor projection = %#v", status)
 	}
 
-	// Begin stays refused -- truthfully now, with status in agreement.
-	if _, err := store.Begin(context.Background(), BeginAttemptRequest{
+	// The new binary admits the successor directly without a reset or migration.
+	retried, err := store.Begin(context.Background(), BeginAttemptRequest{
 		ExpectedRevision: status.Revision, RequestID: "legacy-begin-2", WorkUnit: "narrower-correction",
 		EvidenceGoal: "prove the bounded correction", MaxAttempts: 1, MaxChangedLines: 120,
-	}); !errors.Is(err, ErrRuntimeBudgetExhausted) {
-		t.Fatalf("begin under the legacy exhausted successor = %v, want ErrRuntimeBudgetExhausted", err)
-	}
-
-	// The decision-required reset is admitted and opens the wider fresh
-	// budget the wedged reporter could never reach.
-	after, err := store.Reset(context.Background(), ResetObjectiveRequest{
-		ExpectedRevision: status.Revision, RequestID: "legacy-reset-1",
-		Reason: "recover the published exhausted successor with a fresh budget", Actor: "maintainer",
 	})
 	if err != nil {
-		t.Fatalf("reset of the legacy exhausted successor was refused: %v", err)
+		t.Fatalf("begin under the legacy exhausted successor was refused: %v", err)
 	}
-	wider, err := store.Begin(context.Background(), BeginAttemptRequest{
-		ExpectedRevision: after.Revision, RequestID: "legacy-begin-3", WorkUnit: "recovered-correction",
-		EvidenceGoal: "prove the recovered correction", MaxAttempts: 2, MaxChangedLines: 400,
-	})
-	if err != nil {
-		t.Fatalf("begin after recovering the legacy exhausted successor was refused: %v", err)
-	}
-	if wider.Objective == nil || wider.Objective.MaxAttempts != 2 || wider.CumulativeAttempts != 1 {
-		t.Fatalf("post-recovery objective = %#v", wider)
+	if retried.ActiveAttempt == nil || retried.ActiveAttempt.Ordinal != 2 || retried.CumulativeAttempts != 2 {
+		t.Fatalf("direct legacy retry = %#v", retried)
 	}
 }
 
@@ -817,7 +762,7 @@ func TestRuntimeLedgerRescopeRequiresPreconditions(t *testing.T) {
 		HarnessDisposition: HarnessReused, CleanupEvidence: "cleanup completed",
 		ProcessEvidence: "process scan found no descendants",
 	})
-	if err != nil || !exhausted.DecisionRequired {
+	if err != nil || exhausted.DecisionRequired || exhausted.NextAction != RuntimeActionBegin {
 		t.Fatalf("prepare no-objective guard = %#v err=%v", exhausted, err)
 	}
 	reset, err := store.Reset(context.Background(), ResetObjectiveRequest{
@@ -869,76 +814,38 @@ func TestRuntimeLedgerRescopeRequiresPreconditions(t *testing.T) {
 	}
 }
 
-// TestRuntimeLedgerZeroDriftResetRefusalNamesBothExits is #1974's reproduction.
-// The reporter reached a failed verification objective with the candidate
-// unchanged and budget remaining, ran reset, and concluded the lifecycle was
-// deadlocked. It was not: rescope already owned that transition. The refusal
-// they received named neither it nor the route to a wider successor budget, and
-// status answered next_action: begin, which for failed verification evidence is
-// the one continuation that cannot help.
-//
-// Both named exits are executed here, not just matched as strings, because a
-// refusal that names a command nothing can run is worse than one that names
-// nothing at all.
-func TestRuntimeLedgerZeroDriftResetRefusalNamesBothExits(t *testing.T) {
+// TestRuntimeLedgerZeroDriftResetRemainsBackwardCompatible verifies that an
+// explicit reset still works, while normal retries no longer depend on it.
+func TestRuntimeLedgerZeroDriftResetRemainsBackwardCompatible(t *testing.T) {
 	repo := initRuntimeLedgerRepo(t)
-	store, err := OpenRuntimeStore(context.Background(), repo, "reset-exit-1974")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	store := mustRuntimeStore(t, repo, "zero-drift-reset-compatible")
 	started, err := store.Begin(context.Background(), BeginAttemptRequest{
-		ExpectedRevision: "", RequestID: "verify-begin-1", WorkUnit: "independent-verification",
-		EvidenceGoal: "independently verify the applied change", MaxAttempts: 2, MaxChangedLines: 40,
+		RequestID: "verify-begin-1", WorkUnit: "verify", EvidenceGoal: "prove the candidate",
+		MaxAttempts: 1, MaxChangedLines: 40,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	failed, err := store.Finish(context.Background(), FinishAttemptRequest{
 		ExpectedRevision: started.Revision, RequestID: "verify-finish-1", Outcome: AttemptFailed,
-		EvidenceRevision: runtimeTestHash('7'), Diagnosis: "verification failed with the workspace unchanged",
-		HarnessDisposition: HarnessInvalidated, CleanupEvidence: "verification harness exited cleanly",
-		ProcessEvidence: "post-verification process scan found no descendants",
+		EvidenceRevision: runtimeTestHash('9'), Diagnosis: "verification failed without candidate drift",
+		HarnessDisposition: HarnessReused, CleanupEvidence: "clean", ProcessEvidence: "no descendants",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if failed.DecisionRequired || failed.Complete || failed.NextAction != RuntimeActionBegin || failed.CumulativeAttempts != 1 {
-		t.Fatalf("pre-reset failed-verification status = %#v", failed)
+	if failed.DecisionRequired || failed.NextAction != RuntimeActionBegin {
+		t.Fatalf("routine failure is not retryable: %#v", failed)
 	}
-
-	_, resetErr := store.Reset(context.Background(), ResetObjectiveRequest{
+	reset, err := store.Reset(context.Background(), ResetObjectiveRequest{
 		ExpectedRevision: failed.Revision, RequestID: "verify-reset-1",
-		Reason: "failed evidence proves implementation must remediate", Actor: "maintainer",
-	})
-	if !errors.Is(resetErr, ErrRuntimeResetNotAllowed) {
-		t.Fatalf("zero-drift reset error = %v, want ErrRuntimeResetNotAllowed", resetErr)
-	}
-	for _, want := range []string{
-		"gentle-ai sdd-attempt rescope",
-		"--expected-revision " + strconv.Quote(failed.Revision),
-		"at most 40",
-		"decision-required",
-	} {
-		if !strings.Contains(resetErr.Error(), want) {
-			t.Fatalf("zero-drift reset refusal does not name %q: %v", want, resetErr)
-		}
-	}
-
-	// Exit 1 runs: the rescope the refusal names is admitted at this exact
-	// revision, with the ceiling it advertises.
-	rescoped, err := store.Rescope(context.Background(), RescopeObjectiveRequest{
-		ExpectedRevision: failed.Revision, RequestID: "verify-rescope-1",
-		WorkUnit: "verification-remediation", EvidenceGoal: "remediate the verification gap",
-		MaxAttempts: 2, MaxChangedLines: 40,
-		Reason: "failed evidence names the remediation", Actor: "maintainer",
+		Reason: "caller explicitly chose compatibility reset", Actor: "maintainer",
 	})
 	if err != nil {
-		t.Fatalf("the rescope this refusal names was refused: %v", err)
+		t.Fatalf("backward-compatible reset was refused: %v", err)
 	}
-	if rescoped.Objective == nil || rescoped.Objective.WorkUnit != "verification-remediation" ||
-		rescoped.CumulativeAttempts != 1 {
-		t.Fatalf("rescoped objective = %#v", rescoped)
+	if reset.Objective != nil || reset.LastReset == nil || len(reset.Attempts) != 1 {
+		t.Fatalf("compatibility reset lost history: %#v", reset)
 	}
 }
 
@@ -946,8 +853,8 @@ func TestRuntimeLedgerZeroDriftResetRefusalNamesBothExits(t *testing.T) {
 // exit #1974's refusal now names, and the reason the narrow-only rescope rule
 // is not itself a deadlock: a caller who needs a successor budget WIDER than
 // the failed objective's ceiling spends the remaining attempts honestly, and
-// the run that exhausts them reaches decision-required, where reset opens a
-// fresh budget of any size.
+// repeated failures remain retryable, while explicit reset may still open a
+// fresh compatibility objective of any size.
 func TestRuntimeLedgerExhaustedAttemptsAdmitTheResetForAWiderScope(t *testing.T) {
 	repo := initRuntimeLedgerRepo(t)
 	store, err := OpenRuntimeStore(context.Background(), repo, "reset-exit-1974-wider")
@@ -974,8 +881,8 @@ func TestRuntimeLedgerExhaustedAttemptsAdmitTheResetForAWiderScope(t *testing.T)
 			t.Fatalf("finish %d: %v", ordinal+1, finishErr)
 		}
 		revision = finished.Revision
-		if ordinal == 1 && (!finished.DecisionRequired || finished.NextAction != RuntimeActionReset) {
-			t.Fatalf("exhausting the attempt budget did not reach decision-required: %#v", finished)
+		if ordinal == 1 && (finished.DecisionRequired || finished.NextAction != RuntimeActionBegin) {
+			t.Fatalf("accounting ceiling blocked retry: %#v", finished)
 		}
 	}
 
@@ -984,7 +891,7 @@ func TestRuntimeLedgerExhaustedAttemptsAdmitTheResetForAWiderScope(t *testing.T)
 		Reason: "verification exhausted its budget; remediation needs a wider scope", Actor: "maintainer",
 	})
 	if err != nil {
-		t.Fatalf("reset at decision-required was refused: %v", err)
+		t.Fatalf("explicit compatibility reset was refused: %v", err)
 	}
 
 	// The fresh objective may exceed the exhausted one's ceiling, which is the
@@ -1047,14 +954,13 @@ func TestRuntimeLedgerWidenedRescopeRefusalNamesTheExhaustRoute(t *testing.T) {
 	if !errors.Is(widenErr, ErrRuntimeRescopeWidened) {
 		t.Fatalf("widened rescope error = %v, want ErrRuntimeRescopeWidened", widenErr)
 	}
-	for _, want := range []string{"1 remaining attempt", "decision-required", "gentle-ai sdd-attempt reset"} {
+	for _, want := range []string{"compatibility telemetry", "retry remains available"} {
 		if !strings.Contains(widenErr.Error(), want) {
 			t.Fatalf("widened rescope refusal does not name %q: %v", want, widenErr)
 		}
 	}
 
-	// Walk the route the refusal names: spend the last attempt, land on
-	// decision-required, reset, and open the wider budget rescope refused.
+	// Record another retry, then exercise explicit reset compatibility.
 	last, err := store.Begin(context.Background(), BeginAttemptRequest{
 		ExpectedRevision: failed.Revision, RequestID: "widen-begin-2", WorkUnit: "independent-verification",
 		EvidenceGoal: "independently verify the applied change", MaxAttempts: 2, MaxChangedLines: 40,
@@ -1071,8 +977,8 @@ func TestRuntimeLedgerWidenedRescopeRefusalNamesTheExhaustRoute(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !exhausted.DecisionRequired {
-		t.Fatalf("the route the refusal names did not reach decision-required: %#v", exhausted)
+	if exhausted.DecisionRequired || exhausted.NextAction != RuntimeActionBegin {
+		t.Fatalf("repeated failure did not remain retryable: %#v", exhausted)
 	}
 	after, err := store.Reset(context.Background(), ResetObjectiveRequest{
 		ExpectedRevision: exhausted.Revision, RequestID: "widen-reset-1",

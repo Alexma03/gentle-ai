@@ -14,9 +14,8 @@ import (
 // anti-laundering budget (one passed correction per failed evidence) is
 // pinned at the unit level in runtime_ledger_chain_binding_test.go.
 
-// sddChainVerifyObjective exhausts its budget on the single failed
-// verification attempt, which is exactly the decision-required state the
-// audited reset exists to escape (#1974 field report).
+// sddChainVerifyObjective records a one-shot compatibility ceiling. Failure
+// remains retryable; the following reset is retained as an explicit legacy path.
 var sddChainVerifyObjective = []string{
 	"--work-unit", "bench chain verification",
 	"--evidence-goal", "admit the verification failure",
@@ -24,7 +23,7 @@ var sddChainVerifyObjective = []string{
 }
 
 // sddChainFailedVerificationExhaustsBudget settles the admitted verification
-// failure and proves the runtime demands a maintainer decision.
+// failure and proves accounting does not demand a maintainer decision.
 func sddChainFailedVerificationExhaustsBudget(r *journeyRun) error {
 	acquire := r.run(append([]string{
 		"sdd-attempt", "acquire", "--cwd", r.sandbox.Repo, "--change", sddChange,
@@ -46,14 +45,14 @@ func sddChainFailedVerificationExhaustsBudget(r *journeyRun) error {
 	if err != nil {
 		return err
 	}
-	if proved.ActiveAttempt != nil || len(proved.Attempts) != 1 || proved.Attempts[0].Outcome != "failed" || proved.NextAction != "reset" {
-		return fmt.Errorf("exhausted failed verification did not demand a maintainer decision: %#v", proved)
+	if proved.ActiveAttempt != nil || len(proved.Attempts) != 1 || proved.Attempts[0].Outcome != "failed" || proved.NextAction != "begin" {
+		return fmt.Errorf("failed verification did not remain retryable: %#v", proved)
 	}
 	return nil
 }
 
-// sddChainAuditedReset records the maintainer decision between the failed
-// settle and the correction acquire. The reset wipes the live evidence
+// sddChainAuditedReset exercises the backward-compatible explicit reset between
+// the failed settle and the correction acquire. The reset wipes the live evidence
 // pointer; only the immutable attempt chain remembers the failed evidence.
 func sddChainAuditedReset(r *journeyRun) error {
 	status, err := readRuntimeStatus(r)
@@ -61,7 +60,7 @@ func sddChainAuditedReset(r *journeyRun) error {
 		return err
 	}
 	r.run(sddAttemptArgs(r, "reset", status.Revision, "bench-chain-reset",
-		"--reason", "maintainer decision: remediate the admitted failure under a fresh objective",
+		"--reason", "exercise explicit compatibility reset before remediation",
 		"--actor", "bench"), false)
 	proved, err := proveRuntime(r.sandbox)
 	if err != nil {
@@ -154,8 +153,8 @@ func sddChainJourneys() []Journey {
 			Steps: []Step{
 				{Name: "fixture: completed change with admitted failed verification", Fixture: sddPlanningArtifacts(sddFailedVerifyReport)},
 				{Name: "mode disable", Requires: modeCapability, Args: productArgs("review", "mode", "disable", "--json")},
-				{Name: "failed verification exhausts its objective budget", Requires: sddAttemptBeginCapability, Composite: sddChainFailedVerificationExhaustsBudget},
-				{Name: "audited reset records the maintainer decision", Requires: sddAttemptResetCapability, Composite: sddChainAuditedReset},
+				{Name: "failed verification remains retryable at its objective ceiling", Requires: sddAttemptBeginCapability, Composite: sddChainFailedVerificationExhaustsBudget},
+				{Name: "explicit compatibility reset preserves the failed-evidence chain", Requires: sddAttemptResetCapability, Composite: sddChainAuditedReset},
 				{Name: "acquire the one bounded correction after the reset", Requires: sddAttemptRemediationCapability, Composite: sddUnmanagedAcquireCorrection},
 				{Name: "fixture: correction changes the candidate", Fixture: sddBoundedCorrection},
 				{Name: "settle the evidence-bound correction across the reset", Requires: sddAttemptRemediationCapability, Composite: sddUnmanagedCorrectionCompletes},
@@ -179,8 +178,8 @@ func sddChainJourneys() []Journey {
 			Steps: []Step{
 				{Name: "fixture: completed change with admitted failed verification", Fixture: sddPlanningArtifacts(sddFailedVerifyReport)},
 				{Name: "mode disable", Requires: modeCapability, Args: productArgs("review", "mode", "disable", "--json")},
-				{Name: "failed verification exhausts its objective budget", Requires: sddAttemptBeginCapability, Composite: sddChainFailedVerificationExhaustsBudget},
-				{Name: "audited reset records the maintainer decision", Requires: sddAttemptResetCapability, Composite: sddChainAuditedReset},
+				{Name: "failed verification remains retryable at its objective ceiling", Requires: sddAttemptBeginCapability, Composite: sddChainFailedVerificationExhaustsBudget},
+				{Name: "explicit compatibility reset preserves the failed-evidence chain", Requires: sddAttemptResetCapability, Composite: sddChainAuditedReset},
 				{Name: "later interruption records distinct live evidence", Requires: sddAttemptRemediationCapability, Composite: sddChainInterruptedAttempt},
 				{Name: "acquire the correction bound to the original failed evidence", Requires: sddAttemptRemediationCapability, Composite: sddUnmanagedAcquireCorrection},
 				{Name: "fixture: correction changes the candidate", Fixture: sddBoundedCorrection},

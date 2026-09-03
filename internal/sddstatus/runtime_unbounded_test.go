@@ -184,17 +184,17 @@ func TestRuntimeRescopePreservesLimitKind(t *testing.T) {
 			t.Fatalf("unbounded rescope gained a line ceiling: %#v", rescoped.Objective)
 		}
 
-		_, err = store.Begin(context.Background(), BeginAttemptRequest{
+		continued, err := store.Begin(context.Background(), BeginAttemptRequest{
 			ExpectedRevision: rescoped.Revision, RequestID: "unbounded-positive-continuation", WorkUnit: "narrower-unit",
 			EvidenceGoal: "remain unbounded", MaxAttempts: 3, MaxChangedLines: 10,
 		})
-		if !errors.Is(err, ErrRuntimeObjectiveChange) {
-			t.Fatalf("positive continuation on unbounded objective = %v, want ErrRuntimeObjectiveChange", err)
+		if err != nil || continued.ActiveAttempt == nil || continued.Objective.MaxChangedLines != 0 {
+			t.Fatalf("advisory positive continuation on unbounded objective = %#v err=%v", continued, err)
 		}
 	})
 }
 
-func TestRuntimePositiveHistoricalLimitStillExhaustsAndReplays(t *testing.T) {
+func TestRuntimePositiveHistoricalLimitRemainsAdvisoryAndReplays(t *testing.T) {
 	repo := initRuntimeLedgerRepo(t)
 	store := mustRuntimeStore(t, repo, "positive-limit-replay")
 	started, err := store.Begin(context.Background(), BeginAttemptRequest{
@@ -214,14 +214,14 @@ func TestRuntimePositiveHistoricalLimitStillExhaustsAndReplays(t *testing.T) {
 		t.Fatal(err)
 	}
 	last := finished.Attempts[len(finished.Attempts)-1]
-	if !last.ChangedLineBudgetExceeded || !finished.DecisionRequired || finished.Complete {
-		t.Fatalf("positive historical limit was not enforced: status=%#v attempt=%#v", finished, last)
+	if !last.ChangedLineBudgetExceeded || finished.DecisionRequired || !finished.Complete {
+		t.Fatalf("positive historical telemetry blocked passing evidence: status=%#v attempt=%#v", finished, last)
 	}
 	replayed, err := store.Status()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !replayed.DecisionRequired || replayed.Objective == nil || replayed.Objective.MaxChangedLines != 5 {
+	if replayed.DecisionRequired || !replayed.Complete || replayed.Objective == nil || replayed.Objective.MaxChangedLines != 5 {
 		t.Fatalf("positive historical limit did not replay: %#v", replayed)
 	}
 }

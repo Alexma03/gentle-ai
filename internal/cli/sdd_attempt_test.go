@@ -43,7 +43,7 @@ func TestRunSDDAttemptLifecycleIsMachineReadableAndResetExplicit(t *testing.T) {
 		"--diagnosis", "CLI harness reproduced the bounded runtime failure", "--harness-disposition", "reused",
 		"--cleanup-evidence", "CLI cleanup completed", "--process-evidence", "CLI process scan found no descendants",
 	})
-	if !failed.DecisionRequired || failed.NextAction != sddstatus.RuntimeActionReset {
+	if failed.DecisionRequired || failed.NextAction != sddstatus.RuntimeActionBegin {
 		t.Fatalf("finish CLI status = %#v", failed)
 	}
 

@@ -1,7 +1,6 @@
 package sddstatus
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -19,14 +18,13 @@ func TestApplyNativeRuntimeErrorRoutingRendersWindowsPathVerbatim(t *testing.T) 
 	}
 }
 
-func TestApplyNativeRuntimeRoutingRendersWindowsPathVerbatim(t *testing.T) {
+func TestApplyNativeRuntimeRoutingIgnoresLegacyAccountingDecision(t *testing.T) {
 	status := &Status{RuntimeStatus: &RuntimeStatus{Change: "my-change", DecisionRequired: true}}
 	status.ActionContext.WorkspaceRoot = `C:\Users\dev\repo`
 	applyNativeRuntimeRouting(status)
 	got := strings.Join(status.BlockedReasons, "\n")
-	want := `in "C:\Users\dev\repo"`
-	if !strings.Contains(got, want) {
-		t.Fatalf("blocked-runtime reason does not contain the path as the filesystem knows it:\nwant substring: %s\ngot: %s", want, got)
+	if got != "" {
+		t.Fatalf("legacy accounting decision rendered a hard block: %s", got)
 	}
 }
 
@@ -113,7 +111,7 @@ func TestRuntimeObjectiveChangeRefusalRendersWindowsPathVerbatim(t *testing.T) {
 	store := RuntimeStore{Workspace: `C:\Users\dev\repo`, Change: "my-change"}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := store.runtimeObjectiveChangeRefusal(context.Background(), tt.status)
+			err := store.runtimeObjectiveChangeRefusal(tt.status)
 			if occurrences := strings.Count(err.Error(), want); occurrences != tt.occurrences {
 				t.Fatalf("objective-change refusal must carry the verbatim path:\nwant %d occurrences of %s, got %d\ngot: %s", tt.occurrences, want, occurrences, err)
 			}

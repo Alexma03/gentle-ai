@@ -90,8 +90,9 @@ type sddRuntimeStatus struct {
 		Reason               string `json:"reason"`
 		Actor                string `json:"actor"`
 	} `json:"last_rescope"`
-	NextAction string `json:"next_action"`
-	Complete   bool   `json:"complete"`
+	NextAction       string `json:"next_action"`
+	Complete         bool   `json:"complete"`
+	DecisionRequired bool   `json:"decision_required"`
 }
 
 type sddCompactAttemptResult struct {

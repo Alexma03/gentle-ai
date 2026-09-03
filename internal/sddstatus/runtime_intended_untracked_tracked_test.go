@@ -2,7 +2,6 @@ package sddstatus
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -164,8 +163,8 @@ func TestRuntimeResetAdmissibleAfterIntendedUntrackedCommitDrift(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "sdd-attempt reset") {
 		t.Fatalf("changed-objective refusal after commit drift = %v, want the reset exit named", err)
 	}
-	// And the reset the refusal names must actually run: its drift check and
-	// its fresh capture both replay the recorded selection.
+	// And the reset the refusal names must actually run while replaying the
+	// recorded selection.
 	reset, err := store.Reset(context.Background(), ResetObjectiveRequest{
 		ExpectedRevision: failed.Revision, RequestID: "tracked-admissible-reset",
 		Reason: "maintainer decision: the selected file landed and the candidate moved on",
@@ -180,10 +179,9 @@ func TestRuntimeResetAdmissibleAfterIntendedUntrackedCommitDrift(t *testing.T) {
 }
 
 // The overlay identity binds only trees and paths, so committing the selected
-// path with no other edit keeps the candidate byte-identical — that is
-// rescope's zero-drift shape, not reset's. The changed-objective refusal must
-// name the rescope exit, the elective reset must stay refused, and the rescope
-// itself must run through both of its reconciled captures.
+// path with no other edit keeps the candidate byte-identical. Reset is now
+// structurally authorized for every terminal objective, so the changed-scope
+// refusal must name reset even though legacy rescope remains available.
 func TestRuntimeRescopeAdmissibleAfterIntendedUntrackedLandsByteIdentical(t *testing.T) {
 	repo := initRuntimeLedgerRepo(t)
 	if err := os.WriteFile(filepath.Join(repo, "selected.txt"), []byte("selected\n"), 0o644); err != nil {
@@ -211,18 +209,10 @@ func TestRuntimeRescopeAdmissibleAfterIntendedUntrackedLandsByteIdentical(t *tes
 		ExpectedRevision: failed.Revision, RequestID: "tracked-zero-drift-changed", WorkUnit: "other",
 		EvidenceGoal: "independent verification", MaxAttempts: 2, MaxChangedLines: 20,
 	})
-	if err == nil || !strings.Contains(err.Error(), "sdd-attempt rescope") {
-		t.Fatalf("changed-objective refusal after a byte-identical landing = %v, want the rescope exit named", err)
+	if err == nil || !strings.Contains(err.Error(), "sdd-attempt reset") {
+		t.Fatalf("changed-objective refusal after a byte-identical landing = %v, want the reset exit named", err)
 	}
-	// The elective reset stays refused: the reconciled drift capture must
-	// succeed and answer zero drift instead of dying on the replayed
-	// selection.
-	if _, err := store.Reset(context.Background(), ResetObjectiveRequest{
-		ExpectedRevision: failed.Revision, RequestID: "tracked-zero-drift-reset",
-		Reason: "elective reset over an unmoved candidate", Actor: "maintainer",
-	}); !errors.Is(err, ErrRuntimeResetNotAllowed) {
-		t.Fatalf("zero-drift reset after the landing = %v, want ErrRuntimeResetNotAllowed", err)
-	}
+	// A caller may still choose the retained audited rescope directly.
 	rescoped, err := store.Rescope(context.Background(), RescopeObjectiveRequest{
 		ExpectedRevision: failed.Revision, RequestID: "tracked-zero-drift-rescope",
 		WorkUnit: "narrower verify", EvidenceGoal: "narrower verification",

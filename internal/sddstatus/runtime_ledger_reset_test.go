@@ -52,7 +52,7 @@ func TestRuntimeLedgerExplicitResetStartsDistinctBudgetWithoutLosingHistory(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !exhausted.DecisionRequired || exhausted.NextAction != RuntimeActionReset {
+	if exhausted.DecisionRequired || exhausted.NextAction != RuntimeActionBegin {
 		t.Fatalf("exhausted objective status = %#v", exhausted)
 	}
 	oldObjectiveID := exhausted.Objective.ID
@@ -125,22 +125,22 @@ func TestRuntimeLedgerResetRequiresTerminalObjectiveAndExactCAS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = store.Reset(context.Background(), ResetObjectiveRequest{
+	reset, err := store.Reset(context.Background(), ResetObjectiveRequest{
 		ExpectedRevision: failed.Revision, RequestID: "reset-early", Reason: "attempted early reset", Actor: "maintainer",
 	})
-	if !errors.Is(err, ErrRuntimeResetNotAllowed) {
-		t.Fatalf("early reset error = %v", err)
+	if err != nil || reset.LastReset == nil {
+		t.Fatalf("terminal compatibility reset = %#v err=%v", reset, err)
 	}
 	_, err = store.Reset(context.Background(), ResetObjectiveRequest{
 		ExpectedRevision: started.Revision, RequestID: "reset-stale", Reason: "attempted stale reset", Actor: "maintainer",
 	})
 	var conflict *RuntimeRevisionConflictError
-	if !errors.As(err, &conflict) || conflict.Current != failed.Revision {
+	if !errors.As(err, &conflict) || conflict.Current != reset.Revision {
 		t.Fatalf("stale reset error = %T %#v", err, err)
 	}
 	status, statusErr := store.Status()
-	if statusErr != nil || status.Revision != failed.Revision || countRuntimeRecords(t, store.Dir) != 2 {
-		t.Fatalf("denied resets mutated ledger: status=%#v err=%v records=%d", status, statusErr, countRuntimeRecords(t, store.Dir))
+	if statusErr != nil || status.Revision != reset.Revision || countRuntimeRecords(t, store.Dir) != 3 {
+		t.Fatalf("reset/CAS state = status=%#v err=%v records=%d", status, statusErr, countRuntimeRecords(t, store.Dir))
 	}
 }
 
@@ -212,7 +212,7 @@ func TestRuntimeLedgerCASAllowsOnlyOneConcurrentBudgetReset(t *testing.T) {
 		HarnessDisposition: HarnessReused, CleanupEvidence: "concurrent reset cleanup completed",
 		ProcessEvidence: "concurrent reset process scan found no descendants",
 	})
-	if err != nil || !exhausted.DecisionRequired {
+	if err != nil || exhausted.DecisionRequired || exhausted.NextAction != RuntimeActionBegin {
 		t.Fatalf("prepare concurrent reset = %#v err=%v", exhausted, err)
 	}
 
@@ -457,10 +457,9 @@ func TestRuntimeLedgerDriftResetRequiresMaintainerAuthorization(t *testing.T) {
 
 // TestRuntimeLedgerResetWithoutDriftStillRequiresTerminalScope guards the
 // narrower scope of the fix: an early elective reset after a terminal
-// failed/interrupted attempt, with the candidate unchanged (begin would
-// still succeed), must remain refused so the per-objective budget cannot be
-// laundered by resetting instead of retrying.
-func TestRuntimeLedgerResetWithoutDriftStillRequiresTerminalScope(t *testing.T) {
+// failed/interrupted attempt with an unchanged candidate remains retryable;
+// explicit reset is retained only for backward-compatible callers.
+func TestRuntimeLedgerResetWithoutDriftRemainsCompatibleAtTerminalScope(t *testing.T) {
 	repo := initRuntimeLedgerRepo(t)
 	store, err := OpenRuntimeStore(context.Background(), repo, "no-drift-guard")
 	if err != nil {
@@ -482,11 +481,11 @@ func TestRuntimeLedgerResetWithoutDriftStillRequiresTerminalScope(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = store.Reset(context.Background(), ResetObjectiveRequest{
+	reset, err := store.Reset(context.Background(), ResetObjectiveRequest{
 		ExpectedRevision: interrupted.Revision, RequestID: "no-drift-reset-1",
 		Reason: "attempted early elective reset with no drift", Actor: "maintainer",
 	})
-	if !errors.Is(err, ErrRuntimeResetNotAllowed) {
-		t.Fatalf("undrifted early reset error = %v, want ErrRuntimeResetNotAllowed", err)
+	if err != nil || reset.LastReset == nil || len(reset.Attempts) != 1 {
+		t.Fatalf("undrifted terminal reset = %#v err=%v", reset, err)
 	}
 }

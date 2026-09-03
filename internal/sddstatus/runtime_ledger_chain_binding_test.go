@@ -34,10 +34,10 @@ func TestRuntimeUnmanagedRemediationBindsAcrossAuditedReset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !failed.DecisionRequired || failed.NextAction != RuntimeActionReset {
-		t.Fatalf("exhausted failed verification = %#v", failed)
+	if failed.DecisionRequired || failed.NextAction != RuntimeActionBegin {
+		t.Fatalf("failed verification was not retryable = %#v", failed)
 	}
-	// The audited reset is the documented escape from decision-required. It
+	// The explicit reset is retained as a backward-compatible transition. It
 	// wipes the live evidence pointer; only the attempt chain remembers.
 	reset, err := store.Reset(context.Background(), ResetObjectiveRequest{
 		ExpectedRevision: failed.Revision, RequestID: "chain-audited-reset",

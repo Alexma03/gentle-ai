@@ -199,7 +199,7 @@ func runPrintedConsecutiveRescopeRepair(r *journeyRun) error {
 		DecisionRequired bool   `json:"decision_required"`
 		NextAction       string `json:"next_action"`
 	}
-	if err := json.Unmarshal([]byte(strings.TrimSpace(repaired.Stdout)), &repairedStatus); err != nil || !repairedStatus.DecisionRequired || repairedStatus.NextAction != "reset" {
+	if err := json.Unmarshal([]byte(strings.TrimSpace(repaired.Stdout)), &repairedStatus); err != nil || repairedStatus.DecisionRequired || repairedStatus.NextAction != "begin" {
 		return fmt.Errorf("repair result = %#v, parse=%v", repairedStatus, err)
 	}
 	entries, err := os.ReadDir(recordDir)
@@ -217,7 +217,7 @@ func runPrintedConsecutiveRescopeRepair(r *journeyRun) error {
 		}
 	}
 	status := r.run([]string{"sdd-attempt", "status", "--cwd", r.sandbox.Repo, "--change", rc1ConsecutiveRescopeChange}, false)
-	if status.ExitCode != 0 || !strings.Contains(status.Stdout, `"last_repair"`) || !strings.Contains(status.Stdout, `"decision_required": true`) || !strings.Contains(status.Stdout, `"next_action": "reset"`) {
+	if status.ExitCode != 0 || !strings.Contains(status.Stdout, `"last_repair"`) || !strings.Contains(status.Stdout, `"decision_required": false`) || !strings.Contains(status.Stdout, `"next_action": "begin"`) {
 		return fmt.Errorf("status after printed repair = exit %d, stdout %q, stderr %q", status.ExitCode, firstLine(status.Stdout), firstLine(status.Stderr))
 	}
 	reset := r.run([]string{"sdd-attempt", "reset", "--cwd", r.sandbox.Repo, "--change", rc1ConsecutiveRescopeChange, "--expected-revision", repairedStatus.Revision, "--request-id", "bench-2839-reset", "--actor", "bench-maintainer", "--reason", "reset repaired exhausted objective"}, false)

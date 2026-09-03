@@ -67,7 +67,7 @@ func TestRuntimeLedgerRepairsPublishedConsecutiveRescope(t *testing.T) {
 	if err != nil || string(after) != string(before) {
 		t.Fatalf("poisoned record changed: err=%v", err)
 	}
-	if repaired.Objective == nil || repaired.Objective.ID != b.Objective.ID || repaired.LastRepair == nil || repaired.LastRepair.ReplacedRevision != poisonRevision || repaired.LastReset != nil || !repaired.DecisionRequired || repaired.NextAction != RuntimeActionReset || repaired.CumulativeAttempts != 1 {
+	if repaired.Objective == nil || repaired.Objective.ID != b.Objective.ID || repaired.LastRepair == nil || repaired.LastRepair.ReplacedRevision != poisonRevision || repaired.LastReset != nil || repaired.DecisionRequired || repaired.NextAction != RuntimeActionBegin || repaired.CumulativeAttempts != 1 {
 		t.Fatalf("repaired status = %#v", repaired)
 	}
 	reset, err := store.Reset(context.Background(), ResetObjectiveRequest{ExpectedRevision: repaired.Revision, RequestID: "reset-b", Reason: "reset repaired exhausted objective", Actor: "maintainer"})
