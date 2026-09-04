@@ -83,7 +83,7 @@ Reviewers inspect only provider-bound immutable trees. They never inspect the li
 
 Native Go alone selects lenses, classifies candidate causality, performs refutation, derives repository evidence, and permits at most one bounded correction. A validator that cannot inspect its immutable trees has no verdict; report that block rather than submitting a failed validation.
 
-The user-owned RDD switch is the complete authorization for review. When enabled, medium- and high-risk START runs automatically without a candidate-scoped consent prompt. Use the global or clone-local disable command as the durable kill switch.
+The user-owned RDD switch is the complete authorization for review. After an authorized source mutation is normalized and before reporting it complete, the agent enters the lifecycle once. When enabled, applicable START runs automatically without a candidate-scoped consent prompt. Use the global or clone-local disable command as the durable kill switch.
 
 ## Delivery remains human-owned
 

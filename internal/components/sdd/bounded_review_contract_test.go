@@ -55,6 +55,8 @@ func boundedReviewRequiredClausesFor(agent model.AgentID) []string {
 	return append(captureTransportClausesFor(agent), []string{
 		"Native Compact Review Orchestration",
 		"gentle-ai review status --cwd <repo> --contract gentle-ai.review-integration/v2 --agent " + string(agent) + " --next-transition",
+		"## Entry rule",
+		"before reporting it complete",
 		"Selectorless STATUS only preflights the current worktree candidate",
 		"START freezes one compact atomic transaction",
 		"run that provider-issued command verbatim",
@@ -100,6 +102,24 @@ func boundedReviewRequiredClausesFor(agent model.AgentID) []string {
 		"persist the pending state before prompting",
 		"STOP without invoking `sdd-propose`",
 	}...)
+}
+
+func TestReviewLifecycleContractNamesAutomaticEntryBeforeLifecycle(t *testing.T) {
+	content := boundedReviewContract()
+	entry := strings.Index(content, "## Entry rule")
+	lifecycle := strings.Index(content, "## Atomic lifecycle")
+	if entry < 0 || lifecycle < 0 || entry >= lifecycle {
+		t.Fatalf("entry rule index %d must precede atomic lifecycle index %d", entry, lifecycle)
+	}
+	for _, want := range []string{
+		"before reporting it complete",
+		"The enabled switch is complete authorization",
+		"do not request or relay a second candidate-scoped consent",
+	} {
+		if !strings.Contains(content, want) {
+			t.Errorf("shared contract missing automatic entry clause %q", want)
+		}
+	}
 }
 
 func TestReviewLifecycleContractRequiresAtomicBurnAndNonDecidingDelivery(t *testing.T) {
