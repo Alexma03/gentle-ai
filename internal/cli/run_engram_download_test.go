@@ -308,6 +308,7 @@ func TestRunInstallBetaEngramUsesMainGoInstallAndInstalledBinary(t *testing.T) {
 	}
 	betaEngram := filepath.Join(gobin, binaryName)
 
+	restoreHome := osUserHomeDir
 	restoreCommand := runCommand
 	restoreLookPath := cmdLookPath
 	restoreGoEnv := goEnv
@@ -315,6 +316,7 @@ func TestRunInstallBetaEngramUsesMainGoInstallAndInstalledBinary(t *testing.T) {
 	restoreVerifyVersionCommand := verifyEngramVersionCommand
 	restoreProbeCommand := probeEngramProtocolFlagCommand
 	t.Cleanup(func() {
+		osUserHomeDir = restoreHome
 		runCommand = restoreCommand
 		cmdLookPath = restoreLookPath
 		goEnv = restoreGoEnv
@@ -323,6 +325,7 @@ func TestRunInstallBetaEngramUsesMainGoInstallAndInstalledBinary(t *testing.T) {
 		probeEngramProtocolFlagCommand = restoreProbeCommand
 	})
 
+	osUserHomeDir = func() (string, error) { return home, nil }
 	cmdLookPath = func(name string) (string, error) {
 		if name == "engram" {
 			return "/usr/local/bin/engram", nil
@@ -376,6 +379,9 @@ func TestRunInstallBetaEngramUsesMainGoInstallAndInstalledBinary(t *testing.T) {
 	}
 	if probeCommand != betaEngram {
 		t.Fatalf("expected protocol probe to use beta engram binary %q, got %q", betaEngram, probeCommand)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".claude.json")); err != nil {
+		t.Fatalf("expected install state under isolated test home: %v", err)
 	}
 }
 
