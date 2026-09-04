@@ -629,7 +629,6 @@ internal/reviewtransaction/rar_plan_authority.go	"verification obligation %q is 
 internal/reviewtransaction/rar_plan_authority.go	"verification plan does not require frozen-plan consent"
 internal/reviewtransaction/rar_plan_authority.go	"verification plan does not require immediate authorization"
 internal/reviewtransaction/rar_plan_authority.go	"verification plan that runs nothing cannot bind effect dimensions"
-internal/reviewtransaction/rdd_mode.go	"clone-local review consent latch is corrupt"
 internal/reviewtransaction/rdd_mode.go	"clone-local review mode generation space is exhausted"
 internal/reviewtransaction/rdd_mode.go	"clone-local review mode override is corrupt"
 internal/reviewtransaction/rdd_mode.go	"clone-local review mode override may only disable"
