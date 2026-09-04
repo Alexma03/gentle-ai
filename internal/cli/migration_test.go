@@ -21,7 +21,7 @@ func TestMigrateInstallStateUsesInstallLock(t *testing.T) {
 		t.Fatalf("MigrateInstallState() error=%v result=%#v, want selection-required", err, result)
 	}
 
-	lock, err := reviewtransaction.AcquireAuthorityFileLock(installStateLockPath(home))
+	lock, err := reviewtransaction.AcquireAuthorityFileLock(mustInstallStateLockPath(t, home))
 	if err != nil {
 		t.Fatal(err)
 	}
