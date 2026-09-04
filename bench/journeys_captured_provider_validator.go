@@ -110,6 +110,7 @@ func captureProviderValidatorSlotWithResultFor(r *journeyRun, lineage string, pa
 		"original_criteria":                map[string]any{"passed": passed, "evidence": []string{originalEvidence}},
 		"correction_regression":            map[string]any{"passed": true, "evidence": []string{"the correction introduced no unrelated regression"}},
 		"follow_ups":                       []any{},
+		"passed_note_unused":               "provider diagnostic ignored during raw targeted-validator admission",
 	})
 	if err != nil {
 		return err
