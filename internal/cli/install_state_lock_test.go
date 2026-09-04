@@ -8,11 +8,12 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/reviewtransaction"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/state"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/statecoord"
 )
 
 func TestPersistSyncManagedAssetStateReReadsLatestStateAfterLockContention(t *testing.T) {
 	home := t.TempDir()
-	held, err := reviewtransaction.AcquireAuthorityFileLock(installStateLockPath(home))
+	held, err := reviewtransaction.AcquireAuthorityFileLock(mustInstallStateLockPath(t, home))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,4 +46,13 @@ func TestPersistSyncManagedAssetStateRefusesCorruptLatestState(t *testing.T) {
 	if err := persistSyncManagedAssetState(home, model.Selection{}, "sha256:current-writer", ""); err == nil || !strings.Contains(err.Error(), "run `gentle-ai install`") {
 		t.Fatalf("corrupt sync state persistence error = %v", err)
 	}
+}
+
+func mustInstallStateLockPath(t *testing.T, home string) string {
+	t.Helper()
+	lockPath, err := statecoord.LockPath(home)
+	if err != nil {
+		t.Fatalf("install state lock path: %v", err)
+	}
+	return lockPath
 }

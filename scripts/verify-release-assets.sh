@@ -37,6 +37,7 @@ archives=(
   "gentle-ai_${version}_linux_amd64.tar.gz"
   "gentle-ai_${version}_linux_arm64.tar.gz"
   "gentle-ai-review-provider-contract-${contract_semver}.tar.gz"
+  "gentle-ai-release-provenance-v1.tar.gz"
 )
 expected_assets=("${archives[@]}" checksums.txt checksums.txt.minisig)
 

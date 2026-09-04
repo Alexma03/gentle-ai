@@ -4,6 +4,10 @@
 
 The parent orchestrator coordinates one native transaction; reviewers, refuters, correction actors, and validators receive only their provider-issued role input. Prompt prose never creates authority or decides delivery.
 
+## Entry rule
+
+Enter this lifecycle once per candidate after authorized source-mutating implementation is complete and normalized, and before reporting it complete, whenever the user-owned review switch is enabled (`gentle-ai review mode status` reads it without changing it). The enabled switch is complete authorization: run the selectorless STATUS in step 1 and route only from its returned `next_transition`; do not request or relay a second candidate-scoped consent. Skip review only for a trivial passive documentation-only edit, when RDD is disabled, or while a transaction is already bound to the candidate.
+
 ## Atomic lifecycle
 
 1. **Preflight only.** Selectorless STATUS only preflights the current worktree candidate and returns one exact START invocation. It never discovers, resumes, recovers, or evaluates ambient authority from another lineage or worktree: `gentle-ai review status --cwd <repo> --contract gentle-ai.review-integration/v2 --agent {{GENTLE_AI_RUNTIME_AGENT_ID}} --next-transition`.

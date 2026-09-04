@@ -11,7 +11,10 @@ import (
 	"github.com/gentleman-programming/gentle-ai/v2/internal/reviewtransaction"
 )
 
-const boundedReviewContractAsset = "skills/_shared/review-ledger-contract.md"
+const (
+	boundedReviewContractAsset   = "skills/_shared/review-ledger-contract.md"
+	boundedPiReviewContractAsset = "skills/_shared/review-ledger-contract-pi.md"
+)
 
 // reviewerBindingEnvironmentVariable is the prefix the orchestrator contract
 // tells the parent to assemble before running a lens. Naming it inside the lens
@@ -81,7 +84,27 @@ func renderSDDOrchestratorAsset(agent model.AgentID, options ...OrchestratorRend
 	return composeOrchestratorPrompt(agent, options...)
 }
 
+// ReviewExecutionContractFor returns the exact review execution contract text
+// a runtime receives when generic SDD composition renders it: the shared
+// ledger contract, its capture-transport paragraph, and its concurrent-lens
+// group addendum, all bound to the requesting agent's identity. It is the
+// single entry point the provider contract bundle (issue #4056) uses to ship
+// this text to a runtime whose adapter cannot render it into a live system
+// prompt, so that channel can never drift from what every other runtime's
+// installed contract says. It errors when the agent's compiled capability does
+// not advertise the review transport contract, matching the same gate
+// renderBoundedReviewAssetBody applies before splicing this section in.
+func ReviewExecutionContractFor(agent model.AgentID) (string, error) {
+	if !rendersReviewLifecycle(agent) {
+		return "", fmt.Errorf("%s does not render the review execution contract", agent)
+	}
+	return bindRuntimeAgentIdentity(boundedReviewContractFor(agent), agent), nil
+}
+
 func boundedReviewContractFor(agent model.AgentID) string {
+	if agent == model.AgentPi {
+		return strings.TrimSpace(assets.MustRead(boundedPiReviewContractAsset))
+	}
 	return selectReviewerCaptureTransport(boundedReviewContractSource(), agent)
 }
 
@@ -191,13 +214,14 @@ func renderBoundedReviewAssetBodyFromContent(agent model.AgentID, path, content 
 	return content
 }
 
-// rendersReviewLifecycle is deliberately derived from the canonical capability
-// manifest. An agent cannot receive the shared lifecycle prose unless it
-// advertises the review transport contract; generic SDD composition therefore
-// remains safe for runtimes outside the closed RDD set.
+// rendersReviewLifecycle is deliberately derived from both the provider's
+// closed runtime registry and the canonical capability manifest. An agent
+// cannot receive the shared lifecycle prose unless both boundaries admit it;
+// generic SDD composition therefore remains safe for runtimes outside the
+// closed RDD set.
 func rendersReviewLifecycle(agent model.AgentID) bool {
 	manifest, err := capabilitymanifest.ForAgent(agent)
-	return err == nil && manifest.Advertises(capabilitymanifest.ContractReviewTransportV1)
+	return err == nil && reviewerprovider.RegisteredRuntime(agent) && manifest.Advertises(capabilitymanifest.ContractReviewTransportV1)
 }
 
 func authorityFirstTerminalProcedure() string {
