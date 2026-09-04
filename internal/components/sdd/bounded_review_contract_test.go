@@ -40,6 +40,18 @@ func captureTransportClausesFor(agent model.AgentID) []string {
 }
 
 func boundedReviewRequiredClausesFor(agent model.AgentID) []string {
+	if agent == model.AgentPi {
+		return []string{
+			"Native Compact Review Orchestration",
+			"`gentle_review` with {\"operation\":\"inspect\"}",
+			"`gentle_review` with operation `status`, the exact retained `lineageId`, and `workspaceRoot` only when needed",
+			"`gentle_review_capture` for one current returned slot",
+			"`gentle_review_capture_group` for the complete current reviewer group",
+			"do not request or relay a second candidate-scoped consent",
+			"Only the exact provider-issued acknowledgement continuation burns approved authority",
+			"Commit, push, PR, and release remain separate human decisions under ordinary repository policy",
+		}
+	}
 	return append(captureTransportClausesFor(agent), []string{
 		"Native Compact Review Orchestration",
 		"gentle-ai review status --cwd <repo> --contract gentle-ai.review-integration/v2 --agent " + string(agent) + " --next-transition",
@@ -376,8 +388,16 @@ func TestAuthorityFirstLifecycleRendersForAdvertisedRuntimes(t *testing.T) {
 		}
 		rendered++
 		t.Run(string(agent.ID), func(t *testing.T) {
-			procedure := bindRuntimeAgentIdentity(authorityFirstTerminalProcedure(), agent.ID)
 			content := renderSDDOrchestratorAsset(agent.ID)
+			if agent.ID == model.AgentPi {
+				for _, want := range []string{"Inspect before START", "Stay bound", "Collect exactly", "Acknowledge exactly"} {
+					if !strings.Contains(content, want) {
+						t.Errorf("rendered Pi orchestrator missing facade lifecycle step %q", want)
+					}
+				}
+				return
+			}
+			procedure := bindRuntimeAgentIdentity(authorityFirstTerminalProcedure(), agent.ID)
 			if strings.Count(content, procedure) != 1 {
 				t.Fatal("rendered orchestrator does not contain exactly one canonical terminal procedure")
 			}
