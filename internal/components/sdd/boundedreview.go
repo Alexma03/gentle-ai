@@ -214,13 +214,14 @@ func renderBoundedReviewAssetBodyFromContent(agent model.AgentID, path, content 
 	return content
 }
 
-// rendersReviewLifecycle is deliberately derived from the canonical capability
-// manifest. An agent cannot receive the shared lifecycle prose unless it
-// advertises the review transport contract; generic SDD composition therefore
-// remains safe for runtimes outside the closed RDD set.
+// rendersReviewLifecycle is deliberately derived from both the provider's
+// closed runtime registry and the canonical capability manifest. An agent
+// cannot receive the shared lifecycle prose unless both boundaries admit it;
+// generic SDD composition therefore remains safe for runtimes outside the
+// closed RDD set.
 func rendersReviewLifecycle(agent model.AgentID) bool {
 	manifest, err := capabilitymanifest.ForAgent(agent)
-	return err == nil && manifest.Advertises(capabilitymanifest.ContractReviewTransportV1)
+	return err == nil && reviewerprovider.RegisteredRuntime(agent) && manifest.Advertises(capabilitymanifest.ContractReviewTransportV1)
 }
 
 func authorityFirstTerminalProcedure() string {
