@@ -333,7 +333,8 @@ func listActiveOpenSpecChanges(workspaceRoot string) ([]string, error) {
 
 	changes := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		if entry.IsDir() && entry.Name() != "archive" {
+		if entry.IsDir() && entry.Name() != "archive" && entry.Name() != "active" &&
+			!openSpecChangeContainer(filepath.Join(workspaceRoot, "openspec", "changes", entry.Name())) {
 			changes = append(changes, entry.Name())
 		}
 	}
