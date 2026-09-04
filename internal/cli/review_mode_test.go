@@ -7,7 +7,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -531,48 +530,6 @@ func TestTierZeroReviewStartNeverAsksForConsent(t *testing.T) {
 	if console.Len() != 0 {
 		t.Fatalf("tier 0 emitted a consent prompt:\n%s", console.String())
 	}
-	if asked, err := reviewtransaction.RDDConsentAsked(context.Background(), repo); err != nil || asked {
-		t.Fatalf("tier 0 consumed the one-time question: asked=%v err=%v", asked, err)
-	}
-}
-
-// reviewConsentChoicePattern matches one numbered answer the question offers.
-// The count is asserted, because turning reviews off for good must never be
-// reachable by pressing a number in a hurried moment.
-var reviewConsentChoicePattern = regexp.MustCompile(`(?m)^\s*\d+\)\s`)
-
-// assertReviewConsentPrompt checks the shared shape of the question: the value
-// framing, exactly the two offered answers, the deliberate off path named as a
-// trailing line rather than a choice, and the tier-specific reason. It also
-// rejects internal vocabulary, because the question is for a human.
-func assertReviewConsentPrompt(t *testing.T, prompt, reason string) string {
-	t.Helper()
-	for _, want := range []string{
-		reason,
-		"takes a bit longer",
-		"substantially safer",
-		"1) Run the review now",
-		"2) Not now, just this once",
-		"gentle-ai review mode disable",
-	} {
-		if !strings.Contains(prompt, want) {
-			t.Fatalf("consent prompt missing %q:\n%s", want, prompt)
-		}
-	}
-	if choices := reviewConsentChoicePattern.FindAllString(prompt, -1); len(choices) != 2 {
-		t.Fatalf("consent prompt offers %d numbered choices, want exactly 2:\n%s", len(choices), prompt)
-	}
-	for _, forbidden := range []string{"Never ask again", "never ask again", "3)"} {
-		if strings.Contains(prompt, forbidden) {
-			t.Fatalf("consent prompt still offers a permanent disable %q:\n%s", forbidden, prompt)
-		}
-	}
-	for _, forbidden := range []string{"gentle-ai.", "sha256:", "lineage", "schema", "contract", "lens"} {
-		if strings.Contains(prompt, forbidden) {
-			t.Fatalf("consent prompt leaked internal vocabulary %q:\n%s", forbidden, prompt)
-		}
-	}
-	return prompt
 }
 
 // stubReviewConsole replaces the console seam so the one-time question can be

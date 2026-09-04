@@ -15,9 +15,9 @@ import (
 )
 
 // TestReviewFacadeStartHighRiskCarriesConsentEvidencePhrases proves the
-// non-interactive START result relays the same human evidence phrases the
-// interactive consent prompt speaks, derived from the one shared helper, so a
-// headless agent can explain WHY the deeper review was selected.
+// non-interactive START result carries the human-readable evidence phrases
+// derived from the one shared helper, so a headless agent can explain WHY the
+// deeper review was selected.
 func TestReviewFacadeStartHighRiskCarriesConsentEvidencePhrases(t *testing.T) {
 	repo := initReviewCLIRepo(t)
 	writeReviewStartCandidate(t, repo, "service-token.ts", "export const token = 'candidate'\n", 0o644)
@@ -36,8 +36,8 @@ func TestReviewFacadeStartHighRiskCarriesConsentEvidencePhrases(t *testing.T) {
 	if !reflect.DeepEqual(started.RiskEvidence, want) {
 		t.Fatalf("start risk_evidence = %#v, want %#v", started.RiskEvidence, want)
 	}
-	// Prompt parity: the phrases must be exactly what the interactive consent
-	// prompt would say for the same assessed candidate, from the same helper.
+	// The phrases must come from the same risk-assessment projection used by
+	// negotiated starts, rather than from a second copy of the wording.
 	builder := reviewtransaction.SnapshotBuilder{Repo: repo}
 	intended, err := builder.DiscoverUnignoredUntracked(context.Background())
 	if err != nil {
@@ -57,18 +57,12 @@ func TestReviewFacadeStartHighRiskCarriesConsentEvidencePhrases(t *testing.T) {
 		t.Fatalf("start risk_evidence %#v does not derive from the shared consent helper %#v",
 			started.RiskEvidence, reviewConsentEvidencePhrases(assessment.Reasons))
 	}
-	prompt := reviewConsentPrompt(assessment)
-	for _, phrase := range started.RiskEvidence {
-		if !strings.Contains(prompt, phrase) {
-			t.Fatalf("interactive consent prompt %q does not speak phrase %q", prompt, phrase)
-		}
-	}
 }
 
 // TestReviewFacadeStartMediumRiskCarriesConsentReason proves a tier-1 start
-// relays the same consolidated-review reason the interactive consent prompt
-// speaks, so a headless agent can explain WHY a review is wanted. Issue #1822:
-// the phrase must come from the one shared wording source, never a second copy.
+// relays the consolidated-review reason, so a headless agent can explain WHY a
+// review is wanted. Issue #1822: the phrase must come from the one shared
+// wording source, never a second copy.
 // Issue #1827: the reason alone is not enough — the start must also name the
 // evidence path that made the candidate non-passive.
 func TestReviewFacadeStartMediumRiskCarriesConsentReason(t *testing.T) {
@@ -91,29 +85,6 @@ func TestReviewFacadeStartMediumRiskCarriesConsentReason(t *testing.T) {
 	want := "an executable change in view.go"
 	if !reflect.DeepEqual(started.RiskEvidence[1:], []string{want}) {
 		t.Fatalf("medium start risk_evidence = %#v, want the evidence phrase %q after the reason", started.RiskEvidence, want)
-	}
-	// Prompt parity: every phrase the START result carries must be spoken by
-	// the interactive consent prompt for the same assessed candidate.
-	builder := reviewtransaction.SnapshotBuilder{Repo: repo}
-	intended, err := builder.DiscoverUnignoredUntracked(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	snapshot, err := builder.Build(context.Background(), reviewtransaction.Target{
-		Kind: reviewtransaction.TargetCurrentChanges, Projection: reviewtransaction.ProjectionWorkspace, IntendedUntracked: intended,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	assessment, err := builder.AssessSnapshotRisk(context.Background(), snapshot)
-	if err != nil {
-		t.Fatal(err)
-	}
-	prompt := reviewConsentPrompt(assessment)
-	for _, phrase := range started.RiskEvidence {
-		if !strings.Contains(prompt, phrase) {
-			t.Fatalf("interactive consent prompt %q does not speak phrase %q", prompt, phrase)
-		}
 	}
 }
 

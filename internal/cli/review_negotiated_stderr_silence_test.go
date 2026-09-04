@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"os"
 	"sync"
@@ -105,11 +104,8 @@ func TestNegotiatedStatusStopIsByteSilentOnStderr(t *testing.T) {
 
 // TestNegotiatedStartUndeclaredConsentIsByteSilentOnStderr pins the START half
 // of the same contract: a negotiated START without a --consent declaration
-// reviews the candidate in the fail-safe direction, exactly like a headless
-// start, but announces nothing — the consent-skip notices are a human surface
-// and negotiated consent is carried by the typed consent envelope instead.
-// Neither the one-time consent latch nor the once-per-clone notice marker is
-// consumed, so a later plain (non-negotiated) start still shows the notice.
+// reviews the candidate automatically, but announces nothing: RDD is already
+// enabled for the user, so no candidate-scoped consent surface is involved.
 func TestNegotiatedStartUndeclaredConsentIsByteSilentOnStderr(t *testing.T) {
 	reviewEnabledHome(t)
 	repo := initReviewCLIRepo(t)
@@ -130,12 +126,6 @@ func TestNegotiatedStartUndeclaredConsentIsByteSilentOnStderr(t *testing.T) {
 	}
 	if got := stderr(); got != "" {
 		t.Fatalf("undeclared negotiated START wrote stderr, want zero bytes:\n%q", got)
-	}
-	if asked, err := reviewtransaction.RDDConsentAsked(context.Background(), repo); err != nil || asked {
-		t.Fatalf("negotiated START consumed the one-time question: asked=%v err=%v", asked, err)
-	}
-	if shown, err := reviewConsentNoticeAlreadyShown(context.Background(), repo); err != nil || shown {
-		t.Fatalf("negotiated START burned the once-per-clone notice marker: shown=%v err=%v", shown, err)
 	}
 }
 

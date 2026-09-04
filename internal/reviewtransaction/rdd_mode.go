@@ -36,13 +36,6 @@ const (
 	// generation instead of deleting history: CAS needs a head to compare
 	// against, and re-enabling needs a cutoff timestamp.
 	rddModeOverrideInherit = "inherit"
-
-	// rddConsentSchema identifies the one-shot latch recording that the user has
-	// already been asked whether receipt-driven development may run.
-	rddConsentSchema = "gentle-ai.rdd-consent-asked/v1"
-	// rddConsentName never matches the gen-%010d.json generation pattern, so the
-	// override head scan ignores it instead of mistaking it for a generation.
-	rddConsentName = "asked.json"
 )
 
 var (
@@ -66,19 +59,11 @@ var (
 	// impose receipt-driven development on every clone that checks it out.
 	ErrRDDModeRepositoryForcedOn = errors.New("clone-local review mode override may only disable")
 
-	// ErrRDDConsentCorrupt reports an unreadable one-shot consent latch.
-	ErrRDDConsentCorrupt = errors.New("clone-local review consent latch is corrupt")
-
 	// ErrRDDModePartiallyApplied reports a clone-scope decision this build
 	// recorded but could not publish at the readable location a coexisting
 	// gentle-ai reads. It is the opposite of a fallback: it exists so a
 	// half-applied kill switch can never be reported as a working one.
 	ErrRDDModePartiallyApplied = errors.New("clone-local review mode was not applied for every gentle-ai on this machine")
-
-	// rddConsentPayload is the exact latch content. It deliberately carries no
-	// timestamp: identical bytes keep the immutable no-replace publish idempotent,
-	// so recording the same answer twice can never raise a slot conflict.
-	rddConsentPayload = []byte(`{"schema":"` + rddConsentSchema + `"}` + "\n")
 )
 
 // RDDMode is the receipt-driven-development kill-switch value.
@@ -629,55 +614,6 @@ func AuthorizeRDDCandidate(status RDDModeStatus) error {
 		return &RDDDisabledError{Operation: RDDOperationStart, Source: status.Source}
 	}
 	return nil
-}
-
-// RDDConsentAsked reports whether this clone has already put the one-time review
-// question to the user.
-//
-// Only acceptance sets the latch. Declining applies to one candidate and records
-// nothing, so the next work unit is offered the review again — today's passive
-// documentation says nothing about tomorrow's migration. Turning reviews off for
-// good stays a deliberate `review mode disable`, never a keystroke in a hurry.
-//
-// The latch lives beside the clone-local override so both share one never-committed
-// scope: a fresh clone is asked once, no clone inherits another clone's answer, and
-// there is no second storage to reconcile.
-func RDDConsentAsked(ctx context.Context, repo string) (bool, error) {
-	if err := ctx.Err(); err != nil {
-		return false, err
-	}
-	dir, err := cloneLocalRDDModeRoot(ctx, repo, false)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return false, nil
-		}
-		return false, err
-	}
-	payload, err := readPrivateRARFile(filepath.Join(dir, rddConsentName))
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return false, nil
-		}
-		return false, fmt.Errorf("%w: %v", ErrRDDConsentCorrupt, err)
-	}
-	if !bytes.Equal(payload, rddConsentPayload) {
-		return false, fmt.Errorf("%w: unexpected latch content", ErrRDDConsentCorrupt)
-	}
-	return true, nil
-}
-
-// RecordRDDConsentAsked latches the one-time question as asked. It is a one-way
-// latch rather than a mode: it records only that the human was given the choice,
-// never which choice they made.
-func RecordRDDConsentAsked(ctx context.Context, repo string) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	dir, err := cloneLocalRDDModeRoot(ctx, repo, true)
-	if err != nil {
-		return err
-	}
-	return publishPrivateRARImmutable(filepath.Join(dir, rddConsentName), rddConsentPayload)
 }
 
 func rddModeStatus(

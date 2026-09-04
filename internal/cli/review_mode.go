@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -586,55 +584,6 @@ const (
 	reviewConsentDeclinedNotice = "Review skipped for this candidate at your request. It will be offered again on the next change."
 )
 
-// reviewConsentNoticeDirName and reviewConsentNoticeMarkerFile locate the
-// once-per-clone marker for reviewConsentSkippedNotice, mirroring the
-// existing <GitCommonDir>/gentle-ai/<subdir> convention this package already
-// uses for clone-local, uncommitted state (see writeReviewDefectReport).
-const (
-	reviewConsentNoticeDirName    = "review-mode"
-	reviewConsentNoticeMarkerFile = "non-interactive-notice-shown"
-)
-
-// reviewConsentNoticeAlreadyShown reports whether this clone already saw
-// reviewConsentSkippedNotice. An error resolving the marker is treated as
-// "not shown" so a broken marker can never silently suppress the notice.
-func reviewConsentNoticeAlreadyShown(ctx context.Context, repo string) (bool, error) {
-	path, err := reviewConsentNoticeMarkerPath(ctx, repo)
-	if err != nil {
-		return false, err
-	}
-	if _, statErr := os.Stat(path); statErr != nil {
-		if os.IsNotExist(statErr) {
-			return false, nil
-		}
-		return false, statErr
-	}
-	return true, nil
-}
-
-// recordReviewConsentNoticeShown persists that this clone saw the notice.
-// It is best-effort: a write failure here must never fail review start, the
-// same fail-open posture the rest of this consent flow already uses for the
-// consent-asked latch and the other console notices.
-func recordReviewConsentNoticeShown(ctx context.Context, repo string) error {
-	path, err := reviewConsentNoticeMarkerPath(ctx, repo)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, []byte(time.Now().UTC().Format(time.RFC3339Nano)+"\n"), 0o644)
-}
-
-func reviewConsentNoticeMarkerPath(ctx context.Context, repo string) (string, error) {
-	lease, err := reviewtransaction.OpenRepositoryIdentityLease(ctx, repo)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(lease.Identity().GitCommonDir, "gentle-ai", reviewConsentNoticeDirName, reviewConsentNoticeMarkerFile), nil
-}
-
 // reviewConsentSession is the console the one-time question uses.
 type reviewConsentSession struct {
 	Interactive bool
@@ -700,36 +649,6 @@ func authorizeReviewStart(ctx context.Context, repo string, assessment reviewtra
 	}
 	_ = negotiated // retained in the internal signature for compatibility callers
 	return nil
-}
-
-func recordReviewConsentAsked(ctx context.Context, repo string) error {
-	if err := reviewtransaction.RecordRDDConsentAsked(ctx, repo); err != nil {
-		return fmt.Errorf("record the review question as asked: %w", err)
-	}
-	return nil
-}
-
-// readReviewConsentAnswer reads exactly one line. An empty line accepts the
-// offered default, which is the safe direction: review the change.
-func readReviewConsentAnswer(input io.Reader) (string, error) {
-	if input == nil {
-		return "", errors.New("review consent console has no input")
-	}
-	line, err := bufio.NewReader(input).ReadString('\n')
-	answer := strings.TrimSpace(line)
-	if err != nil && answer == "" {
-		return "", err
-	}
-	if answer == "" {
-		return reviewConsentAnswerRun, nil
-	}
-	return answer, nil
-}
-
-func reviewConsentPrompt(assessment reviewtransaction.RiskAssessment) string {
-	return fmt.Sprintf("%s\nWhy: %s\n%s\n%s%s%s",
-		reviewConsentHeadline, reviewConsentReason(assessment), reviewConsentValue,
-		reviewConsentAnswers, reviewConsentOffPath, reviewConsentQuestion)
 }
 
 // reviewConsentMediumReason is the single wording source for the tier-1

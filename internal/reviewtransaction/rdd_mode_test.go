@@ -13,36 +13,6 @@ import (
 	"time"
 )
 
-// TestRDDConsentLatchIsAbsentUntilRecordedAndThenIdempotent locks the property
-// the latch relies on: recording the same answer twice must not raise an
-// immutable-slot conflict, and the latch must not disturb the override head.
-func TestRDDConsentLatchIsAbsentUntilRecordedAndThenIdempotent(t *testing.T) {
-	repo := initSnapshotRepo(t)
-	ctx := context.Background()
-
-	if asked, err := RDDConsentAsked(ctx, repo); err != nil || asked {
-		t.Fatalf("fresh clone latch = %v, %v", asked, err)
-	}
-	if err := RecordRDDConsentAsked(ctx, repo); err != nil {
-		t.Fatalf("record consent: %v", err)
-	}
-	if err := RecordRDDConsentAsked(ctx, repo); err != nil {
-		t.Fatalf("repeated record consent: %v", err)
-	}
-	if asked, err := RDDConsentAsked(ctx, repo); err != nil || !asked {
-		t.Fatalf("latched consent = %v, %v", asked, err)
-	}
-	// Resolve against an explicit global opinion because this assertion targets
-	// the persisted source, not merely the personal fork's default-on behavior.
-	status, err := ResolveRDDMode(ctx, repo, RDDGlobalMode{Value: string(RDDModeOn)})
-	if err != nil {
-		t.Fatalf("ResolveRDDMode after latching: %v", err)
-	}
-	if status.Effective != RDDModeOn || status.Revision != "" {
-		t.Fatalf("consent latch disturbed the override head: %#v", status)
-	}
-}
-
 func TestResolveRDDModeLetsAnyOffWin(t *testing.T) {
 	for _, test := range []struct {
 		name       string
