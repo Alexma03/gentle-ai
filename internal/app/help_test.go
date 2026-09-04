@@ -105,8 +105,8 @@ func TestHelpDocumentsUserControlledReviewModeKillSwitch(t *testing.T) {
 		"--scope <global|clone>",
 		"off wins",
 		"status never mutates",
-		"asks once per clone",
-		"'not now' applies to that candidate only",
+		"runs automatically when RDD is on",
+		"no candidate-scoped consent prompt",
 		"gentle-ai review mode disable",
 	} {
 		if !strings.Contains(output, want) {
@@ -115,7 +115,12 @@ func TestHelpDocumentsUserControlledReviewModeKillSwitch(t *testing.T) {
 	}
 	// The permanent disable stopped being a numbered answer, so the help must
 	// not keep advertising it as one.
-	for _, stale := range []string{"never ask again", "Never ask again"} {
+	for _, stale := range []string{
+		"never ask again",
+		"Never ask again",
+		"asks once per clone",
+		"'not now' applies to that candidate only",
+	} {
 		if strings.Contains(output, stale) {
 			t.Fatalf("help output still offers a permanent disable as an answer %q:\n%s", stale, output)
 		}

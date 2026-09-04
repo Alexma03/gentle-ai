@@ -46,11 +46,8 @@ COMMANDS
   review mode <enable|disable|status> [--cwd <repo>] [--scope <global|clone>]
                User-owned kill switch; off wins, no clone inherits an override,
                status never mutates, and re-enabling applies to future candidates only
-               'review start' asks once per clone before a review that would do work;
-               accepting the review records that answer, 'not now' applies to that candidate only
-               and persists nothing, turning reviews off for good needs a deliberate
-               'gentle-ai review mode disable', and a session without a terminal reviews
-               the change and says so instead of asking
+               'review start' runs automatically when RDD is on, with no candidate-scoped consent prompt;
+               turning reviews off needs a deliberate 'gentle-ai review mode disable'
 
 COMPATIBILITY COMMANDS
   review-start --cwd <repo> --lineage <id> --policy-file <path>
