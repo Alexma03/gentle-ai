@@ -38,14 +38,10 @@ func stopOversizedLensContextReview(r *journeyRun) error {
 	if err != nil {
 		return err
 	}
-	granted := false
-	for index, argument := range args {
-		if argument == "--consent=relay" {
-			args[index], granted = "--consent=granted", true
+	for _, argument := range args {
+		if strings.HasPrefix(argument, "--consent") {
+			return fmt.Errorf("oversized candidate START retained obsolete consent: %q", start.NextTransition.Execute.Command)
 		}
-	}
-	if !granted {
-		return fmt.Errorf("oversized candidate START did not request consent: %q", start.NextTransition.Execute.Command)
 	}
 	started := r.run(args, false)
 	if started.ExitCode == 0 {

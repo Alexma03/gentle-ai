@@ -8,7 +8,7 @@ import (
 
 // issue3564Journeys proves an attempt token remains governed only by its SDD
 // evidence chain when receipt-driven development changes while the token is
-// live. The journey starts from the runner's untouched (off) mode, acquires a
+// live. The journey explicitly turns the default-on mode off, acquires a
 // directly retryable failed-evidence correction, turns review on, and settles the
 // exact token without creating or consulting review authority.
 func issue3564Journeys() []Journey {
@@ -20,6 +20,8 @@ func issue3564Journeys() []Journey {
 			Source: "#3564 Slice 1: SDD attempt authority is independent of receipt-driven development mode",
 			Steps: []Step{
 				{Name: "fixture: repository with a committed OpenSpec change", Fixture: sddRuntimeRepo},
+				{Name: "turn review off before acquiring the independent SDD token", Requires: modeCapability,
+					Args: productArgs("review", "mode", "disable", "--scope", "global", "--json"), After: issue3564ModeIs("off")},
 				{Name: "review mode starts off", Requires: modeCapability,
 					Args: productArgs("review", "mode", "status", "--json"), After: issue3564ModeIs("off")},
 				{Name: "fail the verification objective without blocking its retry", Requires: sddAttemptRemediationCapability,

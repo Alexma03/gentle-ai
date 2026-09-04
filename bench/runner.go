@@ -579,14 +579,9 @@ type Step struct {
 // ReviewPrecondition is a journey's declared receipt-driven-development
 // starting state, and every journey must declare one.
 //
-// Receipt-driven development is opt-in: a fresh install has the switch off, and
-// the sandbox HOME every journey runs under IS a fresh install. So a journey
-// whose subject is the review lifecycle no longer gets a review by standing
-// still — it has to opt in the way a user does. Leaving that to whatever the
-// product's default happens to be is what this type exists to stop: the corpus
-// once measured the lifecycle only because the default happened to say yes, and
-// the day the default changed those journeys did not fail, they quietly
-// measured a different flow.
+// A fresh personal install defaults receipt-driven development on, and every
+// journey gets an isolated HOME. The declaration keeps each journey's intended
+// mode explicit instead of coupling its evidence to an ambient default.
 //
 // The declaration is what the RUNNER does with the switch, because that is the
 // part the harness can verify. It is not a prediction about what the product's
@@ -597,11 +592,8 @@ const (
 	// reviewPreconditionUndeclared is the zero value, and validateCorpus
 	// rejects it. A new journey has to say which world it runs in.
 	reviewPreconditionUndeclared ReviewPrecondition = ""
-	// reviewOptedIn runs `gentle-ai review mode enable --scope global` in the
-	// sandbox HOME before the journey's first product command, exactly as a
-	// user opts in, and fails the journey if the product does not then report
-	// the switch on. Global is the only scope that can assert "on": a clone may
-	// only ever assert "off".
+	// reviewOptedIn ensures global RDD is on before the journey's first product
+	// command and fails if the product does not report that state.
 	reviewOptedIn ReviewPrecondition = "opted-in"
 	// reviewUntouched runs no mode command at all. The journey either drives
 	// the switch itself (its subject IS the switch) or its subject is what

@@ -46,7 +46,7 @@ After a parent PR merges, rebase/retarget the next PR so GitHub shows only the c
 
 ## Chain Context Section
 
-Append this section to the repo PR template; do not replace required issue/checklist sections.
+Append this section to the repository's existing PR template when useful; do not introduce or require issue-link sections.
 
 ```markdown
 ## Chain Context

@@ -157,23 +157,19 @@ func captureFrozenReviewerResult(r *journeyRun, status statusEnvelope) error {
 	}
 	return nil
 }
-func startFrozenLineageWithConsent(r *journeyRun, status statusEnvelope) error {
+func startFrozenLineage(r *journeyRun, status statusEnvelope) error {
 	args, err := printedCommandArguments(status.NextTransition.Execute.Command)
 	if err != nil {
 		return err
 	}
-	granted := false
-	for index, argument := range args {
-		if argument == "--consent=relay" {
-			args[index], granted = "--consent=granted", true
+	for _, argument := range args {
+		if strings.HasPrefix(argument, "--consent") {
+			return fmt.Errorf("printed START retained obsolete consent: %q", status.NextTransition.Execute.Command)
 		}
-	}
-	if !granted {
-		return fmt.Errorf("printed START did not request consent: %q", status.NextTransition.Execute.Command)
 	}
 	observation := r.run(args, false)
 	if observation.ExitCode != 0 || rememberLineage(r.sandbox, observation) != nil || r.sandbox.Lineage == "" {
-		return fmt.Errorf("granted printed START = exit %d lineage %q: %s", observation.ExitCode, r.sandbox.Lineage, firstLine(observation.Stderr))
+		return fmt.Errorf("printed START = exit %d lineage %q: %s", observation.ExitCode, r.sandbox.Lineage, firstLine(observation.Stderr))
 	}
 	return nil
 }
@@ -195,7 +191,7 @@ func exerciseFrozenLineageResume(r *journeyRun) error {
 	if err != nil || start.NextTransition.Kind != "execute" || start.NextTransition.Execute.Operation != "review.start" {
 		return fmt.Errorf("selected v2 Codex START = %+v, %v", start.NextTransition, err)
 	}
-	if err := startFrozenLineageWithConsent(r, start); err != nil {
+	if err := startFrozenLineage(r, start); err != nil {
 		return err
 	}
 	before, beforeDocument, err := frozenLineageStatus(r, r.sandbox.Lineage)

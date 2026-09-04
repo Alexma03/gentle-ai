@@ -71,9 +71,9 @@ func driveRepositoryContextFreshProcesses(r *journeyRun) error {
 	if err != nil {
 		return err
 	}
-	for index, argument := range args {
-		if argument == "--consent=relay" {
-			args[index] = "--consent=granted"
+	for _, argument := range args {
+		if strings.HasPrefix(argument, "--consent") {
+			return fmt.Errorf("repository-context START retained obsolete consent: %q", negotiated.NextTransition.Execute.Command)
 		}
 	}
 	started := r.run(args, false)

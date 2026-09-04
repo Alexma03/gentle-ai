@@ -105,16 +105,16 @@ func startProviderCaptureRetry(r *journeyRun) error {
 	if err != nil {
 		return err
 	}
-	consent, agent := false, false
-	for index, argument := range args {
-		if argument == "--consent=relay" {
-			args[index], consent = "--consent=granted", true
+	agent := false
+	for _, argument := range args {
+		if argument == "--consent=relay" || argument == "--consent=granted" {
+			return fmt.Errorf("provider START retained obsolete consent: %v", args)
 		}
 		if argument == "--agent=claude-code" {
 			agent = true
 		}
 	}
-	if !consent || !agent {
+	if !agent {
 		return fmt.Errorf("provider START did not carry the negotiated Claude binding: %v", args)
 	}
 	if observation := r.run(append(args, "--focus", "reliability"), false); observation.ExitCode != 0 {
