@@ -43,33 +43,18 @@ var (
 
 	// engramGoInstallCmdFn executes `go install <pkg>`. Package-level var for testability.
 	engramGoInstallCmdFn = func(pkg string) error {
+		installDir := engramInstallDirFn(runtime.GOOS)
+		if err := os.MkdirAll(installDir, 0o755); err != nil {
+			return fmt.Errorf("create managed engram install dir %q: %w", installDir, err)
+		}
 		cmd := exec.Command("go", "install", pkg)
 		cmd.Stdin = nil
+		cmd.Env = setEnvValue(os.Environ(), "GOBIN", installDir)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("go install %s: %w (output: %s)", pkg, err, strings.TrimSpace(string(out)))
 		}
 		return nil
-	}
-
-	// engramGoEnvFn queries the Go toolchain's effective environment for the
-	// given keys (e.g. "GOBIN", "GOPATH"). Package-level var for testability —
-	// swapped in tests to simulate values set via `go env -w` without mutating
-	// the real Go env file.
-	engramGoEnvFn = func(keys ...string) (map[string]string, error) {
-		args := append([]string{"env"}, keys...)
-		out, err := exec.Command("go", args...).Output()
-		if err != nil {
-			return nil, err
-		}
-		lines := strings.Split(strings.TrimRight(string(out), "\r\n"), "\n")
-		values := make(map[string]string, len(keys))
-		for i, key := range keys {
-			if i < len(lines) {
-				values[key] = strings.TrimSpace(lines[i])
-			}
-		}
-		return values, nil
 	}
 )
 
@@ -778,38 +763,36 @@ func (b *byteReaderAt) ReadAt(p []byte, off int64) (int, error) {
 // to be engramCanonicalPackage + "@main") using `go install`.
 // It returns the path to the installed binary. This is the beta-channel upgrade path.
 //
-// The install directory is resolved via `go env GOBIN GOPATH` (the effective Go
-// environment) so that values set via `go env -w GOBIN=...` (stored in Go's env
-// file, NOT in shell env) are honored correctly. This mirrors the resolution done
-// by goInstallBinDirFromGoEnv in internal/cli/run.go.
+// The install directory is the stable managed Engram directory. The command
+// overrides GOBIN so changing Go toolchain versions cannot strand a newer binary
+// behind an older PATH-visible copy.
 func engramGoInstallFromMain(pkg string) (string, error) {
 	pkg = canonicalEngramGoInstallPackage(pkg)
 	if err := engramGoInstallCmdFn(pkg); err != nil {
 		return "", err
 	}
 
-	// Resolve the directory where `go install` placed the binary using the
-	// effective Go environment (honors `go env -w GOBIN=...`, not just shell env).
-	values, err := engramGoEnvFn("GOBIN", "GOPATH")
-	if err != nil {
-		return "", fmt.Errorf("resolve go install bin dir: %w", err)
-	}
-	gobin := strings.TrimSpace(values["GOBIN"])
-	gopath := strings.TrimSpace(values["GOPATH"])
-
-	if gobin == "" && gopath != "" {
-		gobin = filepath.Join(gopath, "bin")
-	}
-	if gobin == "" {
-		home, _ := os.UserHomeDir()
-		gobin = filepath.Join(home, "go", "bin")
-	}
+	// Always return the stable managed destination used by the command. Using
+	// the active Go toolchain's GOBIN here can leave a newer binary under a
+	// version-specific directory while an older managed binary remains on PATH.
+	gobin := engramInstallDirFn(runtime.GOOS)
 
 	binaryName := engramName
 	if runtime.GOOS == "windows" {
 		binaryName += ".exe"
 	}
 	return filepath.Join(gobin, binaryName), nil
+}
+
+func setEnvValue(env []string, key, value string) []string {
+	prefix := key + "="
+	result := make([]string, 0, len(env)+1)
+	for _, entry := range env {
+		if !strings.HasPrefix(entry, prefix) {
+			result = append(result, entry)
+		}
+	}
+	return append(result, prefix+value)
 }
 
 // writeExecutable writes a binary to outPath using an atomic rename to avoid

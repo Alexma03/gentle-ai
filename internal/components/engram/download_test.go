@@ -1196,21 +1196,18 @@ func TestEngramGoInstallFromMainCanonicalizesModuleCasing(t *testing.T) {
 	const fakeInstallDir = "/custom/gobin"
 
 	origGoInstallCmdFn := engramGoInstallCmdFn
-	origGoEnvFn := engramGoEnvFn
+	origInstallDirFn := engramInstallDirFn
 	t.Cleanup(func() {
 		engramGoInstallCmdFn = origGoInstallCmdFn
-		engramGoEnvFn = origGoEnvFn
+		engramInstallDirFn = origInstallDirFn
 	})
+	engramInstallDirFn = func(string) string { return fakeInstallDir }
 
 	var gotPkg string
 	engramGoInstallCmdFn = func(pkg string) error {
 		gotPkg = pkg
 		return nil
 	}
-	engramGoEnvFn = func(keys ...string) (map[string]string, error) {
-		return map[string]string{"GOBIN": fakeInstallDir, "GOPATH": ""}, nil
-	}
-
 	_, err := engramGoInstallFromMain("github.com/gentleman-programming/engram/v2/cmd/engram@main")
 	if err != nil {
 		t.Fatalf("engramGoInstallFromMain: unexpected error: %v", err)
@@ -1222,34 +1219,15 @@ func TestEngramGoInstallFromMainCanonicalizesModuleCasing(t *testing.T) {
 	}
 }
 
-// TestEngramGoInstallFromMain_UsesGoEnvForBinDir verifies that
-// engramGoInstallFromMain resolves the install directory via `go env GOBIN GOPATH`
-// (the effective Go environment) rather than reading raw shell env vars.
-// This matters when GOBIN is set via `go env -w GOBIN=...` (stored in Go's
-// env file) but NOT exported into the shell environment.
-func TestEngramGoInstallFromMain_UsesGoEnvForBinDir(t *testing.T) {
-	fakeInstallDir := filepath.Join(t.TempDir(), "custom", "gobin", "via", "go-env")
+// TestEngramGoInstallFromMain_UsesStableManagedBinDir verifies that a Go
+// toolchain update cannot strand a new Engram binary under a version-specific
+// GOBIN while an older managed binary remains earlier on PATH.
+func TestEngramGoInstallFromMain_UsesStableManagedBinDir(t *testing.T) {
+	stableInstallDir := filepath.Join(t.TempDir(), "stable", "bin")
 
-	origGoEnvFn := engramGoEnvFn
-	t.Cleanup(func() { engramGoEnvFn = origGoEnvFn })
-
-	// Simulate GOBIN set only via `go env -w` (not in shell env).
-	// The raw os.Getenv("GOBIN") would return "", but go env GOBIN returns
-	// the persisted value from the Go env file.
-	t.Setenv("GOBIN", "")
-	t.Setenv("GOPATH", "")
-
-	engramGoEnvFn = func(keys ...string) (map[string]string, error) {
-		result := make(map[string]string, len(keys))
-		for _, k := range keys {
-			if k == "GOBIN" {
-				result[k] = fakeInstallDir
-			} else {
-				result[k] = ""
-			}
-		}
-		return result, nil
-	}
+	origInstallDirFn := engramInstallDirFn
+	t.Cleanup(func() { engramInstallDirFn = origInstallDirFn })
+	engramInstallDirFn = func(string) string { return stableInstallDir }
 
 	// Inject a fake go install that does nothing (no real network/build).
 	origGoInstallCmdFn := engramGoInstallCmdFn
@@ -1261,16 +1239,15 @@ func TestEngramGoInstallFromMain_UsesGoEnvForBinDir(t *testing.T) {
 		t.Fatalf("engramGoInstallFromMain: unexpected error: %v", err)
 	}
 
-	wantDir := fakeInstallDir
+	wantDir := stableInstallDir
 	gotDir := filepath.Dir(binaryPath)
 	if gotDir != wantDir {
-		t.Errorf("binary dir = %q, want %q (from go env GOBIN)", gotDir, wantDir)
+		t.Errorf("binary dir = %q, want stable managed dir %q", gotDir, wantDir)
 	}
 }
 
 func TestEngramGoInstallFromMain_UsesNormalPublicGoProxyAndSumDB(t *testing.T) {
 	binDir := t.TempDir()
-	goPath := filepath.Join(binDir, "go")
 	recordPath := filepath.Join(t.TempDir(), "go-env.txt")
 	fakeGo := filepath.Join(binDir, "go")
 	if runtime.GOOS == "windows" {
@@ -1289,7 +1266,7 @@ func TestEngramGoInstallFromMain_UsesNormalPublicGoProxyAndSumDB(t *testing.T) {
 		t.Setenv("GENTLE_AI_FAKE_GO", "1")
 	} else {
 		script := "#!/usr/bin/env bash\n" +
-			"printf 'GONOSUMDB=%s\\nGOPRIVATE=%s\\nGONOPROXY=%s\\n' \"${GONOSUMDB:-}\" \"${GOPRIVATE:-}\" \"${GONOPROXY:-}\" > \"$GO_ENV_RECORD\"\n"
+			"printf 'GONOSUMDB=%s\\nGOPRIVATE=%s\\nGONOPROXY=%s\\nGOBIN=%s\\n' \"${GONOSUMDB:-}\" \"${GOPRIVATE:-}\" \"${GONOPROXY:-}\" \"${GOBIN:-}\" > \"$GO_ENV_RECORD\"\n"
 		if err := os.WriteFile(fakeGo, []byte(script), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -1300,11 +1277,10 @@ func TestEngramGoInstallFromMain_UsesNormalPublicGoProxyAndSumDB(t *testing.T) {
 	t.Setenv("GOPRIVATE", "github.com/acme/*")
 	t.Setenv("GONOPROXY", "corp.example/*")
 
-	origGoEnvFn := engramGoEnvFn
-	t.Cleanup(func() { engramGoEnvFn = origGoEnvFn })
-	engramGoEnvFn = func(keys ...string) (map[string]string, error) {
-		return map[string]string{"GOBIN": goPath, "GOPATH": filepath.Join(t.TempDir(), "gopath")}, nil
-	}
+	managedDir := filepath.Join(t.TempDir(), "managed-bin")
+	origInstallDirFn := engramInstallDirFn
+	t.Cleanup(func() { engramInstallDirFn = origInstallDirFn })
+	engramInstallDirFn = func(string) string { return managedDir }
 
 	if _, err := engramGoInstallFromMain("github.com/Gentleman-Programming/engram/v2/cmd/engram@main"); err != nil {
 		t.Fatalf("engramGoInstallFromMain() error = %v", err)
@@ -1318,6 +1294,7 @@ func TestEngramGoInstallFromMain_UsesNormalPublicGoProxyAndSumDB(t *testing.T) {
 		"GONOSUMDB=example.com/private",
 		"GOPRIVATE=github.com/acme/*",
 		"GONOPROXY=corp.example/*",
+		"GOBIN=" + managedDir,
 	} {
 		if !strings.Contains(string(recorded), want) {
 			t.Fatalf("go install env missing %q\nrecorded:\n%s", want, recorded)
