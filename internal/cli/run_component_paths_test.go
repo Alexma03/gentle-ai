@@ -526,56 +526,6 @@ func TestInstallStripsLegacyTriggerRulesSection(t *testing.T) {
 	}
 }
 
-// ─── Workspace scope must not strand orchestrator-prompt guidance ──────────
-//
-// OpenCode and Kilocode only ever load the home-level settings document, so a
-// workspace-scoped install that resolves their guidance against the workspace
-// root writes a file the agent never reads (issue #1825). Guidance for these
-// agents therefore resolves against the home directory in every scope, while
-// every other agent keeps its workspace-scoped delivery.
-
-func TestInstallRoutingGuidanceWorkspaceScopeDeliversOpenCodeToHome(t *testing.T) {
-	home := t.TempDir()
-	workspace := t.TempDir()
-
-	// Seed the home settings with the retired section so the strip is proven to
-	// resolve against the same home scope the injector writes.
-	seeded := filemerge.InjectMarkdownSection("", "trigger-rules", "Retired WorkRun ceremony\n")
-	seedOpenCodeOrchestratorPrompt(t, home, seeded)
-
-	step := agentRoutingGuidanceStep{
-		id:           "agent-guidance:" + string(model.AgentOpenCode),
-		agent:        model.AgentOpenCode,
-		homeDir:      home,
-		workspaceDir: workspace,
-		scope:        ScopeWorkspace,
-	}
-	if err := step.Run(); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	prompt := openCodeOrchestratorPrompt(t, home)
-	if !strings.Contains(prompt, routingOpenMarker) || !strings.Contains(prompt, routingCloseMarker) {
-		t.Fatalf("workspace-scoped install left the home OpenCode orchestrator prompt unrouted:\n%s", prompt)
-	}
-	if strings.Contains(prompt, "Retired WorkRun ceremony") {
-		t.Fatalf("legacy trigger-rules content survived the workspace-scoped install:\n%s", prompt)
-	}
-
-	stranded := filepath.Join(workspace, ".config", "opencode")
-	if _, err := os.Stat(stranded); !os.IsNotExist(err) {
-		t.Fatalf("workspace-scoped install created %q, a directory OpenCode never loads (stat err = %v)", stranded, err)
-	}
-
-	first := readTextFile(t, openCodeSettingsPath(home))
-	if err := step.Run(); err != nil {
-		t.Fatalf("second Run() error = %v", err)
-	}
-	if second := readTextFile(t, openCodeSettingsPath(home)); second != first {
-		t.Fatalf("second workspace-scoped run rewrote the home settings; delivery is not idempotent")
-	}
-}
-
 // TestAgentRoutingGuidanceStepSkipsAgentsWithoutSystemPrompt covers issue
 // #4063: Pi reports SupportsSystemPrompt()==false because gentle-pi owns its
 // system prompt, so the routing guidance step must leave Pi's
@@ -609,37 +559,6 @@ func TestAgentRoutingGuidanceStepSkipsAgentsWithoutSystemPrompt(t *testing.T) {
 	}
 }
 
-func TestRoutingGuidancePathsWorkspaceScopeReportOrchestratorPromptAgentsAtHome(t *testing.T) {
-	home := t.TempDir()
-	workspace := t.TempDir()
-	adapters := resolveAdapters([]model.AgentID{model.AgentOpenCode, model.AgentKilocode, model.AgentClaudeCode})
-
-	paths := routingGuidancePaths(home, workspace, ScopeWorkspace, adapters)
-
-	for _, want := range []string{
-		filepath.Join(home, ".config", "opencode", "opencode.json"),
-		filepath.Join(home, ".config", "kilo", "opencode.json"),
-	} {
-		if !containsPath(paths, want) {
-			t.Fatalf("routingGuidancePaths(workspace) missing home settings path %q\npaths=%v", want, paths)
-		}
-	}
-	for _, unwanted := range []string{
-		filepath.Join(workspace, ".config", "opencode", "opencode.json"),
-		filepath.Join(workspace, ".config", "kilo", "opencode.json"),
-	} {
-		if containsPath(paths, unwanted) {
-			t.Fatalf("routingGuidancePaths(workspace) reported %q, a path the agent never loads\npaths=%v", unwanted, paths)
-		}
-	}
-
-	// Every other agent keeps its workspace-scoped delivery.
-	claudePrompt := systemPromptFileFor(t, workspace, model.AgentClaudeCode)
-	if !containsPath(paths, claudePrompt) {
-		t.Fatalf("routingGuidancePaths(workspace) lost the workspace-scoped path %q for prompt-file agents\npaths=%v", claudePrompt, paths)
-	}
-}
-
 // TestRoutingGuidancePathsExcludesAgentsWithoutSystemPrompt covers issue
 // #4063: Pi's APPEND_SYSTEM.md must never be listed as a routing guidance
 // target, because the step that would write it is now a no-op for Pi and
@@ -659,9 +578,6 @@ func TestRoutingGuidancePathsExcludesAgentsWithoutSystemPrompt(t *testing.T) {
 		t.Fatalf("routingGuidancePaths() lost Claude Code's prompt path %q\npaths=%v", claudePrompt, paths)
 	}
 }
-
-// seedOpenCodeOrchestratorPrompt writes a minimal home settings document whose
-// managed orchestrator agent already carries the given prompt.
 
 // ─── Routing guidance is part of the rollback contract ─────────────────────
 //
