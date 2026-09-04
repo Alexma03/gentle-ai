@@ -52,9 +52,9 @@ func TestOfferReviewAfterVerifyEnabledModeIsAvailable(t *testing.T) {
 	}
 }
 
-// TestOfferReviewAfterVerifyUnsetModeOffersNothing proves that an unset mode
-// preserves the opt-in default: without an explicit enable, no offer exists.
-func TestOfferReviewAfterVerifyUnsetModeOffersNothing(t *testing.T) {
+// TestOfferReviewAfterVerifyUsesPersonalDefault proves that an unset mode
+// inherits the personal fork's default-on review policy.
+func TestOfferReviewAfterVerifyUsesPersonalDefault(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
@@ -62,8 +62,8 @@ func TestOfferReviewAfterVerifyUnsetModeOffersNothing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OfferReviewAfterVerify(unset mode) = err %v, want nil", err)
 	}
-	if offer.Available {
-		t.Fatalf("OfferReviewAfterVerify(unset mode) = %#v, want Available=false — nobody opted in", offer)
+	if !offer.Available {
+		t.Fatalf("OfferReviewAfterVerify(unset mode) = %#v, want Available=true from the personal default", offer)
 	}
 }
 

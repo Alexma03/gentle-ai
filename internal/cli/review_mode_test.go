@@ -53,7 +53,7 @@ func TestReviewModeGlobalScopeWorksFromNonGitDirectory(t *testing.T) {
 	if err := RunReviewMode([]string{"status", "--cwd", nonGit, "--json"}, &output); err != nil {
 		t.Fatalf("unset global status from non-Git cwd error = %v\n%s", err, output.String())
 	}
-	if before := decodeReviewModeResult(t, output.Bytes()); before.Status.Effective != reviewtransaction.RDDModeOff ||
+	if before := decodeReviewModeResult(t, output.Bytes()); before.Status.Effective != reviewtransaction.RDDModeOn ||
 		before.Status.Source != reviewtransaction.RDDModeSourceDefault ||
 		before.Status.Global != reviewtransaction.RDDModeUnset || before.Status.CloneLocal != reviewtransaction.RDDModeUnset {
 		t.Fatalf("unset global status from non-Git cwd = %#v", before.Status)
@@ -129,13 +129,9 @@ func TestReviewModeRepositoryRequiredRefusalDoesNotDependOnGitStderrLanguage(t *
 	}
 }
 
-// TestReviewModeGlobalEnableSurvivesTheOptInDefault is the upgrade-safety
-// property behind making receipt-driven development opt-in. A user who
-// deliberately ran `review mode enable --scope global` before the flip must
-// still be reviewed after it: the enable writes an explicit "on" into user
-// state, and resolution reads that explicit opinion rather than falling through
-// to the now-off default. A clone that never opted in stays off.
-func TestReviewModeGlobalEnableSurvivesTheOptInDefault(t *testing.T) {
+// TestReviewModeGlobalEnableRemainsAnExplicitOpinion proves an explicit enable
+// remains distinguishable from the personal default and survives across clones.
+func TestReviewModeGlobalEnableRemainsAnExplicitOpinion(t *testing.T) {
 	home := reviewModeHome(t)
 	repo := initReviewCLIRepo(t)
 
@@ -143,9 +139,9 @@ func TestReviewModeGlobalEnableSurvivesTheOptInDefault(t *testing.T) {
 	if err := RunReviewMode([]string{"status", "--cwd", repo, "--json"}, &output); err != nil {
 		t.Fatalf("RunReviewMode(status) error = %v", err)
 	}
-	if before := decodeReviewModeResult(t, output.Bytes()); before.Status.Effective != reviewtransaction.RDDModeOff ||
+	if before := decodeReviewModeResult(t, output.Bytes()); before.Status.Effective != reviewtransaction.RDDModeOn ||
 		before.Status.Source != reviewtransaction.RDDModeSourceDefault {
-		t.Fatalf("a clone nobody opted in was not off by default: %#v", before.Status)
+		t.Fatalf("a fresh clone did not inherit the personal default: %#v", before.Status)
 	}
 
 	output.Reset()
@@ -182,8 +178,7 @@ func TestReviewModeGlobalEnableSurvivesTheOptInDefault(t *testing.T) {
 // TestReviewModeCloneScopeDisablesOnlyThisClone needs a user who opted in
 // globally: the property under test is that a clone-local off does not travel
 // to a second clone, and that is only observable when something other than the
-// override would have said on. Against the opt-in default both clones would
-// read off for the same reason and the test would prove nothing.
+// override says on.
 func TestReviewModeCloneScopeDisablesOnlyThisClone(t *testing.T) {
 	reviewEnabledHome(t)
 	repo := initReviewCLIRepo(t)

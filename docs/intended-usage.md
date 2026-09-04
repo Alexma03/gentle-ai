@@ -97,7 +97,7 @@ The orchestrator must stop acting as a monolithic executor when complexity appea
 
 - **4-file rule**: reading 4+ files to understand a flow means delegate exploration or run an exploration phase.
 - **Multi-file write rule**: touching 2+ non-trivial files means use one writer or require fresh review before completion.
-- **PR rule**: review can provide fresh evidence for a commit, push, or PR, but it never authorizes delivery. Receipt-driven development is opt-in with `gentle-ai review mode enable --scope global`; whether it is on or off, ordinary repository policy decides delivery.
+- **PR rule**: review can provide fresh evidence for a commit, push, or PR, but it never authorizes delivery. Receipt-driven development is on by default in this personal fork and can be disabled globally or per clone; ordinary repository policy always decides delivery.
 - **Incident rule**: after wrong cwd, worktree/git accident, merge recovery, confusing test command, or environment workaround, run a fresh audit before continuing.
 - **Long-session rule**: after roughly 20 tool calls, 5 exploratory reads, or 2 non-mechanical edits with growing complexity, pause and delegate, re-plan, or justify why not.
 - **Fresh review rule**: use fresh context for adversarial review of diffs, conflicts, PR readiness, and incidents when the agent platform supports it.

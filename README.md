@@ -78,7 +78,7 @@ After installation, run `gentle-ai install` and select only the runtimes and com
 
 ### The flow at a glance
 
-Once you enable it, both implementation routes can converge on RDD: a bounded native review freezes the candidate and reports an informational outcome — review is never reopened for unchanged content. RDD is opt-in, and ordinary repository policy owns delivery whether it is on or off.
+Both implementation routes can converge on RDD: a bounded native review freezes the candidate and reports an informational outcome — review is never reopened for unchanged content. RDD defaults on in this personal fork, and ordinary repository policy owns delivery whether it is on or off.
 
 **Organic route (no SDD)** — the agent picks the smallest useful route and RDD enters at the end, over the frozen candidate:
 
@@ -88,9 +88,9 @@ flowchart TD
     B -->|"4+ file exploration<br/>or 2+ non-trivial writes"| D["Delegated direct<br/>(one bounded worker)"]
     C --> E["Implementation + tests"]
     D --> E
-    E --> F{"RDD enabled?<br/>(user-owned, opt-in)"}
-    F -->|"off (default)"| Z["Ordinary delivery<br/>reports disabled/unmanaged"]
-    F -->|"on (explicitly enabled)"| G["review status --next-transition<br/>(provider-owned negotiated route)"]
+    E --> F{"RDD enabled?<br/>(user-owned, default on)"}
+    F -->|"explicitly off"| Z["Ordinary delivery<br/>reports disabled/unmanaged"]
+    F -->|"on (default or explicit)"| G["review status --next-transition<br/>(provider-owned negotiated route)"]
     G --> H{"Risk frozen<br/>at START"}
     H -->|"low"| I["Structural readback<br/>0 lenses · silent"]
     H -->|"standard"| J["1 focus lens<br/>+ consent"]
@@ -158,7 +158,7 @@ Size, file count, or perceived risk never select SDD on their own — only an ex
 
 ### Control receipt-driven development
 
-Review mode is user-owned and available independently of the review lifecycle. **Receipt-driven development is opt-in: it is off until you turn it on.**
+Review mode is user-owned and available independently of the review lifecycle. **Receipt-driven development is on by default in this personal fork.**
 
 ```bash
 gentle-ai review mode status --cwd .
@@ -166,7 +166,7 @@ gentle-ai review mode enable --scope global --cwd .
 gentle-ai review mode disable --cwd .
 ```
 
-`status` is read-only. With no source expressing an opinion the effective mode is `off`, reported as decided by `default`; only an explicit global enable turns review on. Any global or clone-local disabled source wins; a clone can opt out with `--scope clone` but cannot force review on, so `--scope global` is the only way in. Enabling applies only to future candidates, while declining a one-candidate review prompt does not change the mode. When review is off, native review does not run. Review outcomes are informational in every mode, and ordinary repository policy decides delivery without fabricated approval.
+`status` is read-only. With no source expressing an opinion the effective mode is `on`, reported as decided by `default`. Any explicit global or clone-local disabled source wins; a clone can opt out with `--scope clone` but cannot force review on. Enabling applies only to future candidates, while declining a one-candidate review prompt does not change the mode. When review is off, native review does not run. Review outcomes are informational in every mode, and ordinary repository policy decides delivery without fabricated approval.
 
 Historical note: `v2.2.2` introduced the native `disabled/unmanaged` disposition. Current SDD status does not use that disposition: with review disabled, it skips review authority, emits no `reviewGate`, and pre-verify continues without routing to a review that cannot start. Archive and delivery proceed under ordinary repository policy; any present review outcome is informational.
 

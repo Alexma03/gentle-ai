@@ -452,35 +452,24 @@ func TestConsentFlagRequiresNegotiatedContract(t *testing.T) {
 	}
 }
 
-// TestHeadlessSkipNoticeFollowsAnExplicitOptIn replaces a provenance notice
-// that can no longer happen. It used to cover the case where reviews ran
-// because nobody chose anything, and the notice had to admit that. Making
-// receipt-driven development opt-in deletes that case outright: a default-source
-// clone never reaches the consent ceremony, because the start is refused before
-// it. So the two halves of the old test become the two facts worth pinning --
-// an unconfigured headless clone is refused and told how to opt in, and an
-// explicitly enabled one gets the skip notice with no provenance excuse
-// attached, because there is no longer any way for reviews to be on by accident.
-func TestHeadlessSkipNoticeFollowsAnExplicitOptIn(t *testing.T) {
+// TestHeadlessSkipNoticeCoversDefaultAndExplicitModes proves both the personal
+// default and an explicit global enable can run headless without inventing a
+// consent interaction.
+func TestHeadlessSkipNoticeCoversDefaultAndExplicitModes(t *testing.T) {
 	reviewModeHome(t)
 	repo := initReviewCLIRepo(t)
 	console := stubReviewConsole(t, false, "")
 	writeReviewStartCandidate(t, repo, "scripts/deploy.sh", "echo deploy\n", 0o644)
 
 	var output bytes.Buffer
-	err := RunReviewFacadeStart([]string{"--cwd", repo, "--lineage", "review-provenance-default"}, &output)
-	if err == nil {
-		t.Fatalf("an unconfigured clone started a review nobody asked for:\n%s", output.String())
+	if err := RunReviewFacadeStart([]string{"--cwd", repo, "--lineage", "review-provenance-default"}, &output); err != nil {
+		t.Fatalf("headless start with personal default: %v\n%s", err, output.String())
 	}
-	if !strings.Contains(err.Error(), "gentle-ai review mode enable --scope=global") {
-		t.Fatalf("the opt-in refusal names no way in: %v", err)
-	}
-	if console.String() != "" {
-		t.Fatalf("a refused start reached the consent ceremony:\n%s", console.String())
+	if !strings.Contains(console.String(), reviewConsentSkippedNotice) {
+		t.Fatalf("default-source start lost the skip notice:\n%s", console.String())
 	}
 
-	// An explicit opt-in is the only route to a review, and its headless notice
-	// carries no provenance sentence: the switch was chosen, not inherited.
+	// An explicit enable remains an equally valid route.
 	reviewEnabledHome(t)
 	repoExplicit := initReviewCLIRepo(t)
 	consoleExplicit := stubReviewConsole(t, false, "")

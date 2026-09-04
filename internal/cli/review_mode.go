@@ -38,15 +38,15 @@ type ReviewModeResult struct {
 }
 
 // RunReviewMode is the user-controlled receipt-driven-development switch.
-// Receipt-driven development is opt-in: with no source expressing an opinion it
-// resolves to off, and only an explicit global enable turns it on. The global
-// mode lives in uncommitted user state; the clone-local override lives under
-// this clone's Git common directory and can only disable. Any off wins, status
-// never mutates, and enabling applies to future candidates only.
+// Receipt-driven development defaults on in the personal fork when no source
+// expresses an opinion. The global mode lives in uncommitted user state; the
+// clone-local override lives under this clone's Git common directory and can
+// only disable. Any explicit off wins, status never mutates, and enabling
+// applies to future candidates only.
 func RunReviewMode(args []string, stdout io.Writer) error {
 	if len(args) == 0 || args[0] == "help" || args[0] == "-h" || args[0] == "--help" {
 		_, _ = fmt.Fprintln(stdout, "Usage: gentle-ai review mode <enable|disable|status> [--cwd <repo>] [--scope <global|clone>] [--expected-revision <revision>] [--json]")
-		_, _ = fmt.Fprintln(stdout, "User-owned switch. Receipt-driven development is off until you enable it: run 'gentle-ai review mode enable --scope global' to opt in. Any off wins: a repository may disable it for this clone but can never require it, and no other clone inherits the override. status is read-only and reports both sources plus the effective mode. Enabling applies to future candidates only.")
+		_, _ = fmt.Fprintln(stdout, "User-owned switch. Receipt-driven development defaults on in this personal fork. Any explicit off wins: use 'gentle-ai review mode disable --scope global' machine-wide or --scope clone for one clone. A repository can never force review on, and no other clone inherits its override. status is read-only and reports both sources plus the effective mode. Enabling applies to future candidates only.")
 		return nil
 	}
 	operation := args[0]
@@ -134,7 +134,7 @@ func globalOnlyReviewModeStatus(global reviewtransaction.RDDGlobalMode) reviewtr
 		Schema:     reviewtransaction.RDDModeStatusSchema,
 		Global:     reviewtransaction.RDDModeUnset,
 		CloneLocal: reviewtransaction.RDDModeUnset,
-		Effective:  reviewtransaction.RDDModeOff,
+		Effective:  reviewtransaction.DefaultRDDMode,
 		Source:     reviewtransaction.RDDModeSourceDefault,
 	}
 	switch strings.TrimSpace(global.Value) {
@@ -572,11 +572,10 @@ const (
 	reviewConsentOffPath        = reviewConsentOffPathNote + "\n"
 	reviewConsentQuestion       = "Choose 1 or 2 [1]: "
 
-	// reviewConsentSkippedNotice keeps the fail-safe default discoverable: an
+	// reviewConsentSkippedNotice keeps headless review discoverable: an
 	// unanswerable question must never look like a silent yes. It carries no
-	// provenance sentence about how reviews got switched on, because with
-	// receipt-driven development opt-in there is only one way: an explicit
-	// enable. A clone that never opted in is refused long before this point.
+	// provenance sentence about whether reviews came from the personal default
+	// or an explicit enable because that distinction does not change the action.
 	reviewConsentSkippedNotice = "Gentle AI reviewed this change without asking, because this session has no terminal to answer on. " +
 		"Run 'gentle-ai review mode disable' to turn reviews off, or 'gentle-ai review mode status' to see the current setting."
 

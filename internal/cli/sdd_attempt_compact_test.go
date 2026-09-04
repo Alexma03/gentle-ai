@@ -402,6 +402,9 @@ func TestRunSDDAttemptSettleSurvivesOffToOnReviewModeTransition(t *testing.T) {
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	repo := initReviewCLIRepo(t)
 	const change = "mode-transition-settle"
+	if err := RunReviewMode([]string{"disable", "--cwd", repo, "--scope", "global"}, io.Discard); err != nil {
+		t.Fatalf("disable receipt-driven development for transition precondition: %v", err)
+	}
 
 	var modeOutput bytes.Buffer
 	if err := RunReviewMode([]string{"status", "--cwd", repo, "--json"}, &modeOutput); err != nil {

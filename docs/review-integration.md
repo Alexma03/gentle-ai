@@ -2,9 +2,9 @@
 
 ← [Back to README](../README.md)
 
-## RDD starts off
+## RDD starts on
 
-RDD is opt-in. Until a user enables it with `gentle-ai review mode enable --scope global`, review does not govern the candidate and delivery follows ordinary repository policy. Disabling returns to that state. Enabling revalidates the current candidate; it never resumes stale authority.
+RDD is on by default in this personal fork. An explicit global or clone-local disable always wins, review then does not govern the candidate, and delivery follows ordinary repository policy. Enabling revalidates the current candidate; it never resumes stale authority.
 
 ## Quick path
 

@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// TestRDDModeResolvesOnlyFromItsPersistedSetting proves review activation is
-// controlled solely by the user-owned RDD mode, never by an environment toggle.
-func TestRDDModeResolvesOnlyFromItsPersistedSetting(t *testing.T) {
+// TestRDDModeResolvesPersonalDefaultAndPersistedOverrides proves the personal
+// default is on while explicit persisted decisions remain authoritative.
+func TestRDDModeResolvesPersonalDefaultAndPersistedOverrides(t *testing.T) {
 	repo := initSnapshotRepo(t)
 	ctx := context.Background()
 
@@ -15,8 +15,8 @@ func TestRDDModeResolvesOnlyFromItsPersistedSetting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status.Enabled() {
-		t.Fatal("RDD mode defaulted on without a persisted opt-in")
+	if !status.Enabled() || status.Source != RDDModeSourceDefault {
+		t.Fatalf("RDD mode did not resolve the personal default: %#v", status)
 	}
 
 	status, err = ResolveRDDMode(ctx, repo, RDDGlobalMode{Value: string(RDDModeOn)})
@@ -24,7 +24,7 @@ func TestRDDModeResolvesOnlyFromItsPersistedSetting(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !status.Enabled() {
-		t.Fatal("explicit persisted global RDD opt-in did not enable review mode")
+		t.Fatal("explicit persisted global RDD enable did not enable review mode")
 	}
 
 	if _, err := SetCloneLocalRDDMode(ctx, repo, RDDModeOff, "", RDDGlobalMode{}); err != nil {

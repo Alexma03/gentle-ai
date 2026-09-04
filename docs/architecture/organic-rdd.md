@@ -12,11 +12,11 @@ Receipt-Driven Development (RDD) reviews a finished candidate without taking own
 
 ## Atomic transaction lifecycle
 
-**The switch is a switch, and it starts off.** RDD is opt-in: until someone runs
-`gentle-ai review mode enable --scope global`, it does not govern the candidate.
-Nothing blocks or gates delivery; ordinary repository policy applies. `gentle-ai
-review mode disable` returns to that state. Enabling RDD revalidates the current
-candidate instead of resuming stale obligations.
+**The switch is a switch, and this personal fork starts on.** With no recorded
+opinion, RDD governs the candidate through the default source. An explicit
+global or clone-local disable wins and returns delivery to ordinary repository
+policy. Enabling RDD again revalidates the current candidate instead of resuming
+stale obligations.
 
 ```text
 selectorless STATUS -> exact START -> bound collection/finalize -> approved + burn -> ordinary repository policy
