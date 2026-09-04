@@ -29,14 +29,10 @@ func TestRenderDependencyTreePiOnlyEngramPlanShowsComponentAndPiInstallCopy(t *t
 		"engram",
 		"Pi agent support will be installed.",
 		"pi install git:github.com/Alexma03/gentle-pi@custom/main",
-		"pi install npm:gentle-engram",
+		"pi install npm:gentle-engram@0.1.11",
 		"pi install npm:pi-mcp-adapter",
-		"npm exec --yes --package gentle-engram@latest -- pi-engram init",
-		"pi install npm:pi-subagents",
-		"pi install npm:@juicesharp/rpiv-ask-user-question",
-		"pi install npm:pi-web-access",
-		"pi install npm:@juicesharp/rpiv-todo",
-		"pi install npm:pi-btw",
+		"npm exec --yes --package gentle-engram@0.1.11 -- pi-engram init",
+		"pi install npm:pi-subagents@0.65.0",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("RenderDependencyTree() missing %q for Pi-only plan; output:\n%s", want, out)

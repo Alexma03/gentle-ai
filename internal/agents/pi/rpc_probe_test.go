@@ -64,8 +64,8 @@ func TestInstalledSubagentsRPCProviderSelectsCanonicalAndRejectsRetired(t *testi
 	if err != nil {
 		t.Fatalf("installedSubagentsRPCProvider() error = %v", err)
 	}
-	if response.Package != piSubagentsPackageSpec {
-		t.Fatalf("package = %q, want %q", response.Package, piSubagentsPackageSpec)
+	if response.Package != piSubagentsPackage {
+		t.Fatalf("package = %q, want %q", response.Package, piSubagentsPackage)
 	}
 
 	if err := os.WriteFile(settingsPath, []byte(`{"packages":["npm:pi-subagents","npm:pi-subagents-j0k3r"]}`), 0o644); err != nil {
@@ -128,7 +128,7 @@ func TestProbeSubagentsRPCCapturesOfficialRPCNotification(t *testing.T) {
 	if err := json.Compact(&compactReadyBuffer, []byte(canonicalPiSubagentsRPCReady)); err != nil {
 		t.Fatal(err)
 	}
-	want := PiSubagentsRPCProviderResponse{Package: piSubagentsPackageSpec, Ready: compactReadyBuffer.Bytes()}
+	want := PiSubagentsRPCProviderResponse{Package: piSubagentsPackage, Ready: compactReadyBuffer.Bytes()}
 	if !reflect.DeepEqual(response, want) {
 		t.Fatalf("ProbeSubagentsRPC() = %#v, want %#v", response, want)
 	}

@@ -27,13 +27,10 @@ Gentle AI runs exactly these Pi setup steps:
 
 ```bash
 pi install git:github.com/Alexma03/gentle-pi@custom/main
-pi install npm:gentle-engram
+pi install npm:gentle-engram@0.1.11
 pi install npm:pi-mcp-adapter
-npm exec --yes --package gentle-engram@latest -- pi-engram init
-pi install npm:@juicesharp/rpiv-ask-user-question
-pi install npm:pi-web-access
-pi install npm:@juicesharp/rpiv-todo
-pi install npm:pi-btw
+npm exec --yes --package gentle-engram@0.1.11 -- pi-engram init
+pi install npm:pi-subagents@0.65.0
 ```
 
 | Package                                                  | What it adds                                                                                                              |
@@ -42,12 +39,9 @@ pi install npm:pi-btw
 | [`gentle-engram`](https://pi.dev/packages/gentle-engram) | Pi integration for Engram session memory and MCP tools. It is not the Engram binary itself.                               |
 | `pi-mcp-adapter`                                         | Lets Pi expose MCP servers, including Engram, through Pi's MCP runtime.                                                   |
 | `pi-engram init`                                         | Initializes the Pi Engram MCP config shape owned by `gentle-engram`.                                                      |
-| `@juicesharp/rpiv-ask-user-question`                     | Lets Pi child agents ask the active user session for clarification when they need human input.                            |
-| `pi-web-access`                                          | Adds web access tools for Pi.                                                                                             |
-| `@juicesharp/rpiv-todo`                                  | Adds todo/task tracking support for Pi sessions.                                                                          |
-| `pi-btw`                                                 | Adds BTW companion workflow support for Pi.                                                                               |
+| [`pi-subagents`](https://github.com/nicobailon/pi-subagents) | Provides the native subagent runtime and RPC v1 surface consumed by `gentle-pi`.                                        |
 
-`gentle-pi` owns Pi's runtime behavior. Its current harness enforces parent-only delegation triggers: delegate exploration after 4+ files, use one writer for multi-file changes, require fresh review before PRs, run fresh audits after incidents, and pause long monolithic sessions before they drift.
+`gentle-pi` owns Pi's runtime behavior and delegates subagent execution to NicoBailon's `pi-subagents`. The install uses exact compatible versions so `gentle-ai sync` does not silently move the runtime contract.
 
 The real Engram component is provisioned separately by Gentle AI so `gentle-engram` has an Engram runtime to talk to.
 During that Engram provisioning step, Gentle AI declares `npm:pi-mcp-adapter` in Pi's agent settings and adds the npm dependency. Existing unrelated Pi settings, package entries, and npm dependencies are preserved.

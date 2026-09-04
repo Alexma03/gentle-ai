@@ -171,11 +171,11 @@ func (a *Adapter) AcceptSubagentsRPCResponse(response PiSubagentsRPCProviderResp
 		return PiSubagentsRPCCapabilities{}, fmt.Errorf("pi-subagents RPC provider response is missing package identity")
 	}
 	identity := piPackageIdentity(response.Package)
-	if identity != piSubagentsPackageSpec {
+	if identity != piSubagentsPackage {
 		if isRetiredPiSubagentPackage(identity) {
-			return PiSubagentsRPCCapabilities{}, fmt.Errorf("retired Pi subagents provider %q rejected; canonical %q is required", response.Package, piSubagentsPackageSpec)
+			return PiSubagentsRPCCapabilities{}, fmt.Errorf("retired Pi subagents provider %q rejected; canonical %q is required", response.Package, piSubagentsPackage)
 		}
-		return PiSubagentsRPCCapabilities{}, fmt.Errorf("Pi subagents provider %q rejected; canonical %q is required", response.Package, piSubagentsPackageSpec)
+		return PiSubagentsRPCCapabilities{}, fmt.Errorf("Pi subagents provider %q rejected; canonical %q is required", response.Package, piSubagentsPackage)
 	}
 	if len(bytes.TrimSpace(response.Ready)) == 0 {
 		return PiSubagentsRPCCapabilities{}, fmt.Errorf("pi-subagents RPC ready payload is absent")

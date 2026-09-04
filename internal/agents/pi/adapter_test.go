@@ -155,14 +155,10 @@ func TestAdapterInstallCommandSequenceUsesNpmWhenPnpmIsUnavailable(t *testing.T)
 
 	want := [][]string{
 		{"pi", "install", GentlePiPackageSpec},
-		{"pi", "install", "npm:gentle-engram"},
+		{"pi", "install", "npm:gentle-engram@0.1.11"},
 		{"pi", "install", "npm:pi-mcp-adapter"},
-		{"npm", "exec", "--yes", "--package", "gentle-engram@latest", "--", "pi-engram", "init"},
+		{"npm", "exec", "--yes", "--package", "gentle-engram@0.1.11", "--", "pi-engram", "init"},
 		piSubagentsInstallCommand(system.PlatformProfile{}),
-		{"pi", "install", "npm:@juicesharp/rpiv-ask-user-question"},
-		{"pi", "install", "npm:pi-web-access"},
-		{"pi", "install", "npm:@juicesharp/rpiv-todo"},
-		{"pi", "install", "npm:pi-btw"},
 	}
 	if !reflect.DeepEqual(commands, want) {
 		t.Fatalf("InstallCommand() = %#v, want %#v", commands, want)
@@ -184,7 +180,7 @@ func TestAdapterInstallCommandSequenceUsesSameSubagentsPackageForWindows(t *test
 		t.Fatalf("InstallCommand() error = %v", err)
 	}
 
-	want := []string{"pi", "install", "npm:pi-subagents"}
+	want := []string{"pi", "install", "npm:pi-subagents@0.65.0"}
 	if !reflect.DeepEqual(commands[4], want) {
 		t.Fatalf("InstallCommand()[4] = %#v, want %#v", commands[4], want)
 	}
@@ -205,7 +201,7 @@ func TestAdapterInstallCommandSequenceUsesNpmForEngramInitWhenPnpmIsAvailable(t 
 		t.Fatalf("InstallCommand() error = %v", err)
 	}
 
-	want := []string{"npm", "exec", "--yes", "--package", "gentle-engram@latest", "--", "pi-engram", "init"}
+	want := []string{"npm", "exec", "--yes", "--package", "gentle-engram@0.1.11", "--", "pi-engram", "init"}
 	if !reflect.DeepEqual(commands[3], want) {
 		t.Fatalf("InstallCommand()[3] = %#v, want %#v", commands[3], want)
 	}
@@ -255,7 +251,7 @@ func TestMergePiSettingsFileRetainsCanonicalAndRemovesRetiredSubagentPackages(t 
 			}
 		}
 	}
-	if !reflect.DeepEqual(settings.Packages, []string{"npm:pi-subagents", "npm:other@1.0.0", "npm:pi-mcp-adapter"}) {
+	if !reflect.DeepEqual(settings.Packages, []string{"npm:pi-subagents@0.65.0", "npm:other@1.0.0", "npm:pi-mcp-adapter"}) {
 		t.Fatalf("packages = %#v", settings.Packages)
 	}
 }

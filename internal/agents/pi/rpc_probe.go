@@ -168,12 +168,12 @@ func (a *Adapter) installedSubagentsRPCProvider(homeDir string) (PiSubagentsRPCP
 		if isRetiredPiSubagentPackage(identity) {
 			return PiSubagentsRPCProviderResponse{Package: identity}, nil
 		}
-		if identity == piSubagentsPackageSpec {
+		if identity == piSubagentsPackage {
 			canonical = true
 		}
 	}
 	if canonical {
-		return PiSubagentsRPCProviderResponse{Package: piSubagentsPackageSpec}, nil
+		return PiSubagentsRPCProviderResponse{Package: piSubagentsPackage}, nil
 	}
 	return PiSubagentsRPCProviderResponse{Package: firstIdentity}, nil
 }

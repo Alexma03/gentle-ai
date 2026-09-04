@@ -103,13 +103,10 @@ For the full Pi command and package reference, see [Pi Agent](pi.md).
 - **Detection**: gentle-ai detects Pi from the `pi` binary on `PATH` and its config root at `~/.pi`.
 - **Install**: Pi must already be installed. gentle-ai then installs the full Pi support stack with:
   - `pi install git:github.com/Alexma03/gentle-pi@custom/main`
-  - `pi install npm:gentle-engram`
+  - `pi install npm:gentle-engram@0.1.11`
   - `pi install npm:pi-mcp-adapter`
-  - `npm exec --yes --package gentle-engram@latest -- pi-engram init`
-  - `pi install npm:@juicesharp/rpiv-ask-user-question`
-  - `pi install npm:pi-web-access`
-  - `pi install npm:@juicesharp/rpiv-todo`
-  - `pi install npm:pi-btw`
+  - `npm exec --yes --package gentle-engram@0.1.11 -- pi-engram init`
+  - `pi install npm:pi-subagents@0.65.0`
 - **`gentle-pi` package**: adds the Gentleman harness for Pi: SDD/OpenSpec workflow, strict TDD guidance, safety defaults, `/gentle-ai:*` commands, skill assets, prompts, SDD agents, and SDD chains. On normal `session_start`, it copies project assets into `.pi/agents/`, `.pi/chains/`, and `.pi/gentle-ai/support/` without overwriting local files unless the Pi recovery command uses `--force`. Starting Pi with `pi -ns` skips startup skill loading/hooks, so that automatic refresh does not run in that mode.
 - **Package metadata**: this fork installs `git:github.com/Alexma03/gentle-pi@custom/main` ([Alexma03/gentle-pi](https://github.com/Alexma03/gentle-pi)), not the npm registry package.
 - **Persona command**: `gentle-pi` owns Pi persona switching through `/gentleman:persona` (`/gentle-ai:persona` remains a compatibility alias). It switches between `gentleman` and `neutral`, saves `.pi/gentle-ai/persona.json`, and may require `/reload` or a new Pi session for the active prompt to refresh.
@@ -118,6 +115,5 @@ For the full Pi command and package reference, see [Pi Agent](pi.md).
 - **MCP adapter wiring**: ComponentEngram declares `npm:pi-mcp-adapter` in `.pi/agent/settings.json` packages and adds `pi-mcp-adapter` `^2.6.0` to `.pi/npm/package.json` without removing unrelated user entries. `pi-engram init` owns the Pi Engram MCP config schema and is run during installation.
 - CLI precedence is flag, non-empty environment, prior managed state, then `auto`; `auto` never enables by itself, unresolved non-interactive `auto` stays foreground, and the interactive Pi installer prompts only when that preference is unresolved.
 - The resolved on/off policy is projected to `~/.pi/gentle-ai/background-subagents.json` as `{"schema":"gentle-pi.background-subagents/v1","policy":"on"|"off"}` (the base directory honors `GENTLE_PI_CONFIG_HOME`); `off` rewrites the policy instead of deleting files, and a file at that path without the managed schema marker is never overwritten.
-- **`@juicesharp/rpiv-ask-user-question` package**: lets Pi child agents ask the active user session for clarification when they need human input.
-- **Pi companion packages**: `pi-web-access`, `@juicesharp/rpiv-todo`, and `pi-btw` add web access, todo tracking, and companion workflow support.
+- **`pi-subagents` package**: NicoBailon's runtime owns child execution and exposes the RPC v1 capability surface consumed by `gentle-pi`.
 - **Pi-only flow**: when Pi is the only selected agent, gentle-ai skips persona, ecosystem component selection, and Strict TDD prompts because those behaviors are provided by `gentle-pi`.

@@ -27,7 +27,7 @@ const canonicalPiSubagentsRPCReady = `{
 
 func TestAdapterAcceptsCanonicalPiSubagentsProvider(t *testing.T) {
 	capabilities, err := NewAdapter().AcceptSubagentsRPCResponse(PiSubagentsRPCProviderResponse{
-		Package: piSubagentsPackageSpec,
+		Package: piSubagentsPackage,
 		Ready:   []byte(canonicalPiSubagentsRPCReady),
 	})
 	if err != nil {
@@ -44,10 +44,10 @@ func TestAdapterRejectsAbsentMalformedWrongVersionIncompleteAndRetiredPiSubagent
 		response PiSubagentsRPCProviderResponse
 		want     string
 	}{
-		{name: "absent", response: PiSubagentsRPCProviderResponse{Package: piSubagentsPackageSpec}, want: "ready payload"},
-		{name: "malformed", response: PiSubagentsRPCProviderResponse{Package: piSubagentsPackageSpec, Ready: []byte("{")}, want: "invalid JSON"},
-		{name: "wrong version", response: PiSubagentsRPCProviderResponse{Package: piSubagentsPackageSpec, Ready: []byte(strings.Replace(canonicalPiSubagentsRPCReady, `"version": 1`, `"version": 2`, 1))}, want: "version"},
-		{name: "incomplete", response: PiSubagentsRPCProviderResponse{Package: piSubagentsPackageSpec, Ready: []byte(strings.Replace(canonicalPiSubagentsRPCReady, `"resume"`, `"not-resume"`, 1))}, want: "resume"},
+		{name: "absent", response: PiSubagentsRPCProviderResponse{Package: piSubagentsPackage}, want: "ready payload"},
+		{name: "malformed", response: PiSubagentsRPCProviderResponse{Package: piSubagentsPackage, Ready: []byte("{")}, want: "invalid JSON"},
+		{name: "wrong version", response: PiSubagentsRPCProviderResponse{Package: piSubagentsPackage, Ready: []byte(strings.Replace(canonicalPiSubagentsRPCReady, `"version": 1`, `"version": 2`, 1))}, want: "version"},
+		{name: "incomplete", response: PiSubagentsRPCProviderResponse{Package: piSubagentsPackage, Ready: []byte(strings.Replace(canonicalPiSubagentsRPCReady, `"resume"`, `"not-resume"`, 1))}, want: "resume"},
 		{name: "retired provider", response: PiSubagentsRPCProviderResponse{Package: "npm:pi-subagents-j0k3r", Ready: []byte(canonicalPiSubagentsRPCReady)}, want: "canonical"},
 	}
 

@@ -27,7 +27,10 @@ const (
 	piSettingsFile           = "settings.json"
 	piNPMDirectory           = "npm"
 	piNPMPackageFile         = "package.json"
-	piSubagentsPackageSpec   = "npm:pi-subagents"
+	piSubagentsPackage       = "npm:pi-subagents"
+	piSubagentsPackageSpec   = "npm:pi-subagents@0.65.0"
+	gentleEngramPackageSpec  = "npm:gentle-engram@0.1.11"
+	gentleEngramNPMPackage   = "gentle-engram@0.1.11"
 	piCodingAgentDirEnv      = "PI_CODING_AGENT_DIR"
 	// GentlePiPackageSpec installs this fork's Pi harness, not the npm registry package.
 	GentlePiPackageSpec = "git:github.com/Alexma03/gentle-pi@custom/main"
@@ -83,19 +86,15 @@ func (a *Adapter) CapabilityManifest() capabilitymanifest.AgentCapabilityManifes
 func (a *Adapter) InstallCommand(profile system.PlatformProfile) ([][]string, error) {
 	return [][]string{
 		{"pi", "install", GentlePiPackageSpec},
-		{"pi", "install", "npm:gentle-engram"},
+		{"pi", "install", gentleEngramPackageSpec},
 		{"pi", "install", "npm:pi-mcp-adapter"},
 		a.engramInitCommand(),
 		piSubagentsInstallCommand(profile),
-		{"pi", "install", "npm:@juicesharp/rpiv-ask-user-question"},
-		{"pi", "install", "npm:pi-web-access"},
-		{"pi", "install", "npm:@juicesharp/rpiv-todo"},
-		{"pi", "install", "npm:pi-btw"},
 	}, nil
 }
 
 func (a *Adapter) engramInitCommand() []string {
-	return []string{"npm", "exec", "--yes", "--package", "gentle-engram@latest", "--", "pi-engram", "init"}
+	return []string{"npm", "exec", "--yes", "--package", gentleEngramNPMPackage, "--", "pi-engram", "init"}
 }
 
 func (a *Adapter) GlobalConfigDir(homeDir string) string { return ConfigPath(homeDir) }
@@ -259,7 +258,7 @@ func appendPiPackage(existing any, desired string) []any {
 		if identity == piMCPAdapterPackage || isRetiredPiSubagentPackage(identity) || identity == desiredIdentity {
 			continue
 		}
-		if identity == piSubagentsPackageSpec {
+		if identity == piSubagentsPackage {
 			if canonicalSeen {
 				continue
 			}
@@ -313,14 +312,14 @@ func piPackageIdentity(pkg any) string {
 	if strings.HasPrefix(source, piMCPAdapterPackage+"@") || source == piMCPAdapterPackage {
 		return piMCPAdapterPackage
 	}
-	if strings.HasPrefix(source, piSubagentsPackageSpec+"@") || source == piSubagentsPackageSpec {
-		return piSubagentsPackageSpec
+	if strings.HasPrefix(source, piSubagentsPackage+"@") || source == piSubagentsPackage {
+		return piSubagentsPackage
 	}
 	return source
 }
 
 func isRetiredPiSubagentPackage(identity string) bool {
-	return identity != piSubagentsPackageSpec && strings.Contains(strings.ToLower(identity), "pi-subagents")
+	return identity != piSubagentsPackage && strings.Contains(strings.ToLower(identity), "pi-subagents")
 }
 
 func mergePiJSONFile(path string, overlay []byte) (filemerge.WriteResult, error) {

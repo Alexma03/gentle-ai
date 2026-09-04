@@ -74,7 +74,7 @@ func assertRunInstallRejectsRetiredSelector(t *testing.T, raw string, args ...st
 	}
 }
 
-const engramInitCommandForTest = "npm exec --yes --package gentle-engram@latest -- pi-engram init"
+const engramInitCommandForTest = "npm exec --yes --package gentle-engram@0.1.11 -- pi-engram init"
 
 const canonicalPiSubagentsReadyForCLI = `{
   "version": 1,
@@ -306,7 +306,7 @@ func TestPiAgentInstallProgressUsesAdapterCommandNames(t *testing.T) {
 		t.Fatalf("agentInstallStep.Run() error = %v", err)
 	}
 
-	wantPackages := []string{"pi install git:github.com/Alexma03/gentle-pi@custom/main", "pi install npm:gentle-engram", "pi install npm:pi-mcp-adapter", engramInitCommandForTest, "pi install npm:pi-subagents", "pi install npm:@juicesharp/rpiv-ask-user-question", "pi install npm:pi-web-access", "pi install npm:@juicesharp/rpiv-todo", "pi install npm:pi-btw"}
+	wantPackages := []string{"pi install git:github.com/Alexma03/gentle-pi@custom/main", "pi install npm:gentle-engram@0.1.11", "pi install npm:pi-mcp-adapter", engramInitCommandForTest, "pi install npm:pi-subagents@0.65.0"}
 	if len(events) != len(wantPackages)*2 {
 		t.Fatalf("progress events = %d, want %d: %v", len(events), len(wantPackages)*2, events)
 	}
@@ -401,14 +401,10 @@ func TestPiAgentInstallRunsPackageCommandsWhenPiAlreadyInstalled(t *testing.T) {
 
 	for _, want := range []string{
 		"pi install git:github.com/Alexma03/gentle-pi@custom/main",
-		"pi install npm:gentle-engram",
+		"pi install npm:gentle-engram@0.1.11",
 		"pi install npm:pi-mcp-adapter",
 		engramInitCommandForTest,
-		"pi install npm:pi-subagents",
-		"pi install npm:@juicesharp/rpiv-ask-user-question",
-		"pi install npm:pi-web-access",
-		"pi install npm:@juicesharp/rpiv-todo",
-		"pi install npm:pi-btw",
+		"pi install npm:pi-subagents@0.65.0",
 	} {
 		if !stringSliceContains(commands, want) {
 			t.Fatalf("commands missing %q; got %v", want, commands)
