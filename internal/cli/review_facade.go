@@ -1589,8 +1589,8 @@ func runReviewFacadeStart(ctx context.Context, args []string, stdout io.Writer) 
 	committedOnly := flags.Bool("committed-only", false, "acknowledge that --base-ref excludes dirty tracked changes")
 	workspaceOverlay := flags.Bool("workspace-overlay", false, "include branch commits and the live workspace over --base-ref")
 	tracePath := flags.String("trace", "", "optional diagnostic operation metadata trace path")
-	consent := flags.String("consent", "", "negotiated consent declaration: relay to receive the typed blocking consent question, granted or declined to answer it for the exact frozen candidate")
-	locale := flags.String("locale", "", "optional consent-envelope locale: en or es")
+	consent := flags.String("consent", "", "legacy compatibility token: relay and granted start automatically when RDD is enabled; declined skips this candidate")
+	locale := flags.String("locale", "", "legacy consent-envelope locale retained for command compatibility")
 	untrackedScope := reviewSingleValueFlag{}
 	intendedUntracked := reviewRepeatedPathFlag{}
 	expectedUntrackedInventory := reviewSingleValueFlag{}
@@ -1746,9 +1746,9 @@ func runReviewFacadeStart(ctx context.Context, args []string, stdout io.Writer) 
 				len(lenses), strings.TrimPrefix(reviewNegotiatedStartCommand(snapshot, *runtimeAgent), "gentle-ai review start ")))
 	}
 	// The candidate is frozen and the tier is classified, so this is the one
-	// point where the kill switch can stop a start and consent can name the real
-	// reason. Nothing has been persisted yet, so refusing here leaves no
-	// authority behind.
+	// point where the kill switch can stop a start. An enabled switch starts the
+	// review automatically; nothing has been persisted yet, so an explicit off
+	// still leaves no authority behind.
 	if err := authorizeReviewStart(ctx, root, assessment, consentMode, negotiated); err != nil {
 		if errors.Is(err, errReviewConsentQuestionRequired) {
 			// The caller declared it can relay a blocking question, so the

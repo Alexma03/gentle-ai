@@ -55,9 +55,9 @@ func boundedReviewRequiredClausesFor(agent model.AgentID) []string {
 		"Only candidate-caused severe findings block",
 		"four-lens review is long work",
 		"at-most-one bounded correction",
-		"typed `gentle-ai.review-integration.consent/v3` envelope",
-		"Lossless Blocking Prompt",
-		"Do not translate machine answer tokens (`granted`, `declined`)",
+		"user-owned RDD switch is the complete review authorization",
+		"provider-issued START runs automatically",
+		"do not request or relay a second candidate-scoped consent",
 		"validator that cannot inspect the immutable trees produced no verdict",
 		"Claude Code, Codex, and Pi use the shared Go provider contract",
 		"Never hand candidate bytes through `/tmp`",
@@ -175,17 +175,16 @@ func TestBoundedReviewStopInventoryIsCompleteWithoutRepeatingStatus(t *testing.T
 	}
 }
 
-func TestBoundedReviewConsentLocalizationPreservesMachineDomain(t *testing.T) {
+func TestBoundedReviewUsesModeAsCompleteAuthorization(t *testing.T) {
 	content := boundedReviewContract()
 	for _, want := range []string{
-		"relay it as a Lossless Blocking Prompt",
-		"faithfully translate the headline, reason, `value`, risk evidence, choice labels, every choice `effect`, and the off-path note",
-		"Project `value` as benefits and every `effect` as consequences",
-		"Do not translate machine answer tokens (`granted`, `declined`)",
-		"Run exactly the invocation selected by the human",
+		"The user-owned RDD switch is the complete review authorization",
+		"provider-issued START runs automatically for applicable candidates",
+		"do not request or relay a second candidate-scoped consent",
+		"global or clone-local disable command as the durable kill switch",
 	} {
 		if !strings.Contains(content, want) {
-			t.Errorf("orchestrator contract missing localized consent rule %q", want)
+			t.Errorf("orchestrator contract missing automatic review rule %q", want)
 		}
 	}
 }

@@ -197,40 +197,25 @@ func TestNegotiatedStatusInterpretsCommittedOnlyValue(t *testing.T) {
 	})
 }
 
-func TestNegotiatedV2FreshStatusIncludesExactConsentRelay(t *testing.T) {
+func TestNegotiatedV2FreshStatusStartsWithoutCandidateConsent(t *testing.T) {
 	reviewEnabledHome(t)
 	repo := initReviewCLIRepo(t)
 	writeReviewStartCandidate(t, repo, "scripts/deploy.sh", "echo deploy\n", 0o644)
 
-	status := negotiatedStartStatusForContract(t, repo, ReviewIntegrationContractV2, "--lineage", "status-v2-consent-relay")
-	assertStartTransition(t, status, []string{"cwd", "contract", "target", "projection", "lineage", "consent"})
-	consent := status.NextTransition.Execute.Arguments[len(status.NextTransition.Execute.Arguments)-1]
-	if consent != (ReviewTransitionArgument{Name: "consent", Value: "relay", Token: "--consent=relay"}) {
-		t.Fatalf("v2 START consent argument = %#v", consent)
-	}
+	status := negotiatedStartStatusForContract(t, repo, ReviewIntegrationContractV2, "--lineage", "status-v2-automatic")
+	assertStartTransition(t, status, []string{"cwd", "contract", "target", "projection", "lineage"})
 	wantCommand := "gentle-ai review start" +
 		" " + reviewTransitionShellWord("--cwd="+repo) +
 		" --contract=" + ReviewIntegrationContractV2 +
 		" --target=" + status.TargetIdentity +
 		" --projection=workspace" +
-		" --lineage=status-v2-consent-relay" +
-		" --consent=relay"
+		" --lineage=status-v2-automatic"
 	if status.NextTransition.Execute.Command != wantCommand {
 		t.Fatalf("v2 START command = %q, want %q", status.NextTransition.Execute.Command, wantCommand)
 	}
 	if err := status.Validate(); err != nil {
 		t.Fatalf("v2 fresh STATUS does not validate: %v", err)
 	}
-	invalid := status
-	transition := *status.NextTransition
-	execution := *status.NextTransition.Execute
-	execution.Arguments = append([]ReviewTransitionArgument(nil), execution.Arguments[:len(execution.Arguments)-1]...)
-	transition.Execute = &execution
-	invalid.NextTransition = &transition
-	if err := invalid.Validate(); err == nil {
-		t.Fatal("v2 fresh STATUS accepted a START transition without consent=relay")
-	}
-
 	legacy := negotiatedStartStatusForContract(t, repo, ReviewIntegrationContractV1, "--lineage", "status-v1-compatible")
 	assertStartTransition(t, legacy, []string{"cwd", "contract", "target", "projection", "lineage"})
 	if strings.Contains(legacy.NextTransition.Execute.Command, "--consent") {

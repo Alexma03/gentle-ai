@@ -3,7 +3,6 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
-	"strings"
 	"testing"
 )
 
@@ -89,8 +88,10 @@ func TestNegotiatedRouteWithoutRuntimeIdentityReachesStart(t *testing.T) {
 		}
 		t.Fatalf("provider-returned START failed: %v %#v", err, failure)
 	}
-	if !strings.Contains(startOutput.String(), "consent") {
-		t.Fatalf("negotiated START answered without the consent envelope: %s", startOutput.String())
+	var started ReviewIntegrationStartResult
+	decodeStrictReviewJSON(t, startOutput.Bytes(), &started)
+	if started.Action != "created" || started.LineageID == "" {
+		t.Fatalf("negotiated START did not start automatically: %#v", started)
 	}
 }
 

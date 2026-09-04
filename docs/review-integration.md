@@ -78,11 +78,11 @@ Each provider-issued capture input is one slot. Its reviewer prompt starts with 
 
 Reviewers inspect only provider-bound immutable trees. They never inspect the live worktree, index, `HEAD`, or another revision, and candidate bytes must not move through `/tmp`, a repository scratch file, or `GENTLE_AI_FROZEN_CANDIDATE_CONTEXT`.
 
-## Corrections and consent
+## Corrections and review mode
 
 Native Go alone selects lenses, classifies candidate causality, performs refutation, derives repository evidence, and permits at most one bounded correction. A validator that cannot inspect its immutable trees has no verdict; report that block rather than submitting a failed validation.
 
-Medium and high-risk START may return the typed `gentle-ai.review-integration.consent/v3` envelope. Relay the complete choice envelope losslessly, preserve machine tokens and invocations exactly, and run only the invocation selected by the human. Global RDD mode permits review; it never grants per-candidate consent. A decline is not the kill switch.
+The user-owned RDD switch is the complete authorization for review. When enabled, medium- and high-risk START runs automatically without a candidate-scoped consent prompt. Use the global or clone-local disable command as the durable kill switch.
 
 ## Delivery remains human-owned
 

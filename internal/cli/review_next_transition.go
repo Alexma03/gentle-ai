@@ -620,9 +620,6 @@ func reviewStartArguments(status ReviewTargetStatusResult, lineage string, runti
 	if runtime != "" {
 		arguments = append(arguments, ReviewTransitionArgument{Name: "agent", Value: string(runtime)})
 	}
-	if contract == ReviewIntegrationContractV2 {
-		arguments = append(arguments, ReviewTransitionArgument{Name: "consent", Value: string(reviewConsentModeRelay)})
-	}
 	arguments = append(arguments, reviewStartIntendedUntrackedArguments(intended)...)
 	return arguments
 }

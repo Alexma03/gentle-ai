@@ -8,7 +8,7 @@ Before you dive in, please read this guide fully. We have a structured workflow 
 
 ## Table of Contents
 
-- [Issue-First Workflow](#issue-first-workflow)
+- [Contribution Workflow](#contribution-workflow)
 - [AI-Assisted Contributions](#ai-assisted-contributions)
 - [Label System](#label-system)
 - [Development Setup](#development-setup)
@@ -21,34 +21,22 @@ Before you dive in, please read this guide fully. We have a structured workflow 
 
 ---
 
-## Issue-First Workflow
+## Contribution Workflow
 
-**No PR without an issue. No exceptions.**
+GitHub issues are optional. Create or link one only when the user or contributor explicitly wants issue tracking; an issue never authorizes or blocks implementation, review, or a pull request.
 
-This project follows a strict issue-first workflow:
-
-1. **Open an issue** using the appropriate template ([Bug Report](https://github.com/Gentleman-Programming/gentle-ai/issues/new?template=bug_report.yml) or [Feature Request](https://github.com/Gentleman-Programming/gentle-ai/issues/new?template=feature_request.yml))
-2. **Wait for approval** — work may begin only when the issue has `status:approved` under the canonical issue-creation workflow contract. Without a current direct instruction and target-host capability granting the exact action, comment and wait.
-3. **Comment on the issue** to let others know you're working on it
-4. **Open a PR** referencing the approved issue
-
-PRs that are not linked to an approved issue will be **automatically rejected** by CI.
+1. Create a focused branch from the intended base.
+2. Implement one cohesive change and run applicable checks.
+3. Open a PR with a truthful summary and exact test evidence.
+4. Link an existing issue only when it is useful and explicitly desired.
 
 ---
-
-## Looking for something to work on?
-
-Start at the **[Community Roadmap](docs/community-roadmap.md)**.
-
-Everything labelled [`up-for-grabs`](https://github.com/Gentleman-Programming/gentle-ai/issues?q=is%3Aissue+is%3Aopen+label%3Aup-for-grabs) is scoped, carries `status:approved` so a PR can be opened, and is unclaimed. Comment that you are taking it and go.
-
-An issue **without** that label is usually waiting on information (`status:needs-info`) or on an architectural decision (`status:needs-design`). Those want discussion first — implementing before the decision lands means the work gets thrown away.
 
 ## AI-Assisted Contributions
 
 **AI assistance is allowed, but you must understand and own the complete submission.** Before opening a PR:
 
-- [ ] Confirm the change matches the approved issue scope.
+- [ ] Confirm the change matches the requested scope.
 - [ ] Inspect every changed line.
 - [ ] Remove invented, unverifiable, or unrelated output.
 - [ ] Identify the responsible cause or invariant; confirm the fix resolves it rather than masking or shifting the symptom.
@@ -71,16 +59,6 @@ For disclosure boundaries, required details, attribution rules, and reviewer exp
 | `type:refactor` | Code refactoring, no functional changes |
 | `type:chore` | Build, CI, tooling changes |
 | `type:breaking-change` | Breaking change |
-
-### Status Labels (applied to Issues)
-
-| Label | Description |
-|-------|-------------|
-| `status:needs-review` | Newly opened, awaiting maintainer review |
-| `status:approved` | Approved for implementation — work can begin |
-| `status:in-progress` | Being worked on |
-| `status:blocked` | Blocked by another issue or external dependency |
-| `status:wont-fix` | Out of scope or won't be addressed |
 
 ### Priority Labels
 
@@ -336,7 +314,6 @@ Review feedback should be warm, direct, and useful quickly. Start with the actio
 
 ### Before Opening a PR
 
-- [ ] There is a linked approved issue (`Closes #<N>`)
 - [ ] The PR is one cohesive review unit, or is split at natural architectural/review boundaries
 - [ ] Commits are organized by deliverable work unit
 - [ ] All unit tests pass (`go test ./...`)
@@ -361,23 +338,11 @@ All PRs go through automated checks:
 
 | Check | What It Verifies |
 |-------|-----------------|
-| **Check Issue Reference** | PR body contains `Closes/Fixes/Resolves #N` |
-| **Check Issue Has status:approved** | The linked issue has `status:approved` under the canonical issue-creation workflow contract |
 | **Check PR Has type:* Label** | Exactly one `type:*` label is applied |
 | **Unit Tests** | `go test ./...` passes |
 | **E2E Tests** | `cd e2e && ./docker-test.sh` passes |
 
 **All checks must pass** before a PR can be merged.
-
-### Linking Your Issue
-
-In the PR body, include one of:
-
-```
-Closes #42
-Fixes #42
-Resolves #42
-```
 
 ---
 

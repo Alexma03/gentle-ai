@@ -3,7 +3,6 @@ package cli
 import (
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"os"
 	"sync"
@@ -140,42 +139,6 @@ func TestNegotiatedStartUndeclaredConsentIsByteSilentOnStderr(t *testing.T) {
 	}
 }
 
-// TestNegotiatedStartConsentAnswersStayByteSilentOnStderr proves the three
-// declared consent shapes stay silent on success: relay answers with the typed
-// question envelope, granted starts the review, and neither touches stderr.
-func TestNegotiatedStartConsentAnswersStayByteSilentOnStderr(t *testing.T) {
-	reviewEnabledHome(t)
-	repo := initReviewCLIRepo(t)
-	console := stubReviewConsole(t, false, "")
-	writeReviewStartCandidate(t, repo, "scripts/deploy.sh", "echo deploy\n", 0o644)
-	stderr := captureReviewProcessStderr(t)
-
-	relay := runConsentRelayStart(t, boundNegotiatedStartArgs(t, []string{
-		"start", "--contract", ReviewIntegrationContractV1, "--cwd", repo,
-		"--lineage", "review-negotiated-consents", "--consent", "relay",
-	}))
-	question := decodeConsentQuestion(t, relay.Bytes())
-	if question.Action != "consent_required" || !question.Blocking {
-		t.Fatalf("relay did not answer with the typed question: %#v", question)
-	}
-
-	granted := runConsentRelayStart(t, boundNegotiatedStartArgs(t, []string{
-		"start", "--contract", ReviewIntegrationContractV1, "--cwd", repo,
-		"--lineage", "review-negotiated-consents", "--consent", "granted",
-	}))
-	started := decodeNegotiatedReviewStart(t, granted.Bytes())
-	if started.Action != "created" {
-		t.Fatalf("granted START = %#v", started)
-	}
-
-	if console.Len() != 0 {
-		t.Fatalf("declared negotiated consent wrote to the console:\n%s", console.String())
-	}
-	if got := stderr(); got != "" {
-		t.Fatalf("declared negotiated consent wrote stderr, want zero bytes:\n%q", got)
-	}
-}
-
 // TestNegotiatedLifecycleOperationsAreByteSilentOnStderr walks a complete
 // low-risk negotiated lifecycle — STATUS, terminal START, unmanaged VALIDATE —
 // and requires zero stderr bytes from every successful operation, the exact
@@ -218,82 +181,5 @@ func TestNegotiatedLifecycleOperationsAreByteSilentOnStderr(t *testing.T) {
 
 	if got := stderr(); got != "" {
 		t.Fatalf("negotiated lifecycle wrote stderr, want zero bytes:\n%q", got)
-	}
-}
-
-// TestNegotiatedStartUndeclaredInteractiveKeepsConsentCeremony pins the human
-// half of the negotiated-silence contract: an undeclared negotiated START at a
-// real interactive terminal keeps the exact plain-start one-time ceremony —
-// the Tier A consent prompt is written to the console and answer 2 refuses
-// this candidate. This is also the production-reachability proof for the
-// human narration surface: the prompt bytes below are the registered Tier A
-// vocabulary reaching a real console through authorizeReviewStart.
-func TestNegotiatedStartUndeclaredInteractiveKeepsConsentCeremony(t *testing.T) {
-	reviewEnabledHome(t)
-	repo := initReviewCLIRepo(t)
-	console := stubReviewConsole(t, true, "2\n")
-	writeReviewStartCandidate(t, repo, "scripts/deploy.sh", "echo deploy\n", 0o644)
-
-	var output bytes.Buffer
-	err := RunReview(boundNegotiatedStartArgs(t, []string{
-		"start", "--contract", ReviewIntegrationContractV1, "--cwd", repo,
-		"--lineage", "review-negotiated-interactive",
-	}), &output)
-	if !errors.Is(err, errReviewDeclinedForCandidate) {
-		t.Fatalf("interactive negotiated refusal = %v, want errReviewDeclinedForCandidate\n%s", err, output.String())
-	}
-	assertReviewConsentPrompt(t, console.String(), "scripts/deploy.sh")
-}
-
-// TestNegotiatedStartUndeclaredAskedLatchProceedsSilently proves the machine
-// half stays intact: a non-interactive negotiated START with the one-time
-// question already answered proceeds, writes nothing to the console, and
-// leaves both the consent latch and the once-per-clone notice marker exactly
-// as it found them.
-func TestNegotiatedStartUndeclaredAskedLatchProceedsSilently(t *testing.T) {
-	reviewEnabledHome(t)
-	repo := initReviewCLIRepo(t)
-	console := stubReviewConsole(t, false, "")
-	writeReviewStartCandidate(t, repo, "scripts/deploy.sh", "echo deploy\n", 0o644)
-	if err := recordReviewConsentAsked(context.Background(), repo); err != nil {
-		t.Fatal(err)
-	}
-
-	output := runConsentRelayStart(t, boundNegotiatedStartArgs(t, []string{
-		"start", "--contract", ReviewIntegrationContractV1, "--cwd", repo,
-		"--lineage", "review-negotiated-asked-latch",
-	}))
-	started := decodeNegotiatedReviewStart(t, output.Bytes())
-	if started.Action != "created" {
-		t.Fatalf("asked-latch negotiated START = %#v", started)
-	}
-	if console.Len() != 0 {
-		t.Fatalf("asked-latch negotiated START wrote to the console:\n%s", console.String())
-	}
-	if asked, err := reviewtransaction.RDDConsentAsked(context.Background(), repo); err != nil || !asked {
-		t.Fatalf("negotiated START changed the consent latch: asked=%v err=%v", asked, err)
-	}
-	if shown, err := reviewConsentNoticeAlreadyShown(context.Background(), repo); err != nil || shown {
-		t.Fatalf("negotiated START burned the notice marker: shown=%v err=%v", shown, err)
-	}
-}
-
-// TestPlainStartConsentNoticeStaysByteIdentical pins requirement 3 of the
-// negotiated-silence contract: non-negotiated (human) invocations keep their
-// narration byte-identical. A headless clone that opted in prints exactly the
-// skip notice on its own line and nothing else.
-func TestPlainStartConsentNoticeStaysByteIdentical(t *testing.T) {
-	reviewEnabledHome(t)
-	repo := initReviewCLIRepo(t)
-	console := stubReviewConsole(t, false, "")
-	writeReviewStartCandidate(t, repo, "scripts/deploy.sh", "echo deploy\n", 0o644)
-
-	var output bytes.Buffer
-	if err := RunReviewFacadeStart([]string{"--cwd", repo, "--lineage", "review-plain-notice"}, &output); err != nil {
-		t.Fatalf("plain headless start: %v\n%s", err, output.String())
-	}
-	want := reviewConsentSkippedNotice + "\n"
-	if console.String() != want {
-		t.Fatalf("plain start notice drifted:\n got %q\nwant %q", console.String(), want)
 	}
 }

@@ -1,17 +1,3 @@
-<!-- ⚠️ READ BEFORE SUBMITTING
-  Every PR must be linked to an issue that has the "status:approved" label.
-  PRs without a linked approved issue will be automatically rejected by CI.
-  See CONTRIBUTING.md for the full contribution workflow.
--->
-
-## 🔗 Linked Issue
-
-Closes #
-
-<!-- Replace the # above with the issue number, e.g.: Closes #42 -->
-
----
-
 ## 🏷️ PR Type
 
 What kind of change does this PR introduce?
@@ -93,8 +79,6 @@ The following checks run automatically on this PR:
 | Check | Status | Description |
 |-------|--------|-------------|
 | Review Workload | ⏳ | PR should form one cohesive, independently verifiable work unit or split at natural boundaries |
-| Check Issue Reference | ⏳ | PR body must contain `Closes/Fixes/Resolves #N` |
-| Check Issue Has `status:approved` | ⏳ | Linked issue must have been approved before work began |
 | Check PR Has `type:*` Label | ⏳ | Exactly one `type:*` label must be applied |
 | Unit Tests | ⏳ | `go test ./...` must pass |
 | Go Format | ⏳ | `go run ./internal/gofmtcheck` must pass |
@@ -104,7 +88,6 @@ The following checks run automatically on this PR:
 
 ## ✅ Contributor Checklist
 
-- [ ] PR is linked to an issue with `status:approved`
 - [ ] PR is one cohesive review unit, or is split at natural architectural, domain, interface, risk, or verification boundaries
 - [ ] I have added the appropriate `type:*` label to this PR
 - [ ] Unit tests pass (`go test ./...`)

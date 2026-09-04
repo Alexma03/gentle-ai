@@ -24,7 +24,7 @@ func TestRDDDefectWorkflowSkillContract(t *testing.T) {
 		t.Fatal("public source skill and embedded distribution asset differ")
 	}
 
-	sections := []string{"## Activation Contract", "## Hard Rules", "## Decision Gates", "## Execution Steps", "## Output Contract", "## References"}
+	sections := []string{"## Activation Contract", "## Hard Rules", "## Decision Gates", "## Execution Steps", "## Output Contract"}
 	position := -1
 	for _, section := range sections {
 		next := strings.Index(content, section)
@@ -38,15 +38,13 @@ func TestRDDDefectWorkflowSkillContract(t *testing.T) {
 	}
 
 	for _, required := range []string{
-		"does not grant issue approval, label, review, exception, or merge authority",
 		"`disabled/unmanaged`", "do not start receipt reviews or fabricate approval",
-		"current `main`", "`status:approved`", "superseded or conflicting",
-		"causal authority invariant", "rollback boundary", "every operator flow",
-		"one truthful black-box bench journey", "actual runtime E2E proof",
-		"Synthetic proxy coverage", "CodeGraph-first", "dedicated worktree",
+		"review applicable candidates automatically", "second candidate-scoped consent",
+		"GitHub issues are optional", "Missing issue metadata never blocks",
+		"causal invariant", "rollback boundary", "every operator flow",
+		"truthful runtime evidence", "CodeGraph-first", "dedicated worktree",
 		"behavior-first tests", "source-mutating normalization", "causal cohesion",
-		"reviewer cognitive load", "natural boundaries", "never use line counts or size waivers",
-		"independent read-only", "maintainer-owned", "unresolved_authority_decisions",
+		"independent read-only", "ordinary repository policy", "unresolved_technical_decisions",
 	} {
 		if !strings.Contains(content, required) {
 			t.Errorf("skill missing contract %q", required)

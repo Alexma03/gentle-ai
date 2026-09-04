@@ -61,7 +61,7 @@ func TestReviewNextTransitionExecuteEmitsRunnableCommand(t *testing.T) {
 	}
 }
 
-func TestReviewNextTransitionV2StartCommandCarriesConsentRelay(t *testing.T) {
+func TestReviewNextTransitionV2StartCommandDoesNotCarryCandidateConsent(t *testing.T) {
 	status := ReviewTargetStatusResult{
 		Contract:       ReviewIntegrationContractV2,
 		Applicability:  reviewtransaction.TargetApplicabilityUnrelated,
@@ -72,13 +72,12 @@ func TestReviewNextTransitionV2StartCommandCarriesConsentRelay(t *testing.T) {
 			Paths: []string{"internal/cli/review_next_transition.go"},
 		},
 	}
-	got := newReviewNextTransition(status, nil, nil, nil, reviewNextTransitionInput{StartLineage: "review-v2-consent-command"})
+	got := newReviewNextTransition(status, nil, nil, nil, reviewNextTransitionInput{StartLineage: "review-v2-automatic-command"})
 	want := "gentle-ai review start" +
 		" --contract=gentle-ai.review-integration/v2" +
 		" --target=sha256:" + strings.Repeat("b", 64) +
 		" --projection=workspace" +
-		" --lineage=review-v2-consent-command" +
-		" --consent=relay"
+		" --lineage=review-v2-automatic-command"
 	if got.Execute == nil || got.Execute.Command != want {
 		t.Fatalf("v2 execute command = %#v, want %q", got.Execute, want)
 	}

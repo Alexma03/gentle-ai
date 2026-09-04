@@ -63,17 +63,11 @@ func startCrossRepositoryLifecycleFromTransition(t *testing.T, status ReviewTarg
 		}
 		args = append(args, argument.Token)
 	}
-	question := decodeConsentQuestion(t, runConsentRelayStart(t, args).Bytes())
-	if question.Agent != string(runtime) {
-		t.Fatalf("consent runtime = %q, want %q", question.Agent, runtime)
+	started := decodeNegotiatedReviewStart(t, runConsentRelayStart(t, args).Bytes())
+	if started.Action != "created" {
+		t.Fatalf("automatic cross-repository START = %#v", started)
 	}
-	for _, choice := range question.Choices {
-		if choice.Answer == "granted" {
-			return decodeNegotiatedReviewStart(t, runConsentRelayStart(t, invocationArgs(t, choice.Invocation)).Bytes())
-		}
-	}
-	t.Fatalf("consent envelope has no granted invocation: %#v", question.Choices)
-	return ReviewIntegrationStartResult{}
+	return started
 }
 
 func assertCrossRepositoryContinuation(t *testing.T, status ReviewTargetStatusResult, started ReviewIntegrationStartResult, lineage, label string) {

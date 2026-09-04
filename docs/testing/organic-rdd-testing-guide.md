@@ -96,14 +96,12 @@ The binaries are on the prerelease page: **https://github.com/Gentleman-Programm
 2. [ ] `review start` → **Expected**: `risk_level: high`, 4 lenses, and `risk_evidence` naming the reason (e.g. `"authentication in internal/auth/session.go"`).
 3. [ ] Commit that (`git commit -am "auth"`). Generate 1000+ lines of text across several `.md` files, `git add *.md`, `review start` → **Expected**: `low`, 0 lenses. It does NOT escalate on size.
 
-### Flow 5: The consent question (needs a real terminal)
+### Flow 5: Enabled review starts automatically
 
-1. [ ] With a tier 1/2 change ready, `review start` in an interactive terminal → **Expected**: **two** options — `1) Run the review now` / `2) Not now, just this once` — and a final line naming `gentle-ai review mode disable`. **There is no option 3.**
-2. [ ] Answer `2` → **Expected**: it does not review this candidate.
-3. [ ] ANOTHER change and `review start` → **Expected**: it asks again.
-4. [ ] Answer `1` → **Expected**: it reviews, and the next change no longer asks.
-
-**If you are driving this from a script or an agent**: the answer is read as one whole line, so it must end with a newline. Sending the bare character `2` over a pseudo-terminal is echoed but never completes the read, and the command waits until your harness kills it. Send `2\n`. There is no timeout on this prompt, so a missing newline looks exactly like a hang.
+1. [ ] With a tier 1/2 change ready, `review start` in an interactive terminal → **Expected**: review starts immediately with no consent prompt.
+2. [ ] Run the negotiated STATUS-issued START route → **Expected**: the command contains no `--consent` token and returns the created review authority.
+3. [ ] `gentle-ai review mode disable --scope clone --cwd $HOME/demo`, then start another candidate → **Expected**: review is refused before authority is created.
+4. [ ] Re-enable the clone and continue.
 
 ### Flow 6: Delivery stays ordinary unmanaged
 
@@ -634,14 +632,6 @@ gentle-ai review start --cwd . > /tmp/rdd-out/o.txt 2> /tmp/rdd-out/e.txt
 
 This one cost the maintainer an hour of chasing a defect that was his own redirect. Flow 24 turns it into a deliberate test instead.
 
-**If an agent runs it, set `CI=1`.** The consent question only shows up when there is a real terminal. Many agent harnesses allocate a pseudo-terminal, so the tool asks… and nobody answers: the shell hangs until it is killed, and the flow ends up as PARTIAL for a reason that is not the product's.
-
-```
-CI=1 gentle-ai review start
-```
-
-With `CI=1` the tool reviews anyway and warns on stderr that it did not ask. It is the same path CI already uses. **Exception: Flow 5 is precisely the test for the question**, so that one needs a real terminal and does not take `CI=1`; if your environment does not have one, mark it N/A.
-
 **Exit codes get lost through a pipe.** In bash, `$?` gives you the status of the **last command in the pipeline**, not the binary's. If you run `gentle-ai ... | tee log.txt`, `$?` is `tee`'s and it is always 0. In PowerShell, `$LASTEXITCODE` does give you the binary's, and that is why the same case "behaved differently" between Windows and Linux. To measure properly:
 
 ```
@@ -663,7 +653,6 @@ This section is retained to explain the original candidate procedure. Do not ope
 
 - **Delivery remains ordinary when reviews are off.** Repository policy rules; review mode does not veto a commit or push.
 - **`requirements.txt`/`CMakeLists.txt` get one review (tier 1), not zero.** An unreviewed dependency bump would be a security downgrade.
-- **With no terminal, the question does not appear and it reviews straight away** (it warns on stderr). Turning a safety net off silently is not an option.
-- **"Not now" asks again on the next piece of work.** Per work unit, on purpose.
+- **Interactive and headless starts behave the same:** enabled RDD reviews automatically; disabled RDD does not start.
 - **A `.md` with executable content escalates.** The content is read, not the extension.
 - **The installed `.claude/CLAUDE.md` escalates if you put it in the diff.** That is what the `.gitignore` in the setup is for.
