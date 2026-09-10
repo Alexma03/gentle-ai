@@ -276,7 +276,6 @@ func TestAdapterInstallCommandSequenceUsesNpmWhenPnpmIsUnavailable(t *testing.T)
 		{"npm", "exec", "--yes", "--package", "gentle-engram@latest", "--", "pi-engram", "init"},
 		{"pi", "install", "npm:@juicesharp/rpiv-ask-user-question"},
 		{"pi", "install", "npm:pi-web-access"},
-		{"pi", "install", "npm:pi-btw"},
 	}
 	if !reflect.DeepEqual(commands, want) {
 		t.Fatalf("InstallCommand() = %#v, want %#v", commands, want)
@@ -327,6 +326,8 @@ func TestMergePiSettingsFileRemovesRetiredCompanionPackages(t *testing.T) {
     "npm:@juicesharp/rpiv-todo@2.9.0",
     "npm:pi-subagents-j0k3r",
     "npm:pi-subagents-j0k3r@1.5.13",
+    "npm:pi-btw",
+    "npm:pi-btw@0.4.1",
     "npm:@juicesharp/rpiv-ask-user-question",
     "npm:other@1.0.0"
   ]

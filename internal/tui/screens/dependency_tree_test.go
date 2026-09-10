@@ -34,7 +34,6 @@ func TestRenderDependencyTreePiOnlyEngramPlanShowsComponentAndPiInstallCopy(t *t
 		"npm exec --yes --package gentle-engram@latest -- pi-engram init",
 		"pi install npm:@juicesharp/rpiv-ask-user-question",
 		"pi install npm:pi-web-access",
-		"pi install npm:pi-btw",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("RenderDependencyTree() missing %q for Pi-only plan; output:\n%s", want, out)
@@ -75,7 +74,6 @@ func TestRenderDependencyTreeMixedPiEmptyPlanShowsPiInstallCopy(t *testing.T) {
 		"npm exec --yes --package gentle-engram@latest -- pi-engram init",
 		"pi install npm:@juicesharp/rpiv-ask-user-question",
 		"pi install npm:pi-web-access",
-		"pi install npm:pi-btw",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("RenderDependencyTree() missing %q for mixed Pi plan; output:\n%s", want, out)

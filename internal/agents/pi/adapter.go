@@ -46,6 +46,7 @@ const gentleAgentsGentlePiVersion = "2.5.0"
 var retiredPiPackageIdentities = map[string]struct{}{
 	"npm:@juicesharp/rpiv-todo": {},
 	"npm:pi-subagents-j0k3r":    {},
+	"npm:pi-btw":                {},
 }
 
 var piWalkDir = filepath.WalkDir
@@ -252,7 +253,6 @@ func (a *Adapter) InstallCommand(profile system.PlatformProfile) ([][]string, er
 		a.engramInitCommand(),
 		{"pi", "install", "npm:@juicesharp/rpiv-ask-user-question"},
 		{"pi", "install", "npm:pi-web-access"},
-		{"pi", "install", "npm:pi-btw"},
 	}, nil
 }
 

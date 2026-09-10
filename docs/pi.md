@@ -32,7 +32,6 @@ pi install npm:pi-mcp-adapter
 npm exec --yes --package gentle-engram@latest -- pi-engram init
 pi install npm:@juicesharp/rpiv-ask-user-question
 pi install npm:pi-web-access
-pi install npm:pi-btw
 ```
 
 | Package                                                  | What it adds                                                                                                              |
@@ -43,7 +42,6 @@ pi install npm:pi-btw
 | `pi-engram init`                                         | Initializes the Pi Engram MCP config shape owned by `gentle-engram`.                                                      |
 | `@juicesharp/rpiv-ask-user-question`                     | Lets Pi child agents ask the active user session for clarification when they need human input.                            |
 | `pi-web-access`                                          | Adds web access tools for Pi.                                                                                             |
-| `pi-btw`                                                 | Adds BTW companion workflow support for Pi.                                                                               |
 
 Discovering and running SDD agents from `.pi/agents/` is provided by `gentle-pi`'s Gentle Agents, which ships the same `subagent_*` tools that the retired `npm:pi-subagents-j0k3r` package used to provide. Gentle AI no longer installs `pi-subagents-j0k3r`, and an existing entry is dropped from `settings.json` on the next install or update so Pi uninstalls it on its next package sync.
 
