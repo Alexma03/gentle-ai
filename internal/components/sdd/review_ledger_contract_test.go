@@ -507,7 +507,15 @@ func TestKilocodeReviewSettingsMatchCurrentMainBaseline(t *testing.T) {
 	// native permissions and the primary orchestrator remain unchanged.
 	// Task 1.5 separates read-only status from authorized continuation. Same-home
 	// materialization changes only the shared dispatcher guard in the orchestrator prompt.
-	const want = "cab19425bb6db40eb916b1a74eab163e5fad630184796390aa40106453ec3947"
+	// #4524 makes the shared session preflight explicit about runtime-confirmed parent
+	// authority. Kilocode inherits the prompt-only fallback because it has no managed
+	// executable tool interception surface.
+	// The OpenCode preflight now always routes through the `question` tool instead of
+	// falling back to a lossless blocking prompt when all three groups are
+	// representable, so the runtime-owned plugin can canonicalize and tolerantly match
+	// grouped answers instead of losing them to a typed chat reply. Kilocode embeds the
+	// same shared session preflight body, so the hash moved. Deliberate, not drift.
+	const want = "8f388ae4197cfa0fbfdf1f82423a599ea43e43665659da11e0389b670d241bf4"
 	if got != want {
 		t.Fatalf("Kilocode settings SHA-256 = %s, want current-main baseline %s", got, want)
 	}
