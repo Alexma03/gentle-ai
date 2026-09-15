@@ -250,7 +250,6 @@ For the full Pi command and package reference, see [Pi Agent](pi.md).
   - `npm exec --yes --package gentle-engram@latest -- pi-engram init`
   - `pi install npm:@juicesharp/rpiv-ask-user-question`
   - `pi install npm:pi-web-access`
-  - `pi install npm:pi-btw`
 - **`gentle-pi` package**: adds the Gentleman harness for Pi: ODD with optional SDD/OpenSpec, configured TDD guidance, safety defaults, `/gentle:*` commands, skill assets, prompts, SDD agents, and SDD chains. On normal `session_start`, it copies project assets into `.pi/agents/`, `.pi/chains/`, and `.pi/gentle-ai/support/` without overwriting local files unless the Pi recovery command uses `--force`. Starting Pi with `pi -ns` skips startup skill loading/hooks, so that automatic refresh does not run in that mode.
 - **Package metadata**: latest verified `gentle-pi` version is `2.5.0`; npm lists `alan_buscaglia` as maintainer, with source at [Gentleman-Programming/gentle-pi](https://github.com/Gentleman-Programming/gentle-pi) and package docs at [npm: gentle-pi](https://www.npmjs.com/package/gentle-pi).
 - **Persona command**: `gentle-pi` owns Pi persona switching through `/gentle:persona`. It switches between `gentleman` and `neutral`, saves `.pi/gentle-ai/persona.json`, and may require `/reload` or a new Pi session for the active prompt to refresh.
